@@ -1,0 +1,95 @@
+/*
+  Every colour is defined on bare :root as the complete light palette, then
+  redefined for dark. Nothing may declare a colour only inside a media query —
+  that is how a page ends up painting one theme's text on the other's ground.
+*/
+
+:root {
+  --bg: #ebeff6;
+  --card: #ffffff;
+  --nest: #f4f7fc;
+  --ink: #191d26;
+  --muted: #6b7486;
+  --faint: #a4acbb;
+  --line: #e3e8f1;
+  --track: #dfe5ef;
+  --field: #ffffff;
+
+  /* Lightness and chroma for the progress hue sweep; hue is set per element. */
+  --ring-l: 56%;
+  --ring-c: 0.15;
+
+  --shadow-card: 0 1px 2px rgb(20 26 40 / 5%), 0 6px 16px -6px rgb(20 26 40 / 10%);
+  --shadow-lift: 0 2px 4px rgb(20 26 40 / 6%), 0 14px 30px -10px rgb(20 26 40 / 18%);
+  --sheet-veil: rgb(22 27 38 / 38%);
+
+  --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", menlo, consolas, monospace;
+
+  /* One spring shared by everything, so the whole interface moves alike. */
+  --spring: linear(
+    0,
+    0.009,
+    0.035 2.1%,
+    0.141 4.4%,
+    0.723 12.9%,
+    0.938 16.7%,
+    1.017,
+    1.077,
+    1.121,
+    1.149 24.3%,
+    1.159,
+    1.163,
+    1.161,
+    1.154 29.9%,
+    1.129 32.8%,
+    1.051 39.6%,
+    1.017 43.1%,
+    0.991,
+    0.977 51%,
+    0.975 57.1%,
+    0.997 69.4%,
+    1.003 76.6%,
+    1
+  );
+  --ease: cubic-bezier(0.22, 0.68, 0.36, 1);
+
+  --r-card: 18px;
+  --r-row: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116;
+    --card: #171b22;
+    --nest: #1d222b;
+    --ink: #e8ecf3;
+    --muted: #98a1b2;
+    --faint: #6a7385;
+    --line: #252b35;
+    --track: #2a313d;
+    --field: #1d222b;
+    --ring-l: 74%;
+    --ring-c: 0.14;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 40%), 0 14px 30px -10px rgb(0 0 0 / 60%);
+    --sheet-veil: rgb(6 8 12 / 60%);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e1116;
+  --card: #171b22;
+  --nest: #1d222b;
+  --ink: #e8ecf3;
+  --muted: #98a1b2;
+  --faint: #6a7385;
+  --line: #252b35;
+  --track: #2a313d;
+  --field: #1d222b;
+  --ring-l: 74%;
+  --ring-c: 0.14;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 40%), 0 14px 30px -10px rgb(0 0 0 / 60%);
+  --sheet-veil: rgb(6 8 12 / 60%);
+}

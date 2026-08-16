@@ -1,0 +1,1599 @@
+<title>t0d0 prototype</title>
+<style>
+  :root {
+    --bg: #EBEFF6;
+    --card: #FFFFFF;
+    --nest: #F4F7FC;
+    --ink: #191D26;
+    --muted: #6B7486;
+    --faint: #A4ACBB;
+    --line: #E3E8F1;
+    --track: #DFE5EF;
+    --field: #FFFFFF;
+    --ring-l: 56%;
+    --ring-c: 0.15;
+    --shadow-card: 0 1px 2px rgba(20, 26, 40, .05), 0 6px 16px -6px rgba(20, 26, 40, .10);
+    --shadow-lift: 0 2px 4px rgba(20, 26, 40, .06), 0 14px 30px -10px rgba(20, 26, 40, .18);
+    --sheet-veil: rgba(22, 27, 38, .38);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1116;
+      --card: #171B22;
+      --nest: #1D222B;
+      --ink: #E8ECF3;
+      --muted: #98A1B2;
+      --faint: #6A7385;
+      --line: #252B35;
+      --track: #2A313D;
+      --field: #1D222B;
+      --ring-l: 74%;
+      --ring-c: 0.14;
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 16px -6px rgba(0, 0, 0, .45);
+      --shadow-lift: 0 2px 4px rgba(0, 0, 0, .4), 0 14px 30px -10px rgba(0, 0, 0, .6);
+      --sheet-veil: rgba(6, 8, 12, .6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1116;
+    --card: #171B22;
+    --nest: #1D222B;
+    --ink: #E8ECF3;
+    --muted: #98A1B2;
+    --faint: #6A7385;
+    --line: #252B35;
+    --track: #2A313D;
+    --field: #1D222B;
+    --ring-l: 74%;
+    --ring-c: 0.14;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 16px -6px rgba(0, 0, 0, .45);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, .4), 0 14px 30px -10px rgba(0, 0, 0, .6);
+    --sheet-veil: rgba(6, 8, 12, .6);
+  }
+
+  :root {
+    --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+    --spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.975 57.1%, 0.997 69.4%, 1.003 76.6%, 1);
+    --ease: cubic-bezier(.22, .68, .36, 1);
+    --r-card: 18px;
+    --r-row: 12px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid oklch(var(--ring-l) var(--ring-c) 268); outline-offset: 2px; border-radius: 6px; }
+
+  .app {
+    max-width: 30rem;
+    margin: 0 auto;
+    /* the composer is fixed; reserve exactly its measured height (see --composer-h) */
+    padding: 1.75rem 1rem calc(var(--composer-h, 8rem) + 1.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+  }
+
+  /* ---------- header ---------- */
+  .top {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: .35rem .25rem .1rem;
+  }
+  .brand {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -.04em;
+    line-height: 1;
+    flex: 1;
+  }
+  .brand i { font-style: normal; color: oklch(var(--ring-l) var(--ring-c) 268); }
+  .headline {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.15;
+  }
+  .pct {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+  .frac {
+    font-size: .78rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .totalring { flex: none; }
+
+  .more {
+    flex: none;
+    width: 2rem; height: 2rem;
+    display: grid; place-items: center;
+    border-radius: 999px;
+    color: var(--faint);
+    font-size: 1.15rem;
+    line-height: 1;
+    transition: color .2s, background .2s;
+  }
+  .more:hover { color: var(--ink); background: var(--card); }
+
+  /* The day ends where the list ends. The closer warms as the day fills in:
+     quiet at 0%, tinted along the way, solid once everything is done. */
+  .endday {
+    --end-hue: 268;
+    align-self: center;
+    position: relative;
+    margin-top: 2rem;
+    padding: .72rem 1.35rem;
+    font-size: .86rem;
+    font-weight: 650;
+    letter-spacing: -.005em;
+    color: var(--muted);
+    background: var(--card);
+    border: 1.5px solid transparent;
+    border-radius: 999px;
+    box-shadow: var(--shadow-card);
+    display: inline-flex;
+    align-items: center;
+    gap: .55rem;
+    transition: color .3s var(--ease), background .3s var(--ease),
+                border-color .3s var(--ease), box-shadow .3s var(--ease),
+                transform .45s var(--spring);
+  }
+  .endday[hidden] { display: none; }
+
+  /* a dotted stem, so the list visibly runs into its ending */
+  .endday::before {
+    content: "";
+    position: absolute;
+    top: -1.15rem;
+    left: 50%;
+    width: 2px;
+    height: 1.1rem;
+    transform: translateX(-50%);
+    background: repeating-linear-gradient(to bottom, var(--track) 0 3px, transparent 3px 6px);
+  }
+
+  .endday.lit { border-color: oklch(var(--ring-l) var(--ring-c) var(--end-hue) / .4); }
+  .endday.ripe {
+    color: #fff;
+    background: oklch(var(--ring-l) var(--ring-c) 150);
+    border-color: transparent;
+    box-shadow: var(--shadow-lift);
+  }
+  .endday:hover { color: var(--ink); transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+  .endday.ripe:hover { color: #fff; }
+  .endday:active { transform: scale(.96); }
+  .endday span { transition: transform .3s var(--ease); }
+  .endday:hover span { transform: translateX(3px); }
+
+  /* ---------- list ---------- */
+  .list { display: flex; flex-direction: column; gap: .6rem; }
+
+  .node, .items > .task {
+    transition: opacity .22s var(--ease), transform .3s var(--ease);
+  }
+  @starting-style {
+    .node, .items > .task { opacity: 0; transform: translateY(-8px) scale(.97); }
+  }
+  .node.leaving, .items > .task.leaving { opacity: 0; transform: translateX(14px) scale(.96); }
+
+  .group {
+    background: var(--card);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
+    padding: .55rem .55rem .3rem;
+  }
+  .group.clear { box-shadow: var(--shadow-card), 0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / .5); }
+  .ghead {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .4rem .5rem .5rem;
+  }
+  .chev {
+    flex: none;
+    width: 1.1rem; height: 1.1rem;
+    display: grid; place-items: center;
+    color: var(--faint);
+    transition: transform .3s var(--spring);
+  }
+  .group.collapsed .chev { transform: rotate(-90deg); }
+  .gtitle {
+    flex: 1;
+    font-weight: 700;
+    font-size: .88rem;
+    letter-spacing: .015em;
+    min-width: 0;
+  }
+  .gcount {
+    flex: none;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 2.5rem;
+    text-align: right;
+    padding-left: .2rem;
+  }
+  .group.clear .gcount { color: oklch(var(--ring-l) var(--ring-c) 150); }
+  .gbody { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .34s var(--ease); }
+  .group.collapsed .gbody { grid-template-rows: 0fr; }
+  .gbody > .inner { overflow: hidden; min-height: 0; }
+  /* indent group members so the hierarchy reads without a second nesting level */
+  .items {
+    display: flex;
+    flex-direction: column;
+    margin-left: 1.05rem;
+    padding-left: .6rem;
+    border-left: 1.5px solid var(--line);
+    transition: border-color .3s var(--ease);
+  }
+  .group.clear .items { border-left-color: oklch(var(--ring-l) var(--ring-c) 150 / .45); }
+
+  /* ---------- rows ---------- */
+  .task {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .42rem .5rem;
+    border-radius: var(--r-row);
+    background: transparent;
+    transition: background .18s;
+  }
+  .node > .task {
+    background: var(--card);
+    box-shadow: var(--shadow-card);
+    padding: .7rem .75rem;
+    border-radius: var(--r-card);
+  }
+  .task:hover { background: var(--nest); }
+  .node > .task:hover { background: var(--card); }
+
+  .ring { flex: none; display: block; cursor: pointer; touch-action: manipulation; }
+  .ring circle { fill: none; }
+  .ring .trk { stroke: var(--track); }
+  .ring .seg { transition: stroke .3s var(--ease), stroke-dashoffset .45s var(--ease); }
+  .ring .chk {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 22;
+    stroke-dashoffset: 22;
+    transition: stroke-dashoffset .34s var(--ease) .06s;
+  }
+  .done .ring .chk { stroke-dashoffset: 0; }
+  .ring.pop { animation: pop .45s var(--spring); }
+  @keyframes pop { 0% { transform: scale(1); } 32% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+  .label {
+    flex: 1;
+    min-width: 0;
+    font-size: .95rem;
+    letter-spacing: -.005em;
+    position: relative;
+    overflow-wrap: anywhere;
+    cursor: text;
+    padding: .1rem 0;
+  }
+  .label::after {
+    content: "";
+    position: absolute;
+    left: 0; top: 50%;
+    height: 1.5px;
+    width: 100%;
+    background: currentColor;
+    border-radius: 2px;
+    transform: scaleX(0);
+    transform-origin: left;
+    opacity: .55;
+    transition: transform .3s var(--ease);
+  }
+  .done .label::after { transform: scaleX(1); }
+  .done .label { color: var(--faint); }
+  .label[contenteditable="true"] { cursor: text; color: var(--ink); }
+  .label[contenteditable="true"]::after { display: none; }
+  .qty { color: oklch(var(--ring-l) var(--ring-c) 268); font-weight: 600; }
+  .done .qty { color: inherit; }
+
+  .count {
+    flex: none;
+    font-size: .76rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    padding: .2rem .35rem;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .count:hover { background: var(--nest); color: var(--ink); }
+
+  .kill {
+    flex: none;
+    width: 1.6rem; height: 1.6rem;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    color: var(--faint);
+    opacity: 1;
+    transition: opacity .16s, color .16s, background .16s;
+  }
+  .kill:hover { color: var(--ink); background: var(--nest); }
+  .plus {
+    flex: none;
+    width: 1.6rem; height: 1.6rem;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--faint);
+    transition: opacity .16s, color .16s, background .16s;
+  }
+  .plus:hover { color: oklch(var(--ring-l) var(--ring-c) 268); background: var(--nest); }
+  .plus.aimed { color: oklch(var(--ring-l) var(--ring-c) 268); background: var(--nest); opacity: 1; }
+
+  @media (hover: hover) {
+    .kill, .plus { opacity: 0; }
+    .task:hover .kill, .ghead:hover .kill, .ghead:hover .plus,
+    .kill:focus-visible, .plus:focus-visible { opacity: 1; }
+  }
+
+  /* ---------- composer ---------- */
+  .composer {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 82%, transparent);
+    display: flex;
+    justify-content: center;
+  }
+  .composer form {
+    width: 100%;
+    max-width: 28rem;
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    background: var(--field);
+    border-radius: 999px;
+    box-shadow: var(--shadow-lift);
+    padding: .35rem .35rem .35rem 1rem;
+  }
+  .composer input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: .95rem;
+    color: var(--ink);
+    padding: .5rem 0;
+  }
+  .composer input:focus { outline: none; }
+  .composer input::placeholder { color: var(--faint); }
+  .add {
+    flex: none;
+    width: 2.2rem; height: 2.2rem;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    background: oklch(var(--ring-l) var(--ring-c) 268);
+    color: #fff;
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: transform .4s var(--spring);
+  }
+  .add:active { transform: scale(.9); }
+
+  .destrow {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: 0 .2rem .45rem;
+    font-size: .74rem;
+    color: var(--faint);
+  }
+  .destrow[hidden] { display: none; }
+  .dest {
+    font: inherit;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--card);
+    border: 0;
+    border-radius: 999px;
+    padding: .28rem 1.5rem .28rem .7rem;
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    max-width: 12rem;
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: right .75rem center, right .55rem center;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+  }
+
+  .hint {
+    text-align: center;
+    font-size: .74rem;
+    color: var(--faint);
+    padding: .1rem 0 .2rem;
+  }
+  .hint b { font-weight: 600; color: var(--muted); }
+
+  /* ---------- empty ---------- */
+  .empty {
+    text-align: center;
+    color: var(--faint);
+    font-size: .9rem;
+    padding: 3rem 1rem;
+    line-height: 1.7;
+  }
+
+  /* ---------- toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--composer-h, 8rem) + .6rem);
+    transform: translateX(-50%) translateY(0);
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: var(--shadow-lift);
+    border-radius: 999px;
+    padding: .5rem .55rem .5rem 1rem;
+    font-size: .85rem;
+    z-index: 20;
+    transition: opacity .2s, transform .38s var(--spring);
+  }
+  .toast[hidden] { display: flex; opacity: 0; transform: translateX(-50%) translateY(14px); pointer-events: none; }
+  .toast button {
+    font-size: .8rem;
+    font-weight: 650;
+    color: oklch(var(--ring-l) var(--ring-c) 268);
+    padding: .28rem .7rem;
+    border-radius: 999px;
+    background: var(--nest);
+  }
+
+  /* ---------- close-day sheet ---------- */
+  .veil {
+    position: fixed; inset: 0;
+    background: var(--sheet-veil);
+    backdrop-filter: blur(3px);
+    display: grid;
+    place-items: center;
+    padding: 1.25rem;
+    z-index: 40;
+    transition: opacity .25s;
+  }
+  .veil[hidden] { display: none; }
+  .sheet {
+    background: var(--card);
+    border-radius: 22px;
+    box-shadow: var(--shadow-lift);
+    padding: 2rem 1.75rem 1.5rem;
+    width: 100%;
+    max-width: 20rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .35rem;
+    animation: rise .5s var(--spring);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(18px) scale(.94); } to { opacity: 1; transform: none; } }
+  .sheet h2 {
+    margin: 0;
+    font-size: .74rem;
+    font-weight: 650;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .sheet .score {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -.04em;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    margin-top: .35rem;
+  }
+  .sheet .of { font-size: .9rem; color: var(--muted); margin-bottom: .5rem; }
+  .sheet ul { list-style: none; margin: .3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+  .sheet li { font-size: .85rem; color: var(--muted); }
+  .sheet .dur { font-size: .8rem; color: var(--faint); margin-top: .6rem; }
+  .sheet button {
+    margin-top: 1.3rem;
+    width: 100%;
+    padding: .75rem;
+    border-radius: 14px;
+    font-size: .92rem;
+    font-weight: 650;
+    background: oklch(var(--ring-l) var(--ring-c) 268);
+    color: #fff;
+    transition: transform .4s var(--spring);
+  }
+  .sheet button:active { transform: scale(.96); }
+  .sheet .dismiss {
+    background: none;
+    color: var(--faint);
+    font-weight: 500;
+    font-size: .8rem;
+    margin-top: .3rem;
+    padding: .4rem;
+  }
+
+  .sheet.wide { max-width: 26rem; text-align: left; align-items: stretch; }
+  .sheet.wide h2 { text-align: left; }
+  .sheet.wide p { margin: 0; font-size: .82rem; color: var(--muted); line-height: 1.5; }
+  .sheet.wide textarea {
+    width: 100%;
+    height: 11rem;
+    resize: vertical;
+    margin-top: .3rem;
+    border-radius: 12px;
+    border: 1.5px solid var(--line);
+    background: var(--nest);
+    color: var(--ink);
+    padding: .7rem .8rem;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .74rem;
+    line-height: 1.55;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+  .sheet.wide textarea:focus { outline: none; border-color: oklch(var(--ring-l) var(--ring-c) 268); }
+  .btnrow { display: flex; gap: .5rem; margin-top: .9rem; }
+  .btnrow button { margin-top: 0; flex: 1; padding: .65rem; font-size: .85rem; }
+  .btnrow .ghost {
+    background: var(--nest);
+    color: var(--ink);
+  }
+  .block { margin-top: 1.1rem; }
+  .blocktitle {
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: .4rem;
+  }
+  .drop {
+    margin-top: .55rem;
+    border: 1.5px dashed var(--line);
+    border-radius: 14px;
+    background: var(--nest);
+    padding: 1.4rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    transition: border-color .2s, background .2s;
+  }
+  .drop[hidden] { display: none; }
+  .drop b { font-size: .88rem; font-weight: 650; }
+  .drop span { font-size: .78rem; color: var(--faint); }
+  .drop:hover, .drop.over { border-color: oklch(var(--ring-l) var(--ring-c) 268); background: var(--card); }
+
+  .preview {
+    margin-top: .55rem;
+    border-radius: 14px;
+    background: var(--nest);
+    padding: .9rem 1rem 1rem;
+  }
+  .preview[hidden] { display: none; }
+  .pname { font-size: .86rem; font-weight: 650; overflow-wrap: anywhere; }
+  .psum { font-size: .78rem; color: var(--muted); margin-top: .1rem; }
+  .danger { background: oklch(56% .17 25) !important; }
+
+  .raw { margin-top: 1.2rem; }
+  .raw summary {
+    font-size: .78rem;
+    color: var(--faint);
+    cursor: pointer;
+    list-style: none;
+    padding: .2rem 0;
+  }
+  .raw summary::-webkit-details-marker { display: none; }
+  .raw summary::before { content: "▸ "; }
+  .raw[open] summary::before { content: "▾ "; }
+  .raw summary:hover { color: var(--muted); }
+
+  .status { font-size: .78rem; min-height: 1.2em; margin-top: .55rem; }
+  .status.bad { color: oklch(58% .17 25); }
+  .status.good { color: oklch(var(--ring-l) var(--ring-c) 150); }
+
+  canvas.confetti {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 60;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      transition-duration: .01ms !important;
+    }
+  }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">t<i>0</i>d<i>0</i></div>
+    <div class="headline">
+      <span class="pct" id="pct">0%</span>
+      <span class="frac" id="frac">0 of 0</span>
+    </div>
+    <div class="totalring" id="totalring"></div>
+    <button class="more" id="databtn" type="button" aria-label="Export or import">⋯</button>
+  </header>
+  <main class="list" id="list"></main>
+  <button class="endday" id="closeday" type="button" hidden>That's the day <span aria-hidden="true">→</span></button>
+  <div class="empty" id="empty" hidden>Nothing here yet.<br>Type below to add today's list.</div>
+</div>
+
+<div class="composer">
+  <div style="width:100%;max-width:28rem">
+    <div class="destrow" id="destrow" hidden>
+      <span>Adding to</span>
+      <select class="dest" id="dest" aria-label="Where new items go"></select>
+    </div>
+    <form id="composer" autocomplete="off">
+      <input id="input" placeholder="Add an item…" enterkeyhint="done" autocapitalize="sentences" aria-label="Add an item">
+      <button class="add" type="submit" aria-label="Add">+</button>
+    </form>
+    <div class="hint"><b>#&nbsp;Title</b> makes a group · <b>[3]</b> sets a count</div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden>
+  <span id="toasttext"></span>
+  <button id="undobtn">Undo</button>
+</div>
+
+<div class="veil" id="veil" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle">
+    <h2 id="sheettitle">Today</h2>
+    <div class="score" id="score">0 of 0</div>
+    <div class="of" id="scorelabel">done</div>
+    <ul id="cleared"></ul>
+    <div class="dur" id="dur"></div>
+    <button id="tomorrow">Clear the ticks</button>
+    <button class="dismiss" id="notyet">Not yet</button>
+  </div>
+</div>
+
+<div class="veil" id="dataveil" hidden>
+  <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="datatitle">
+    <h2 id="datatitle">Backup</h2>
+
+    <div class="block">
+      <div class="blocktitle">Export</div>
+      <p>Save your list as a file you can keep, or move to another browser.</p>
+      <div class="btnrow">
+        <button id="downloadjson" type="button">Download .json</button>
+        <button class="ghost" id="copyjson" type="button">Copy</button>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="blocktitle">Import</div>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a backup file">
+        <b>Drop a .json backup here</b>
+        <span>or click to choose one</span>
+      </div>
+      <div class="preview" id="preview" hidden>
+        <div class="pname" id="previewname"></div>
+        <div class="psum" id="previewsum"></div>
+        <div class="btnrow">
+          <button class="ghost" id="cancelimport" type="button">Cancel</button>
+          <button class="danger" id="importjson" type="button">Replace my list</button>
+        </div>
+      </div>
+      <input type="file" id="file" accept="application/json,.json" hidden>
+    </div>
+
+    <details class="raw">
+      <summary>Show raw JSON</summary>
+      <textarea id="json" spellcheck="false" aria-label="List as JSON"></textarea>
+      <div class="btnrow"><button class="ghost" id="pastereplace" type="button">Use this text</button></div>
+    </details>
+
+    <div class="status" id="datastatus"></div>
+    <button class="dismiss" id="datadone" type="button">Close</button>
+  </div>
+</div>
+
+<canvas class="confetti" id="confetti"></canvas>
+
+<script>
+(() => {
+  "use strict";
+
+  const KEY = "t0d0/v1";
+  const STALE = 16 * 60 * 60 * 1000;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const $ = (id) => document.getElementById(id);
+  const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id" + Math.random().toString(36).slice(2));
+
+  /* ---------------- state ---------------- */
+
+  let mem = null; // fallback when localStorage is unavailable (sandboxed frames)
+
+  function save() {
+    const raw = JSON.stringify(state);
+    try { localStorage.setItem(KEY, raw); } catch { mem = raw; }
+  }
+  function load() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch { raw = mem; }
+    if (!raw) return null;
+    try { return normalize(JSON.parse(raw)); } catch { return null; }
+  }
+
+  // Single gate for anything entering the app from outside — stored JSON or a pasted
+  // import. Returns null when the shape is unusable, a repaired state otherwise.
+  function normalize(s) {
+    if (!s || typeof s !== "object" || s.v !== 1 || !Array.isArray(s.list)) return null;
+    const seen = new Set();
+    const keepId = (raw) => {
+      let id = typeof raw === "string" && raw ? raw : uid();
+      while (seen.has(id)) id = uid();
+      seen.add(id);
+      return id;
+    };
+    const asTask = (t) => {
+      if (!t || typeof t !== "object") return null;
+      const text = String(t.text ?? "").trim().slice(0, 200);
+      if (!text) return null;
+      const target = Math.min(99, Math.max(1, Math.round(Number(t.target)) || 1));
+      const count = Math.min(target, Math.max(0, Math.round(Number(t.count)) || 0));
+      return { kind: "task", id: keepId(t.id), text, target, count };
+    };
+    const list = [];
+    for (const n of s.list) {
+      if (!n || typeof n !== "object") continue;
+      if (n.kind === "group") {
+        const title = String(n.title ?? "").trim().slice(0, 200);
+        if (!title) continue;
+        const items = (Array.isArray(n.items) ? n.items : []).map(asTask).filter(Boolean);
+        list.push({ kind: "group", id: keepId(n.id), title, collapsed: !!n.collapsed, items });
+      } else {
+        const t = asTask(n);
+        if (t) list.push(t);
+      }
+    }
+    const openedAt = Number.isFinite(s.openedAt) ? s.openedAt : null;
+    return { v: 1, openedAt, list };
+  }
+
+  const seed = () => ({
+    v: 1,
+    openedAt: null,
+    list: [
+      { kind: "group", id: uid(), title: "Morning", collapsed: false, items: [
+        { kind: "task", id: uid(), text: "eat breakfast", target: 1, count: 0 },
+        { kind: "task", id: uid(), text: "walk the dog", target: 1, count: 0 },
+      ]},
+      { kind: "task", id: uid(), text: "make calls", target: 3, count: 0 },
+      { kind: "task", id: uid(), text: "shopping", target: 1, count: 0 },
+    ],
+  });
+
+  let state = load() || seed();
+  let undoStack = null;
+
+  const tasks = (s = state) => s.list.flatMap((n) => (n.kind === "group" ? n.items : [n]));
+  const isDone = (t) => t.count >= t.target;
+  const progress = (arr) => (arr.length ? arr.reduce((a, t) => a + Math.min(1, t.count / t.target), 0) / arr.length : 0);
+  const findTask = (id) => tasks().find((t) => t.id === id);
+  const findGroup = (id) => state.list.find((n) => n.kind === "group" && n.id === id);
+  const ownerOf = (id) => state.list.find((n) => n.kind === "group" && n.items.some((t) => t.id === id));
+
+  function snapshot() { undoStack = JSON.stringify(state); }
+  function commit() { save(); render(); }
+
+  /* ---------------- parsing ---------------- */
+
+  function parse(raw) {
+    const s = raw.trim();
+    if (!s) return null;
+    if (s.startsWith("#")) {
+      const title = s.slice(1).trim().slice(0, 200);
+      return title ? { kind: "group", id: uid(), title, collapsed: false, items: [] } : null;
+    }
+    const m = s.match(/^(.*?)\s*\[(\d{1,2})\]$/);
+    const text = (m ? m[1] : s).trim().slice(0, 200);
+    const target = m ? Math.min(99, Math.max(1, parseInt(m[2], 10))) : 1;
+    return text ? { kind: "task", id: uid(), text, target, count: 0 } : null;
+  }
+
+  const raw = (t) => (t.target > 1 ? `${t.text} [${t.target}]` : t.text);
+
+  /* ---------------- actions ---------------- */
+
+  let destId = null; // where new items land; always visible in the composer
+
+  function aim(id) {
+    destId = destId === id ? null : id;
+    render();
+    $("input").focus();
+  }
+
+  function add(raw) {
+    const node = parse(raw);
+    if (!node) return;
+    snapshot();
+    if (node.kind === "group") {
+      state.list.push(node);
+      destId = node.id; // writing top-to-bottom keeps working
+    } else {
+      const g = destId ? findGroup(destId) : null;
+      if (g) { g.items.push(node); g.collapsed = false; } else state.list.push(node);
+    }
+    if (!state.openedAt) state.openedAt = Date.now();
+    commit();
+  }
+
+  function bump(id, delta) {
+    const t = findTask(id);
+    if (!t) return;
+    const before = isDone(t);
+    t.count = Math.max(0, Math.min(t.target, t.count + delta));
+    if (!state.openedAt) state.openedAt = Date.now();
+    save();
+    render();
+    if (!before && isDone(t)) { pop(id); vibrate(12); }
+    checkAll();
+  }
+
+  function retext(id, value, isGroup) {
+    if (isGroup) {
+      const g = findGroup(id);
+      const title = value.trim().replace(/^#\s*/, "").slice(0, 200);
+      if (!g || !title) return render();
+      snapshot(); g.title = title; return commit();
+    }
+    const t = findTask(id);
+    if (!t) return;
+    const p = parse(value);
+    if (!p || p.kind !== "task") return render();
+    snapshot();
+    t.text = p.text;
+    t.target = p.target;
+    t.count = Math.min(t.count, t.target);
+    commit();
+  }
+
+  function remove(id) {
+    const el = cache.get(id);
+    const g = findGroup(id);
+    const label = g ? `Deleted “${g.title}”${g.items.length ? ` and ${g.items.length} item${g.items.length > 1 ? "s" : ""}` : ""}` : "Deleted";
+    snapshot();
+    const finish = () => {
+      const owner = ownerOf(id);
+      if (owner) owner.items = owner.items.filter((t) => t.id !== id);
+      else state.list = state.list.filter((n) => n.id !== id);
+      commit();
+      toast(label);
+    };
+    if (el && !reduced) { el.classList.add("leaving"); setTimeout(finish, 200); } else finish();
+  }
+
+  function closeDay(reset) {
+    if (reset) {
+      snapshot();
+      tasks().forEach((t) => { t.count = 0; });
+      state.openedAt = null;
+      commit();
+      toast("Ticks cleared");
+    }
+    hideSheet();
+  }
+
+  function undo() {
+    if (!undoStack) return;
+    state = JSON.parse(undoStack);
+    undoStack = null;
+    commit();
+    hideToast();
+  }
+
+  /* ---------------- rings ---------------- */
+
+  const hueAt = (p) => 268 - 118 * p;
+  const strokeAt = (p) => `oklch(var(--ring-l) var(--ring-c) ${hueAt(p).toFixed(1)})`;
+
+  function makeRing(size, width, target) {
+    const r = size / 2 - width / 2 - 0.5;
+    const C = 2 * Math.PI * r;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+    svg.setAttribute("width", size);
+    svg.setAttribute("height", size);
+    svg.classList.add("ring");
+    svg.dataset.target = target;
+
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.setAttribute("transform", `rotate(-90 ${size / 2} ${size / 2})`);
+    g.setAttribute("stroke-width", width);
+    svg.append(g);
+
+    const segs = target > 1 && target <= 8 ? target : 1;
+    const gap = segs > 1 ? (segs > 5 ? 3.2 : 4.2) : 0;
+    const seg = (C - segs * gap) / segs;
+
+    for (let i = 0; i < segs; i++) {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", size / 2); c.setAttribute("cy", size / 2); c.setAttribute("r", r);
+      c.classList.add("trk");
+      c.setAttribute("stroke-dasharray", `${seg} ${C - seg}`);
+      c.setAttribute("stroke-dashoffset", -(i * (seg + gap)));
+      g.append(c);
+    }
+    for (let i = 0; i < segs; i++) {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", size / 2); c.setAttribute("cy", size / 2); c.setAttribute("r", r);
+      c.classList.add("seg");
+      c.setAttribute("stroke-dasharray", `${seg} ${C - seg}`);
+      c.setAttribute("stroke-dashoffset", -(i * (seg + gap)));
+      c.style.stroke = "transparent";
+      g.append(c);
+    }
+    svg._segs = [...g.querySelectorAll(".seg")];
+    // one "segment" means a sweeping arc: plain checkboxes, big counts, and meters
+    svg._continuous = segs === 1;
+    svg._C = C;
+    svg._seg = seg;
+
+    const k = size / 28;
+    const chk = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    chk.setAttribute("d", `M${9 * k} ${14.4 * k} L${12.6 * k} ${18 * k} L${19 * k} ${10.6 * k}`);
+    chk.setAttribute("stroke-width", width * 0.95);
+    chk.classList.add("chk");
+    svg.append(chk);
+    svg._chk = chk;
+    return svg;
+  }
+
+  function paintRing(svg, count, target) {
+    const p = Math.min(1, count / target);
+    const color = strokeAt(p);
+    if (svg._continuous) {
+      const s = svg._segs[0];
+      s.style.stroke = count ? color : "transparent";
+      s.setAttribute("stroke-dasharray", `${svg._C} ${svg._C}`);
+      s.setAttribute("stroke-dashoffset", svg._C * (1 - p));
+    } else {
+      svg._segs.forEach((s, i) => { s.style.stroke = i < count ? color : "transparent"; });
+    }
+    svg._chk.style.stroke = color;
+  }
+
+  function pop(id) {
+    const el = cache.get(id);
+    const ring = el && el.querySelector(".ring");
+    if (!ring || reduced) return;
+    ring.classList.remove("pop");
+    void ring.offsetWidth;
+    ring.classList.add("pop");
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  const listEl = $("list");
+  const cache = new Map();
+  let editing = null;
+
+  function icon(kind) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("width", "14"); svg.setAttribute("height", "14");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", kind === "chev" ? "M4 6 L8 10 L12 6" : "M4 4 L12 12 M12 4 L4 12");
+    svg.append(p);
+    return svg;
+  }
+
+  function labelHTML(el, t) {
+    el.textContent = t.text;
+    if (t.target > 1) {
+      const b = document.createElement("span");
+      b.className = "qty";
+      b.textContent = ` [${t.target}]`;
+      el.append(b);
+    }
+  }
+
+  function makeTask(t, nested) {
+    const row = document.createElement("div");
+    row.className = "task";
+    row.dataset.id = t.id;
+    row.tabIndex = 0;
+
+    const ring = makeRing(nested ? 24 : 26, 3, t.target);
+    ring.setAttribute("role", "button");
+    ring.setAttribute("aria-label", "Toggle");
+    row.append(ring);
+
+    const label = document.createElement("div");
+    label.className = "label";
+    row.append(label);
+
+    const count = document.createElement("div");
+    count.className = "count";
+    row.append(count);
+
+    const kill = document.createElement("button");
+    kill.className = "kill";
+    kill.setAttribute("aria-label", "Delete");
+    kill.append(icon("x"));
+    row.append(kill);
+
+    ring.addEventListener("click", (e) => bump(t.id, e.shiftKey ? -1 : 1));
+    count.addEventListener("click", () => bump(t.id, -1));
+    kill.addEventListener("click", () => remove(t.id));
+    label.addEventListener("click", () => beginEdit(label, t.id, false));
+
+    row._refs = { ring, label, count, row };
+    return row;
+  }
+
+  function updateTask(row, t) {
+    const { ring, label, count } = row._refs;
+    row.classList.toggle("done", isDone(t));
+    if (editing !== t.id) labelHTML(label, t);
+    count.textContent = t.target > 1 ? `${t.count}/${t.target}` : "";
+    count.hidden = t.target <= 1;
+    if (ring.dataset.target !== String(t.target)) {
+      const fresh = makeRing(ring.getAttribute("width") | 0 || 26, 3, t.target);
+      fresh.addEventListener("click", (e) => bump(t.id, e.shiftKey ? -1 : 1));
+      fresh.setAttribute("role", "button");
+      ring.replaceWith(fresh);
+      row._refs.ring = fresh;
+      paintRing(fresh, t.count, t.target);
+    } else {
+      paintRing(ring, t.count, t.target);
+    }
+    row.setAttribute("aria-label", `${t.text}, ${t.count} of ${t.target}`);
+  }
+
+  function makeGroup(g) {
+    const box = document.createElement("div");
+    box.className = "group";
+    box.dataset.id = g.id;
+
+    const head = document.createElement("div");
+    head.className = "ghead";
+
+    const chev = document.createElement("button");
+    chev.className = "chev";
+    chev.setAttribute("aria-label", "Collapse");
+    chev.append(icon("chev"));
+
+    const title = document.createElement("div");
+    title.className = "gtitle";
+    const cnt = document.createElement("div");
+    cnt.className = "gcount";
+    const plus = document.createElement("button");
+    plus.className = "plus";
+    plus.textContent = "+";
+    plus.setAttribute("aria-label", `Add to ${g.title}`);
+    const kill = document.createElement("button");
+    kill.className = "kill";
+    kill.setAttribute("aria-label", "Delete group");
+    kill.append(icon("x"));
+
+    head.append(chev, title, plus, kill, cnt);
+
+    const body = document.createElement("div");
+    body.className = "gbody";
+    const inner = document.createElement("div");
+    inner.className = "inner";
+    const items = document.createElement("div");
+    items.className = "items";
+    inner.append(items); body.append(inner);
+    box.append(head, body);
+
+    chev.addEventListener("click", () => { g.collapsed = !g.collapsed; commit(); });
+    kill.addEventListener("click", () => remove(g.id));
+    plus.addEventListener("click", () => aim(g.id));
+    title.addEventListener("click", () => beginEdit(title, g.id, true));
+
+    box._refs = { title, cnt, items, plus };
+    return box;
+  }
+
+  function updateGroup(box, g) {
+    const { title, cnt, items, plus } = box._refs;
+    plus.classList.toggle("aimed", destId === g.id);
+    plus.setAttribute("aria-label", `Add to ${g.title}`);
+    box.classList.toggle("collapsed", !!g.collapsed);
+    if (editing !== g.id) title.textContent = g.title;
+    const done = g.items.filter(isDone).length;
+    cnt.textContent = g.items.length ? `${done}/${g.items.length}` : "empty";
+    box.classList.toggle("clear", g.items.length > 0 && done === g.items.length);
+    reconcile(items, g.items, true);
+  }
+
+  function reconcile(container, nodes, nested) {
+    let i = 0;
+    for (const n of nodes) {
+      let el = cache.get(n.id);
+      if (!el) {
+        el = n.kind === "group" ? makeGroup(n) : makeTask(n, nested);
+        if (!nested) { const w = document.createElement("div"); w.className = "node"; w.append(el); w.dataset.id = n.id; cache.set(n.id, w); el = w; }
+        else cache.set(n.id, el);
+      }
+      const inner = nested ? el : el.firstElementChild;
+      if (n.kind === "group") updateGroup(inner, n); else updateTask(inner, n);
+      if (container.children[i] !== el) container.insertBefore(el, container.children[i] || null);
+      i++;
+    }
+    while (container.children.length > i) {
+      const gone = container.lastElementChild;
+      cache.delete(gone.dataset.id);
+      gone.remove();
+    }
+  }
+
+  let shownPct = 0;
+  const totalRing = makeRing(40, 4, 1);
+  $("totalring").append(totalRing);
+
+  function render() {
+    if (destId && !findGroup(destId)) destId = null; // group went away
+    reconcile(listEl, state.list, false);
+    renderDest();
+    $("empty").hidden = state.list.length > 0;
+    $("closeday").hidden = tasks().length === 0;
+
+    const all = tasks();
+    const p = progress(all);
+    paintRing(totalRing, all.length ? p : 0, 1);
+    totalRing.style.opacity = all.length ? 1 : 0.3;
+    $("frac").textContent = `${all.filter(isDone).length} of ${all.length}`;
+    tweenPct(Math.round(p * 100));
+
+    const end = $("closeday");
+    end.style.setProperty("--end-hue", hueAt(p).toFixed(1));
+    end.classList.toggle("lit", p > 0);
+    end.classList.toggle("ripe", all.length > 0 && p === 1);
+  }
+
+  function renderDest() {
+    const sel = $("dest");
+    const groups = state.list.filter((n) => n.kind === "group");
+    $("destrow").hidden = groups.length === 0;
+    const sig = groups.map((g) => g.id + " " + g.title).join("");
+    if (sel._sig !== sig) {
+      sel.textContent = "";
+      sel.append(new Option("Top level", ""));
+      for (const g of groups) sel.append(new Option(g.title, g.id));
+      sel._sig = sig;
+    }
+    sel.value = destId || "";
+  }
+
+  $("dest").addEventListener("change", (e) => {
+    destId = e.target.value || null;
+    render();
+    $("input").focus();
+  });
+
+  function tweenPct(target) {
+    const el = $("pct");
+    if (reduced) { shownPct = target; el.textContent = target + "%"; return; }
+    const from = shownPct, t0 = performance.now(), dur = 420;
+    cancelAnimationFrame(tweenPct._raf);
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      shownPct = Math.round(from + (target - from) * e);
+      el.textContent = shownPct + "%";
+      if (k < 1) tweenPct._raf = requestAnimationFrame(step);
+    };
+    tweenPct._raf = requestAnimationFrame(step);
+  }
+
+  /* ---------------- editing ---------------- */
+
+  function beginEdit(el, id, isGroup) {
+    if (editing) return;
+    editing = id;
+    const t = isGroup ? null : findTask(id);
+    el.textContent = isGroup ? findGroup(id).title : raw(t);
+    el.contentEditable = "true";
+    el.focus();
+    const rng = document.createRange();
+    rng.selectNodeContents(el);
+    getSelection().removeAllRanges();
+    getSelection().addRange(rng);
+
+    const done = (save) => {
+      el.contentEditable = "false";
+      const val = el.textContent;
+      editing = null;
+      el.removeEventListener("keydown", onKey);
+      el.removeEventListener("blur", onBlur);
+      if (save) retext(id, val, isGroup); else render();
+    };
+    const onKey = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); done(true); }
+      if (e.key === "Escape") { e.preventDefault(); done(false); }
+    };
+    const onBlur = () => done(true);
+    el.addEventListener("keydown", onKey);
+    el.addEventListener("blur", onBlur);
+  }
+
+  /* ---------------- completion ---------------- */
+
+  let armed = true;
+  function checkAll() {
+    const all = tasks();
+    const complete = all.length > 0 && all.every(isDone);
+    if (complete && armed) { armed = false; celebrate(); vibrate([18, 40, 24]); }
+    if (!complete) armed = true;
+  }
+
+  function vibrate(pattern) { try { navigator.vibrate && navigator.vibrate(pattern); } catch {} }
+
+  /* ---------------- confetti ---------------- */
+
+  const cv = $("confetti");
+  const ctx = cv.getContext("2d");
+  let bits = [], raf = 0;
+
+  function sizeCanvas() {
+    const d = Math.min(2, devicePixelRatio || 1);
+    cv.width = innerWidth * d; cv.height = innerHeight * d;
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  addEventListener("resize", sizeCanvas);
+  sizeCanvas();
+
+  function celebrate() {
+    if (reduced) return;
+    const r = totalRing.getBoundingClientRect();
+    const ox = r.left + r.width / 2, oy = r.top + r.height / 2;
+    for (let i = 0; i < 90; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 3 + Math.random() * 8;
+      bits.push({
+        x: ox, y: oy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3,
+        rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.35,
+        w: 5 + Math.random() * 5, h: 3 + Math.random() * 4,
+        hue: hueAt(Math.random()), life: 1,
+      });
+    }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+
+  function tick() {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    bits = bits.filter((b) => b.life > 0 && b.y < innerHeight + 40);
+    for (const b of bits) {
+      b.vy += 0.22; b.vx *= 0.995; b.x += b.vx; b.y += b.vy;
+      b.rot += b.vr; b.life -= 0.006;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.globalAlpha = Math.max(0, Math.min(1, b.life));
+      ctx.fillStyle = `hsl(${b.hue} 68% 58%)`;
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      ctx.restore();
+    }
+    raf = bits.length ? requestAnimationFrame(tick) : 0;
+    if (!raf) ctx.clearRect(0, 0, innerWidth, innerHeight);
+  }
+
+  /* ---------------- toast ---------------- */
+
+  let toastTimer = 0;
+  function toast(text) {
+    $("toasttext").textContent = text;
+    $("toast").hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+  function hideToast() { $("toast").hidden = true; }
+  $("undobtn").addEventListener("click", undo);
+
+  /* ---------------- close-day sheet ---------------- */
+
+  function showSheet() {
+    const all = tasks();
+    const done = all.filter(isDone).length;
+    $("score").textContent = `${done} of ${all.length}`;
+    $("scorelabel").textContent = all.length && done === all.length ? "all done" : "done";
+    const cleared = state.list.filter((n) => n.kind === "group" && n.items.length && n.items.every(isDone));
+    const ul = $("cleared");
+    ul.textContent = "";
+    for (const g of cleared) {
+      const li = document.createElement("li");
+      li.textContent = `${g.title} cleared`;
+      ul.append(li);
+    }
+    $("dur").textContent = state.openedAt ? `${fmt(Date.now() - state.openedAt)} since you started` : "";
+    $("veil").hidden = false;
+  }
+  function hideSheet() { $("veil").hidden = true; }
+  function fmt(ms) {
+    const m = Math.round(ms / 60000);
+    return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+  }
+
+  $("closeday").addEventListener("click", showSheet);
+  $("tomorrow").addEventListener("click", () => closeDay(true));
+  $("notyet").addEventListener("click", () => closeDay(false));
+  $("veil").addEventListener("click", (e) => { if (e.target === $("veil")) hideSheet(); });
+
+  /* ---------------- export / import ---------------- */
+
+  function say(text, kind) {
+    const el = $("datastatus");
+    el.textContent = text;
+    el.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function showData() {
+    $("json").value = JSON.stringify(state, null, 2);
+    say("");
+    clearPending();
+    $("dataveil").hidden = false;
+  }
+
+  function closeData() { $("dataveil").hidden = true; clearPending(); }
+
+  $("databtn").addEventListener("click", showData);
+  $("datadone").addEventListener("click", closeData);
+  $("dataveil").addEventListener("click", (e) => { if (e.target === $("dataveil")) closeData(); });
+
+  const stamp = () => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+
+  $("downloadjson").addEventListener("click", async () => {
+    const name = `t0d0-${stamp()}.json`;
+    const text = $("json").value;
+
+    // Inside the artifact viewer a plain <a download> is inert, so route through the
+    // host's save prompt when it exists. On the real page that hook is absent and the
+    // ordinary blob download below is what runs.
+    let host = null;
+    try { host = window.claude && claude.use ? await claude.use("downloads") : null; } catch { host = null; }
+    if (host) {
+      try {
+        await host.save({ filename: name, data: text });
+        say(`Saved as ${name}.`, "good");
+      } catch (err) {
+        const code = err && err.code;
+        say(code === "declined" ? "Save cancelled." : "Couldn't save that file — Copy still works.", "bad");
+      }
+      return;
+    }
+
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    say(`Saved as ${name}.`, "good");
+  });
+
+  /* Import is staged, never immediate: read the file, show what it holds, and only
+     replace on an explicit second press. Undo still covers it afterwards. */
+
+  let pending = null;
+
+  function clearPending() {
+    pending = null;
+    $("preview").hidden = true;
+    $("drop").hidden = false;
+  }
+
+  function stage(text, name) {
+    let parsed;
+    try { parsed = JSON.parse(text); }
+    catch { clearPending(); return say("That isn't valid JSON.", "bad"); }
+    const next = normalize(parsed);
+    if (!next) { clearPending(); return say("Valid JSON, but not a t0d0 backup — it needs \"v\": 1 and a \"list\" array.", "bad"); }
+
+    pending = next;
+    const groups = next.list.filter((n) => n.kind === "group");
+    const items = next.list.flatMap((n) => (n.kind === "group" ? n.items : [n]));
+    const bits = [`${items.length} item${items.length === 1 ? "" : "s"}`];
+    if (groups.length) bits.push(`${groups.length} group${groups.length === 1 ? "" : "s"}`);
+    $("previewname").textContent = name;
+    $("previewsum").textContent = bits.join(" · ") + " — this replaces everything currently in your list.";
+    $("drop").hidden = true;
+    $("preview").hidden = false;
+    say("");
+  }
+
+  async function takeFile(f) {
+    if (!f) return;
+    try { stage(await f.text(), f.name); }
+    catch { say("Couldn't read that file.", "bad"); }
+  }
+
+  $("drop").addEventListener("click", () => $("file").click());
+  $("drop").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); }
+  });
+  $("file").addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    takeFile(f);
+  });
+
+  for (const ev of ["dragenter", "dragover"]) {
+    $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+  }
+  for (const ev of ["dragleave", "dragend"]) {
+    $("drop").addEventListener(ev, () => $("drop").classList.remove("over"));
+  }
+  $("drop").addEventListener("drop", (e) => {
+    e.preventDefault();
+    $("drop").classList.remove("over");
+    takeFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+
+  $("cancelimport").addEventListener("click", () => { clearPending(); say(""); });
+  $("pastereplace").addEventListener("click", () => stage($("json").value, "Pasted text"));
+
+  $("copyjson").addEventListener("click", async () => {
+    const text = $("json").value;
+    try {
+      await navigator.clipboard.writeText(text);
+      say("Copied to clipboard.", "good");
+    } catch {
+      $("json").select();
+      say("Select-all is ready — press Ctrl/Cmd-C.", "bad");
+    }
+  });
+
+  $("importjson").addEventListener("click", () => {
+    if (!pending) return;
+    snapshot();
+    state = pending;
+    destId = null;
+    cache.clear();
+    listEl.textContent = "";
+    commit();
+    armed = !(tasks().length && tasks().every(isDone));
+    const n = tasks().length;
+    closeData();
+    toast(`Imported ${n} item${n === 1 ? "" : "s"}`);
+  });
+
+  /* ---------------- keyboard ---------------- */
+
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+    if (e.key === "Escape") {
+      if (!$("veil").hidden) hideSheet();
+      if (!$("dataveil").hidden) $("dataveil").hidden = true;
+    }
+    if (editing) return;
+
+    const row = document.activeElement && document.activeElement.closest && document.activeElement.closest(".task");
+    if (!row) return;
+    const id = row.dataset.id;
+
+    if (e.key === " ") { e.preventDefault(); bump(id, e.shiftKey ? -1 : 1); focusRow(id); return; }
+    if (e.key === "Tab") {
+      const dir = e.shiftKey ? "out" : "in";
+      // only swallow Tab when the move is actually possible, so focus can still escape the list
+      if (!canMove(id, dir)) return;
+      e.preventDefault();
+      move(id, dir);
+      focusRow(id);
+    }
+  });
+
+  function canMove(id, dir) {
+    const owner = ownerOf(id);
+    if (dir === "out") return !!owner;
+    if (owner) return false;
+    const idx = state.list.findIndex((n) => n.id === id);
+    return state.list.slice(0, idx).some((n) => n.kind === "group");
+  }
+
+  function focusRow(id) {
+    requestAnimationFrame(() => {
+      const el = cache.get(id);
+      const row = el && (el.classList.contains("task") ? el : el.querySelector(".task"));
+      row && row.focus();
+    });
+  }
+
+  function move(id, dir) {
+    const owner = ownerOf(id);
+    snapshot();
+    if (dir === "in" && !owner) {
+      const idx = state.list.findIndex((n) => n.id === id);
+      let g = null;
+      for (let i = idx - 1; i >= 0; i--) if (state.list[i].kind === "group") { g = state.list[i]; break; }
+      if (!g) { undoStack = null; return; }
+      const [t] = state.list.splice(idx, 1);
+      g.items.push(t);
+      g.collapsed = false;
+    } else if (dir === "out" && owner) {
+      const t = owner.items.find((x) => x.id === id);
+      owner.items = owner.items.filter((x) => x.id !== id);
+      const at = state.list.findIndex((n) => n.id === owner.id);
+      state.list.splice(at + 1, 0, t);
+    } else { undoStack = null; return; }
+    commit();
+  }
+
+  /* ---------------- composer ---------------- */
+
+  $("composer").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = $("input");
+    add(input.value);
+    input.value = "";
+    input.focus();
+  });
+
+  /* ---------------- composer height ---------------- */
+
+  // The composer is fixed and its height changes (the "Adding to" row appears with the
+  // first group, the hint wraps on narrow screens). Publish the real height so the list
+  // and the toast can reserve exactly that much and never sit underneath it.
+  const composerEl = document.querySelector(".composer");
+  const syncComposerHeight = () => {
+    document.documentElement.style.setProperty("--composer-h", composerEl.offsetHeight + "px");
+  };
+  if (window.ResizeObserver) new ResizeObserver(syncComposerHeight).observe(composerEl);
+  addEventListener("resize", syncComposerHeight);
+  syncComposerHeight();
+
+  /* ---------------- cross-tab ---------------- */
+
+  addEventListener("storage", (e) => {
+    if (e.key !== KEY) return;
+    const s = load();
+    if (s) { state = s; cache.clear(); listEl.textContent = ""; render(); }
+  });
+
+  /* ---------------- boot ---------------- */
+
+  render();
+  // never celebrate on load: arm only once the list drops below complete
+  armed = !(tasks().length && tasks().every(isDone));
+  if (state.openedAt && Date.now() - state.openedAt > STALE) showSheet();
+})();
+</script>

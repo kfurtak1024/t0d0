@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <!--
+      Pages cannot set headers, so the policy lives here. It is also what keeps the
+      "no network at runtime" rule honest: any stray external request fails loudly.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="One list you prune each morning and tick through the day." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>t0d0</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <h1 class="brand">t<i>0</i>d<i>0</i></h1>
+        <div class="headline">
+          <span class="pct" id="pct" aria-live="polite">0%</span>
+          <span class="frac" id="frac">0 of 0</span>
+        </div>
+        <div class="totalring" id="totalring"></div>
+        <button class="more" id="databtn" type="button" aria-label="Backup">⋯</button>
+      </header>
+
+      <main class="list" id="list"></main>
+
+      <button class="endday" id="closeday" type="button" hidden>
+        That's the day <span aria-hidden="true">→</span>
+      </button>
+
+      <p class="empty" id="empty" hidden>Nothing here yet.<br />Type below to add today's list.</p>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <div class="destrow" id="destrow" hidden>
+          <span>Adding to</span>
+          <select class="dest" id="dest" aria-label="Where new items go"></select>
+        </div>
+        <form id="composer" autocomplete="off">
+          <input
+            id="input"
+            placeholder="Add an item…"
+            enterkeyhint="done"
+            autocapitalize="sentences"
+            aria-label="Add an item"
+          />
+          <button class="add" type="submit" aria-label="Add">+</button>
+        </form>
+        <p class="hint"><b>#&nbsp;Title</b> makes a group · <b>[3]</b> sets a count</p>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" hidden>
+      <span class="toast-text"></span>
+      <button class="toast-action" type="button">Undo</button>
+    </div>
+
+    <div class="veil" id="veil" hidden>
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle">
+        <h2 id="sheettitle">Today</h2>
+        <p class="score">0 of 0</p>
+        <p class="of">done</p>
+        <ul class="cleared"></ul>
+        <p class="dur"></p>
+        <button class="confirm" type="button">Clear the ticks</button>
+        <button class="dismiss" type="button">Not yet</button>
+      </div>
+    </div>
+
+    <div class="veil" id="dataveil" hidden>
+      <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="datatitle">
+        <h2 id="datatitle">Backup</h2>
+
+        <div class="block">
+          <p class="blocktitle">Export</p>
+          <p>Save your list as a file you can keep, or move to another browser.</p>
+          <div class="btnrow">
+            <button class="download" type="button">Download .json</button>
+            <button class="ghost copy" type="button">Copy</button>
+          </div>
+        </div>
+
+        <div class="block">
+          <p class="blocktitle">Import</p>
+          <div class="drop" tabindex="0" role="button" aria-label="Choose a backup file">
+            <b>Drop a .json backup here</b>
+            <span>or click to choose one</span>
+          </div>
+          <div class="preview" hidden>
+            <p class="pname"></p>
+            <p class="psum"></p>
+            <div class="btnrow">
+              <button class="ghost cancel" type="button">Cancel</button>
+              <button class="danger replace" type="button">Replace my list</button>
+            </div>
+          </div>
+          <input class="file" type="file" accept="application/json,.json" hidden />
+        </div>
+
+        <details class="raw">
+          <summary>Show raw JSON</summary>
+          <textarea class="json" spellcheck="false" aria-label="List as JSON"></textarea>
+          <div class="btnrow">
+            <button class="ghost use-text" type="button">Use this text</button>
+          </div>
+        </details>
+
+        <p class="status"></p>
+        <button class="close dismiss" type="button">Close</button>
+      </div>
+    </div>
+
+    <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

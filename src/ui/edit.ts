@@ -1,0 +1,58 @@
+/**
+ * Inline editing. The element becomes contenteditable in place rather than
+ * being swapped for an input, so nothing in the row moves and no transition is
+ * interrupted mid-flight.
+ */
+export interface EditSession {
+  id: string;
+}
+
+export function beginEdit(
+  element: HTMLElement,
+  id: string,
+  initial: string,
+  commit: (value: string) => void,
+  cancel: () => void,
+): EditSession {
+  element.textContent = initial;
+  element.contentEditable = "true";
+  element.spellcheck = false;
+  element.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const selection = getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+
+  let finished = false;
+  const finish = (save: boolean): void => {
+    if (finished) return;
+    finished = true;
+    element.contentEditable = "false";
+    const value = element.textContent;
+    element.removeEventListener("keydown", onKey);
+    element.removeEventListener("blur", onBlur);
+    if (save) commit(value);
+    else cancel();
+  };
+
+  function onKey(event: KeyboardEvent): void {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finish(true);
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finish(false);
+    }
+  }
+  function onBlur(): void {
+    finish(true);
+  }
+
+  element.addEventListener("keydown", onKey);
+  element.addEventListener("blur", onBlur);
+
+  return { id };
+}

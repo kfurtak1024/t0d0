@@ -1,0 +1,908 @@
+.app {
+  max-width: 30rem;
+  margin: 0 auto;
+  /* The composer is fixed; --composer-h is its measured height (see app.ts). */
+  padding: 1.75rem 1rem calc(var(--composer-h, 8rem) + 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+/* ---------------------------------------------------------------- header */
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.35rem 0.25rem 0.1rem;
+}
+
+.brand {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  flex: 1;
+}
+
+.brand i {
+  font-style: normal;
+  color: oklch(var(--ring-l) var(--ring-c) 268);
+}
+
+.headline {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.pct {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.frac {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.totalring {
+  flex: none;
+}
+
+.more {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--faint);
+  font-size: 1.15rem;
+  line-height: 1;
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+
+.more:hover {
+  color: var(--ink);
+  background: var(--card);
+}
+
+/* ------------------------------------------------------------------ list */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.list > .task,
+.list > .group,
+.items > .task {
+  transition:
+    opacity 0.22s var(--ease),
+    transform 0.3s var(--ease);
+}
+
+@starting-style {
+  .list > .task,
+  .list > .group,
+  .items > .task {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+
+.list > .task.leaving,
+.list > .group.leaving,
+.items > .task.leaving {
+  opacity: 0;
+  transform: translateX(14px) scale(0.96);
+}
+
+/* ---------------------------------------------------------------- groups */
+
+.group {
+  background: var(--card);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 0.55rem 0.55rem 0.3rem;
+}
+
+.group.clear {
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / 50%);
+}
+
+.ghead {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem 0.5rem;
+}
+
+.chev {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+  transition: transform 0.3s var(--spring);
+}
+
+.group.collapsed .chev {
+  transform: rotate(-90deg);
+}
+
+.gtitle {
+  flex: 1;
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.015em;
+  min-width: 0;
+  cursor: text;
+}
+
+.gcount {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.5rem;
+  text-align: right;
+  padding-left: 0.2rem;
+}
+
+.group.clear .gcount {
+  color: oklch(var(--ring-l) var(--ring-c) 150);
+}
+
+.gbody {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.34s var(--ease);
+}
+
+.group.collapsed .gbody {
+  grid-template-rows: 0fr;
+}
+
+.gbody > .inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Indent members so one level of hierarchy reads without a second one. */
+.items {
+  display: flex;
+  flex-direction: column;
+  margin-left: 1.05rem;
+  padding-left: 0.6rem;
+  border-left: 1.5px solid var(--line);
+  transition: border-color 0.3s var(--ease);
+}
+
+.group.clear .items {
+  border-left-color: oklch(var(--ring-l) var(--ring-c) 150 / 45%);
+}
+
+/* ------------------------------------------------------------------ rows */
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: var(--r-row);
+  transition: background 0.18s;
+}
+
+.list > .task {
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--r-card);
+}
+
+.items > .task:hover {
+  background: var(--nest);
+}
+
+.ring {
+  flex: none;
+  display: block;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ring circle {
+  fill: none;
+}
+
+.ring .trk {
+  stroke: var(--track);
+}
+
+.ring .seg {
+  transition:
+    stroke 0.3s var(--ease),
+    stroke-dashoffset 0.45s var(--ease);
+}
+
+.ring .chk {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  transition: stroke-dashoffset 0.34s var(--ease) 0.06s;
+}
+
+.done .ring .chk {
+  stroke-dashoffset: 0;
+}
+
+.ring.pop {
+  animation: pop 0.45s var(--spring);
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+
+  32% {
+    transform: scale(1.22);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
+  letter-spacing: -0.005em;
+  position: relative;
+  overflow-wrap: anywhere;
+  cursor: text;
+  padding: 0.1rem 0;
+}
+
+.label .line {
+  position: relative;
+}
+
+/* The strike wipes across the words, not the width of the row. */
+.label .line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1.5px;
+  width: 100%;
+  background: currentcolor;
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0.55;
+  transition: transform 0.3s var(--ease);
+}
+
+.done .label .line::after {
+  transform: scaleX(1);
+}
+
+.done .label {
+  color: var(--faint);
+}
+
+.label[contenteditable="true"] {
+  color: var(--ink);
+}
+
+.qty {
+  color: oklch(var(--ring-l) var(--ring-c) 268);
+  font-weight: 600;
+}
+
+.done .qty {
+  color: inherit;
+}
+
+.count {
+  flex: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.count:hover {
+  background: var(--nest);
+  color: var(--ink);
+}
+
+.kill,
+.plus {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--faint);
+  transition:
+    opacity 0.16s,
+    color 0.16s,
+    background 0.16s;
+}
+
+.plus {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.kill:hover {
+  color: var(--ink);
+  background: var(--nest);
+}
+
+.plus:hover,
+.plus.aimed {
+  color: oklch(var(--ring-l) var(--ring-c) 268);
+  background: var(--nest);
+  opacity: 1;
+}
+
+/* Hover is the right fork, not width: it asks whether a control can hide. */
+@media (hover: hover) {
+  .kill,
+  .plus {
+    opacity: 0;
+  }
+
+  .task:hover .kill,
+  .ghead:hover .kill,
+  .ghead:hover .plus,
+  .kill:focus-visible,
+  .plus:focus-visible {
+    opacity: 1;
+  }
+}
+
+/* --------------------------------------------------------------- the end */
+
+.endday {
+  --end-hue: 268;
+
+  align-self: center;
+  position: relative;
+  margin-top: 2rem;
+  padding: 0.72rem 1.35rem;
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--muted);
+  background: var(--card);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  box-shadow: var(--shadow-card);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  transition:
+    color 0.3s var(--ease),
+    background 0.3s var(--ease),
+    border-color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease),
+    transform 0.45s var(--spring);
+}
+
+.endday[hidden] {
+  display: none;
+}
+
+/* A dotted stem, so the list visibly runs into its ending. */
+.endday::before {
+  content: "";
+  position: absolute;
+  top: -1.15rem;
+  left: 50%;
+  width: 2px;
+  height: 1.1rem;
+  transform: translateX(-50%);
+  background: repeating-linear-gradient(to bottom, var(--track) 0 3px, transparent 3px 6px);
+}
+
+.endday.lit {
+  border-color: oklch(var(--ring-l) var(--ring-c) var(--end-hue) / 40%);
+}
+
+.endday.ripe {
+  color: #fff;
+  background: oklch(var(--ring-l) var(--ring-c) 150);
+  border-color: transparent;
+  box-shadow: var(--shadow-lift);
+}
+
+.endday:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lift);
+}
+
+.endday.ripe:hover {
+  color: #fff;
+}
+
+.endday:active {
+  transform: scale(0.96);
+}
+
+.endday span {
+  transition: transform 0.3s var(--ease);
+}
+
+.endday:hover span {
+  transform: translateX(3px);
+}
+
+.empty {
+  text-align: center;
+  color: var(--faint);
+  font-size: 0.9rem;
+  padding: 3rem 1rem;
+  line-height: 1.7;
+}
+
+/* -------------------------------------------------------------- composer */
+
+.composer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 82%, transparent);
+  display: flex;
+  justify-content: center;
+}
+
+.composer-inner {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.composer form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  background: var(--field);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lift);
+  padding: 0.35rem 0.35rem 0.35rem 1rem;
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font-size: 0.95rem;
+  padding: 0.5rem 0;
+}
+
+.composer input:focus {
+  outline: none;
+}
+
+.composer input::placeholder {
+  color: var(--faint);
+}
+
+.add {
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: oklch(var(--ring-l) var(--ring-c) 268);
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.4s var(--spring);
+}
+
+.add:active {
+  transform: scale(0.9);
+}
+
+.destrow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.2rem 0.45rem;
+  font-size: 0.74rem;
+  color: var(--faint);
+}
+
+.destrow[hidden] {
+  display: none;
+}
+
+.dest {
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--card);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.28rem 1.5rem 0.28rem 0.7rem;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  max-width: 12rem;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentcolor 50%),
+    linear-gradient(135deg, currentcolor 50%, transparent 50%);
+  background-position:
+    right 0.75rem center,
+    right 0.55rem center;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+}
+
+.hint {
+  text-align: center;
+  font-size: 0.74rem;
+  color: var(--faint);
+  padding: 0.1rem 0 0.2rem;
+}
+
+.hint b {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ----------------------------------------------------------------- toast */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--composer-h, 8rem) + 0.6rem);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: var(--card);
+  box-shadow: var(--shadow-lift);
+  border-radius: 999px;
+  padding: 0.5rem 0.55rem 0.5rem 1rem;
+  font-size: 0.85rem;
+  z-index: 20;
+  transition:
+    opacity 0.2s,
+    transform 0.38s var(--spring);
+}
+
+.toast[hidden] {
+  display: flex;
+  opacity: 0;
+  transform: translateX(-50%) translateY(14px);
+  pointer-events: none;
+}
+
+.toast-action {
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: oklch(var(--ring-l) var(--ring-c) 268);
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: var(--nest);
+}
+
+/* ---------------------------------------------------------------- sheets */
+
+.veil {
+  position: fixed;
+  inset: 0;
+  background: var(--sheet-veil);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  z-index: 40;
+  overflow-y: auto;
+}
+
+.veil[hidden] {
+  display: none;
+}
+
+.sheet {
+  background: var(--card);
+  border-radius: 22px;
+  box-shadow: var(--shadow-lift);
+  padding: 2rem 1.75rem 1.5rem;
+  width: 100%;
+  max-width: 20rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  animation: rise 0.5s var(--spring);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sheet h2 {
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.sheet .score {
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.35rem;
+}
+
+.sheet .of {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.sheet .cleared {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sheet .cleared li {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.sheet .dur {
+  font-size: 0.8rem;
+  color: var(--faint);
+  margin-top: 0.6rem;
+}
+
+.sheet button {
+  margin-top: 1.3rem;
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  font-weight: 650;
+  background: oklch(var(--ring-l) var(--ring-c) 268);
+  color: #fff;
+  transition: transform 0.4s var(--spring);
+}
+
+.sheet button:active {
+  transform: scale(0.96);
+}
+
+.sheet .dismiss {
+  background: none;
+  color: var(--faint);
+  font-weight: 500;
+  font-size: 0.8rem;
+  margin-top: 0.3rem;
+  padding: 0.4rem;
+}
+
+/* --------------------------------------------------------- backup sheet */
+
+.sheet.wide {
+  max-width: 26rem;
+  text-align: left;
+  align-items: stretch;
+}
+
+.sheet.wide p {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.block {
+  margin-top: 1.1rem;
+}
+
+.blocktitle {
+  font-size: 0.68rem !important;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint) !important;
+  margin-bottom: 0.4rem;
+}
+
+.drop {
+  margin-top: 0.55rem;
+  border: 1.5px dashed var(--line);
+  border-radius: 14px;
+  background: var(--nest);
+  padding: 1.4rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.drop[hidden] {
+  display: none;
+}
+
+.drop b {
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.drop span {
+  font-size: 0.78rem;
+  color: var(--faint);
+}
+
+.drop:hover,
+.drop.over {
+  border-color: oklch(var(--ring-l) var(--ring-c) 268);
+  background: var(--card);
+}
+
+.preview {
+  margin-top: 0.55rem;
+  border-radius: 14px;
+  background: var(--nest);
+  padding: 0.9rem 1rem 1rem;
+}
+
+.preview[hidden] {
+  display: none;
+}
+
+.pname {
+  font-size: 0.86rem !important;
+  font-weight: 650;
+  color: var(--ink) !important;
+  overflow-wrap: anywhere;
+}
+
+.psum {
+  font-size: 0.78rem !important;
+  margin-top: 0.1rem;
+}
+
+.btnrow {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.btnrow button {
+  margin-top: 0;
+  flex: 1;
+  padding: 0.65rem;
+  font-size: 0.85rem;
+}
+
+.btnrow .ghost {
+  background: var(--nest);
+  color: var(--ink);
+}
+
+.btnrow .danger {
+  background: oklch(56% 0.17 25);
+}
+
+.raw {
+  margin-top: 1.2rem;
+}
+
+.raw summary {
+  font-size: 0.78rem;
+  color: var(--faint);
+  cursor: pointer;
+  list-style: none;
+  padding: 0.2rem 0;
+}
+
+.raw summary::-webkit-details-marker {
+  display: none;
+}
+
+.raw summary::before {
+  content: "▸ ";
+}
+
+.raw[open] summary::before {
+  content: "▾ ";
+}
+
+.sheet.wide textarea {
+  width: 100%;
+  height: 11rem;
+  resize: vertical;
+  margin-top: 0.3rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--nest);
+  padding: 0.7rem 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  line-height: 1.55;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.sheet.wide textarea:focus {
+  outline: none;
+  border-color: oklch(var(--ring-l) var(--ring-c) 268);
+}
+
+.status {
+  font-size: 0.78rem !important;
+  min-height: 1.2em;
+  margin-top: 0.55rem;
+}
+
+.status.bad {
+  color: oklch(58% 0.17 25) !important;
+}
+
+.status.good {
+  color: oklch(var(--ring-l) var(--ring-c) 150) !important;
+}
+
+/* -------------------------------------------------------------- confetti */
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 60;
+}
