@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-label="t0d0 — an ephemeral day tracker">
+  <defs>
+    <style>
+      .wordmark {
+        font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 96px;
+        font-weight: 700;
+        letter-spacing: -4px;
+      }
+      .tagline {
+        font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 27px;
+        font-weight: 500;
+      }
+      .meta {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 17px;
+        letter-spacing: 2px;
+      }
+    </style>
+  </defs>
+
+  <rect width="1200" height="300" fill="#0E1116"/>
+
+  <g transform="translate(88 118)">
+    <text class="wordmark" fill="#E8ECF3">t<tspan fill="#7FA8FF">0</tspan>d<tspan fill="#7FA8FF">0</tspan></text>
+    <text class="tagline" y="56" fill="#98A1B2">One list you prune each morning and tick through the day.</text>
+    <text class="meta" y="106" fill="#6A7385">NO ACCOUNTS · NO HISTORY · NO DEPENDENCIES</text>
+  </g>
+
+  <!-- The rings, sweeping indigo to green exactly as they do in the app. -->
+  <g transform="translate(880 150)" fill="none" stroke-width="13" stroke-linecap="butt">
+    <g transform="translate(0 0)">
+      <circle r="36" stroke="#2A313D"/>
+      <circle r="36" stroke="#7FA8FF" stroke-dasharray="56.5 226.2" transform="rotate(-90)"/>
+    </g>
+    <g transform="translate(105 0)">
+      <circle r="36" stroke="#2A313D"/>
+      <circle r="36" stroke="#4FC3E8" stroke-dasharray="135.7 226.2" transform="rotate(-90)"/>
+    </g>
+    <g transform="translate(210 0)">
+      <circle r="36" stroke="#4FD09A"/>
+      <path d="M-16 2 L-5 14 L17 -12" stroke="#4FD09A" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>
