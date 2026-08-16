@@ -13,12 +13,11 @@ file, and losing it should cost nothing.
 
 <br>
 
-[![CI](https://github.com/kfurtak1024/t0d0/actions/workflows/ci.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/ci.yml)
 [![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE)
 
 [![Runtime dependencies](https://img.shields.io/badge/runtime_deps-0-158A62)](#no-dependencies-is-a-feature)
-[![Bundle](https://img.shields.io/badge/bundle-11.5_kB_gzipped-158A62)](#no-dependencies-is-a-feature)
+[![Bundle](https://img.shields.io/badge/bundle-13.4_kB_gzipped-158A62)](#no-dependencies-is-a-feature)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json)
 [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
 
@@ -58,15 +57,16 @@ that rather than merely promising it.
 | `make calls [3]` | a task that takes three ticks          |
 | `# Morning`      | a group, with the composer aimed at it |
 
-| Do this                                          | To                                                    |
-| ------------------------------------------------ | ----------------------------------------------------- |
-| Click a ring                                     | tick, or count up one                                 |
-| Shift-click a ring                               | count back down — on touch, tap the `1/3` label       |
-| Click any text                                   | edit in place; `Enter` commits, `Escape` reverts      |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | move a focused item into the group above, or back out |
-| <kbd>Space</kbd>                                 | tick the focused item                                 |
-| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, an import, or a cleared day            |
-| `⋯`                                              | theme, save a copy, load one back, erase everything   |
+| Do this                                          | To                                                                   |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| Click a ring                                     | tick, or count up one                                                |
+| Shift-click a ring                               | count back down — on touch, tap the `1/3` label                      |
+| Click any text                                   | edit in place; `Enter` commits, `Escape` reverts                     |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | with a tick focused, move that item into the group above or back out |
+| <kbd>Space</kbd> / <kbd>Enter</kbd>              | tick the focused item                                                |
+| <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                |
+| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, an import, or a cleared day                           |
+| `⋯`                                              | theme, save a copy, load one back, erase everything                  |
 
 ## Quick start
 
@@ -75,23 +75,26 @@ npm ci
 npm run dev
 ```
 
-| Script              | Does                                                     |
-| ------------------- | -------------------------------------------------------- |
-| `npm run dev`       | dev server with hot reload                               |
-| `npm run build`     | typecheck, then production build into `dist/`            |
-| `npm run preview`   | serve the built output                                   |
-| `npm test`          | unit and DOM tests                                       |
-| `npm run test:e2e`  | Playwright — desktop Chromium, WebKit, and mobile Safari |
-| `npm run lint`      | ESLint                                                   |
-| `npm run icons`     | regenerate the favicon and PWA icons                     |
-| **`npm run check`** | **lint + typecheck + test — the gate CI runs**           |
+| Script                  | Does                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `npm run dev`           | dev server with hot reload                                                          |
+| `npm run build`         | typecheck, then production build into `dist/`                                       |
+| `npm run preview`       | serve the built output                                                              |
+| `npm test`              | unit and DOM tests                                                                  |
+| `npm run test:watch`    | the same, on save                                                                   |
+| `npm run test:coverage` | the same, with the thresholds CI enforces                                           |
+| `npm run test:e2e`      | Playwright — Chromium, WebKit and mobile Safari, plus axe and an offline cold start |
+| `npm run lint`          | ESLint                                                                              |
+| `npm run format`        | Prettier                                                                            |
+| `npm run icons`         | regenerate the favicon and PWA icons                                                |
+| **`npm run check`**     | **lint + typecheck + test — the gate CI runs**                                      |
 
 Node version is pinned in [`.nvmrc`](./.nvmrc).
 
 ## No dependencies is a feature
 
 The shipped page contains **zero third-party code**. No framework, no UI library, no
-animation library — 11.5 kB gzipped, all of it written here. Vite, TypeScript, Vitest,
+animation library — 13.4 kB gzipped, all of it written here. Vite, TypeScript, Vitest,
 Playwright, and ESLint are build-time only.
 
 That isn't austerity for its own sake. This is a tool one person opens every morning, and
@@ -110,8 +113,9 @@ src/
 ├─ types.ts parse.ts progress.ts normalize.ts   pure, DOM-free, heavily tested
 ├─ transitions.ts                               every state change as State → State
 ├─ storage.ts store.ts                          persistence and one level of undo
+├─ theme.ts                                     appearance, in its own storage key
 ├─ render/    list.ts ring.ts task.ts group.ts  keyed DOM patching
-├─ ui/        toast sheet backup confetti edit
+├─ ui/        drawer sheet toast edit focus confetti
 └─ styles/    tokens.css base.css app.css
 ```
 
