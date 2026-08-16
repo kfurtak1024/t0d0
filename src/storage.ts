@@ -9,13 +9,24 @@ export const STORAGE_KEY = "t0d0/v1";
  * list is disposable by design, so this is an acceptable degradation.
  */
 let memory: string | null = null;
+let warned = false;
 
-export function save(state: State): void {
+/**
+ * Returns false when the write only reached memory, so the caller can say so.
+ * Silently degrading here would let someone believe a day's list is safe when
+ * it will not survive the next reload.
+ */
+export function save(state: State): boolean {
   const raw = JSON.stringify(state);
   try {
     localStorage.setItem(STORAGE_KEY, raw);
+    warned = false;
+    return true;
   } catch {
     memory = raw;
+    const first = !warned;
+    warned = true;
+    return !first;
   }
 }
 

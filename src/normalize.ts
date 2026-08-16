@@ -19,6 +19,12 @@ const text = (value: unknown): string =>
  */
 export function normalize(input: unknown): State | null {
   if (!isRecord(input)) return null;
+  /*
+   * MIGRATION SEAM. Returning null here discards the store, which is correct
+   * only while v1 is the sole version that has ever shipped. Before bumping
+   * SCHEMA_VERSION, add an upgrade branch for every older version — otherwise
+   * the first launch of the new build silently erases everyone's list.
+   */
   if (input["v"] !== SCHEMA_VERSION) return null;
   if (!Array.isArray(input["list"])) return null;
 

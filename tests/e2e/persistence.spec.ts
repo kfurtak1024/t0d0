@@ -7,7 +7,7 @@ test("the list and its ticks survive a reload", async ({ page }) => {
   await addItem(page, "eat breakfast");
   await addItem(page, "make calls [3]");
 
-  await page.locator(".task", { hasText: "make calls" }).locator(".ring").click();
+  await page.locator(".task", { hasText: "make calls" }).locator(".tick").click();
   await expect(page.locator("#frac")).toHaveText("0 of 2");
 
   await page.reload();

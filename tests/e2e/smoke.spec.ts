@@ -12,7 +12,7 @@ test("adds, ticks, and reports progress", async ({ page }) => {
   await expect(page.locator(".list .task")).toHaveCount(2);
   await expect(page.locator("#frac")).toHaveText("0 of 2");
 
-  await page.locator(".task", { hasText: "shopping" }).locator(".ring").click();
+  await page.locator(".task", { hasText: "shopping" }).locator(".tick").click();
 
   await expect(page.locator(".task", { hasText: "shopping" })).toHaveClass(/done/);
   await expect(page.locator("#frac")).toHaveText("1 of 2");
@@ -25,7 +25,7 @@ test("a counted item needs one tap per unit", async ({ page }) => {
   await expect(row.locator(".count")).toHaveText("0/3");
   await expect(row.locator(".label")).toContainText("[3]");
 
-  for (let i = 0; i < 3; i++) await row.locator(".ring").click();
+  for (let i = 0; i < 3; i++) await row.locator(".tick").click();
 
   await expect(row.locator(".count")).toHaveText("3/3");
   await expect(row).toHaveClass(/done/);
@@ -35,8 +35,8 @@ test("tapping the count steps back down", async ({ page }) => {
   await addItem(page, "make calls [3]");
   const row = page.locator(".task", { hasText: "make calls" });
 
-  await row.locator(".ring").click();
-  await row.locator(".ring").click();
+  await row.locator(".tick").click();
+  await row.locator(".tick").click();
   await expect(row.locator(".count")).toHaveText("2/3");
 
   await row.locator(".count").click();
@@ -52,7 +52,7 @@ test("groups hold their items and report their own count", async ({ page }) => {
   await expect(group.locator(".items .task")).toHaveCount(2);
   await expect(group.locator(".gcount")).toHaveText("0/2");
 
-  await group.locator(".task", { hasText: "eat breakfast" }).locator(".ring").click();
+  await group.locator(".task", { hasText: "eat breakfast" }).locator(".tick").click();
   await expect(group.locator(".gcount")).toHaveText("1/2");
 });
 
@@ -77,7 +77,7 @@ test("the day closes with a summary and clears the ticks", async ({ page }) => {
   await addItem(page, "eat breakfast");
   await addItem(page, "walk the dog");
 
-  await page.locator(".task", { hasText: "eat breakfast" }).locator(".ring").click();
+  await page.locator(".task", { hasText: "eat breakfast" }).locator(".tick").click();
   await page.locator("#closeday").click();
 
   const sheet = page.locator("#veil");
@@ -113,11 +113,44 @@ test("a finished top-level item gets the same green frame as a cleared group", a
   const row = page.locator(".list > .task", { hasText: "shopping" });
 
   const plain = await row.evaluate((el) => getComputedStyle(el).boxShadow);
-  await row.locator(".ring").click();
+  await row.locator(".tick").click();
   await expect(row).toHaveClass(/done/);
 
   const finished = await row.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(finished).not.toBe(plain);
   // Same completion green the group frame uses.
   expect(finished).toMatch(/oklch/);
+});
+
+test("the tick is a real control with the right role and state", async ({ page }) => {
+  await addItem(page, "shopping");
+  await addItem(page, "make calls [3]");
+
+  const check = page.locator(".task", { hasText: "shopping" }).locator(".tick");
+  await expect(check).toHaveRole("checkbox");
+  await expect(check).toHaveAttribute("aria-checked", "false");
+
+  // Focusable, and activated by the keyboard like any button.
+  await check.focus();
+  await page.keyboard.press("Space");
+  await expect(check).toHaveAttribute("aria-checked", "true");
+
+  const spin = page.locator(".task", { hasText: "make calls" }).locator(".tick");
+  await expect(spin).toHaveRole("spinbutton");
+  await expect(spin).toHaveAttribute("aria-valuemax", "3");
+
+  await spin.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(spin).toHaveAttribute("aria-valuenow", "1");
+  await page.keyboard.press("ArrowDown");
+  await expect(spin).toHaveAttribute("aria-valuenow", "0");
+});
+
+test("the list is a list", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "eat breakfast");
+
+  await expect(page.locator("#list")).toHaveRole("list");
+  await expect(page.locator("#list > li")).toHaveCount(1);
+  await expect(page.locator(".items > li")).toHaveCount(1);
 });

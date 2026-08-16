@@ -2,7 +2,7 @@ import { isDone } from "../progress";
 import type { Task } from "../types";
 import { button, icon, type RowActions } from "./context";
 import type { Keyed } from "./list";
-import { makeRing, paintRing, type Ring } from "./ring";
+import { makeRing, paintRing } from "./ring";
 
 const RING_SIZE = { root: 26, nested: 24 } as const;
 
@@ -29,29 +29,49 @@ function writeLabel(el: HTMLElement, task: Task): void {
 export function createTask(task: Task, actions: RowActions, nested: boolean): Keyed<Task> {
   const size = nested ? RING_SIZE.nested : RING_SIZE.root;
 
-  const row = document.createElement("div");
+  const row = document.createElement("li");
   row.className = "task";
   row.dataset["id"] = task.id;
-  row.tabIndex = 0;
+
+  /*
+   * The tick is a real <button>, so it is focusable and activates on Enter and
+   * Space for free. Its ARIA role reports what the item actually is: a checkbox
+   * when one press finishes it, a spinbutton when it takes several. The ring
+   * itself is decorative once the button carries the semantics.
+   */
+  const tick = document.createElement("button");
+  tick.type = "button";
+  tick.className = "tick";
 
   let ring = makeRing(size, 3, task.target);
+  ring.setAttribute("aria-hidden", "true");
+  tick.append(ring);
+
   const label = document.createElement("div");
   label.className = "label";
-  const count = document.createElement("div");
+
+  const count = document.createElement("button");
+  count.type = "button";
   count.className = "count";
+
   const kill = button("kill", "Delete");
   kill.append(icon("x"));
 
-  const wireRing = (target: Ring): void => {
-    target.setAttribute("role", "button");
-    target.setAttribute("aria-label", "Toggle");
-    // Shift-click steps back down; on touch the count label does the same job.
-    target.addEventListener("click", (event) => {
-      actions.bump(task.id, event.shiftKey ? -1 : 1);
-    });
-  };
-  wireRing(ring);
-
+  // Shift-click steps back down; on touch the count label does the same job.
+  tick.addEventListener("click", (event) => {
+    actions.bump(task.id, event.shiftKey ? -1 : 1);
+  });
+  tick.addEventListener("keydown", (event) => {
+    // Spinbutton conventions, and a way down that isn't Shift-click.
+    if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      actions.bump(task.id, -1);
+    }
+    if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+      event.preventDefault();
+      actions.bump(task.id, 1);
+    }
+  });
   count.addEventListener("click", () => {
     actions.bump(task.id, -1);
   });
@@ -62,7 +82,7 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     actions.beginEdit(label, task.id, false);
   });
 
-  row.append(ring, label, count, kill);
+  row.append(tick, label, count, kill);
 
   const update = (next: Task): void => {
     row.classList.toggle("done", isDone(next));
@@ -70,19 +90,34 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     // The arc count is baked into the ring, so a changed target needs a new one.
     if (ring.target !== next.target) {
       const fresh = makeRing(size, 3, next.target);
-      wireRing(fresh);
+      fresh.setAttribute("aria-hidden", "true");
       ring.replaceWith(fresh);
       ring = fresh;
     }
     paintRing(ring, next.count, next.target);
 
     if (!actions.isEditing(next.id)) writeLabel(label, next);
+
     count.hidden = next.target <= 1;
     count.textContent = next.target > 1 ? `${String(next.count)}/${String(next.target)}` : "";
-    row.setAttribute(
-      "aria-label",
-      `${next.text}, ${String(next.count)} of ${String(next.target)} done`,
-    );
+    count.setAttribute("aria-label", `${next.text}: one fewer`);
+
+    if (next.target > 1) {
+      tick.setAttribute("role", "spinbutton");
+      tick.setAttribute("aria-valuenow", String(next.count));
+      tick.setAttribute("aria-valuemin", "0");
+      tick.setAttribute("aria-valuemax", String(next.target));
+      tick.setAttribute("aria-valuetext", `${String(next.count)} of ${String(next.target)} done`);
+      tick.removeAttribute("aria-checked");
+    } else {
+      tick.setAttribute("role", "checkbox");
+      tick.setAttribute("aria-checked", String(isDone(next)));
+      for (const attr of ["aria-valuenow", "aria-valuemin", "aria-valuemax", "aria-valuetext"]) {
+        tick.removeAttribute(attr);
+      }
+    }
+    tick.setAttribute("aria-label", next.text);
+    kill.setAttribute("aria-label", `Delete ${next.text}`);
   };
 
   update(task);
@@ -97,3 +132,7 @@ export function popRing(row: HTMLElement): void {
   void (ring as HTMLElement).offsetWidth;
   ring.classList.add("pop");
 }
+
+/** The row's keyboard handle, for restoring focus after a move. */
+export const tickOf = (row: HTMLElement): HTMLElement | null =>
+  row.querySelector<HTMLElement>(".tick");

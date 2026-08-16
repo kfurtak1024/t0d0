@@ -56,6 +56,7 @@
 
 .more {
   flex: none;
+  position: relative;
   width: 2rem;
   height: 2rem;
   display: grid;
@@ -80,6 +81,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .list > .task,
@@ -130,6 +134,7 @@
 
 .chev {
   flex: none;
+  position: relative;
   width: 1.1rem;
   height: 1.1rem;
   display: grid;
@@ -185,6 +190,8 @@
 .items {
   display: flex;
   flex-direction: column;
+  list-style: none;
+  padding-right: 0;
   margin-left: 1.05rem;
   padding-left: 0.6rem;
   border-left: 1.5px solid var(--line);
@@ -217,11 +224,53 @@
   background: var(--nest);
 }
 
-.ring {
+.tick {
   flex: none;
-  display: block;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+/*
+  Hit areas, not paint areas. Every interactive control below the 44px guideline
+  grows an invisible target via ::after, so the tap size is honest without the
+  visual weight changing.
+*/
+.tick::after,
+.kill::after,
+.plus::after,
+.count::after,
+.more::after,
+.add::after,
+.chev::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+}
+
+.tick::after {
+  inset: -11px;
+}
+
+.chev::after {
+  inset: -14px;
+}
+
+.more::after,
+.add::after {
+  inset: -6px;
+}
+
+.count::after {
+  inset: -12px -8px;
+}
+
+.ring {
+  display: block;
+  pointer-events: none;
 }
 
 .ring circle {
@@ -323,6 +372,7 @@
 
 .count {
   flex: none;
+  position: relative;
   font-size: 0.76rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -341,6 +391,7 @@
 .kill,
 .plus {
   flex: none;
+  position: relative;
   width: 1.6rem;
   height: 1.6rem;
   display: grid;
@@ -524,6 +575,7 @@
 
 .add {
   flex: none;
+  position: relative;
   width: 2.2rem;
   height: 2.2rem;
   border-radius: 999px;
@@ -878,13 +930,6 @@
   color: var(--ink);
 }
 
-.row-flash {
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: oklch(var(--ring-l) var(--ring-c) 150);
-  white-space: nowrap;
-}
-
 .row.danger .row-label,
 .row.danger .row-end {
   color: oklch(56% 0.17 25);
@@ -1003,59 +1048,6 @@
   font-size: 0.8rem;
 }
 
-/* ------------------------------------------------------------- advanced */
-
-.advanced {
-  margin-top: 1.5rem;
-  border-top: 1px solid var(--line);
-  padding-top: 0.9rem;
-}
-
-.advanced summary {
-  font-size: 0.78rem;
-  color: var(--faint);
-  cursor: pointer;
-  list-style: none;
-  padding: 0.2rem 0.15rem;
-}
-
-.advanced summary::-webkit-details-marker {
-  display: none;
-}
-
-.advanced summary::before {
-  content: "▸ ";
-}
-
-.advanced[open] summary::before {
-  content: "▾ ";
-}
-
-.advanced summary:hover {
-  color: var(--muted);
-}
-
-.advanced textarea {
-  width: 100%;
-  height: 10rem;
-  resize: vertical;
-  margin-top: 0.5rem;
-  border-radius: 12px;
-  border: 1.5px solid var(--line);
-  background: var(--nest);
-  padding: 0.7rem 0.8rem;
-  font-family: var(--mono);
-  font-size: 0.74rem;
-  line-height: 1.55;
-  white-space: pre;
-  overflow-x: auto;
-}
-
-.advanced textarea:focus {
-  outline: none;
-  border-color: oklch(var(--ring-l) var(--ring-c) 268);
-}
-
 /* ---------------------------------------------------------------- about */
 
 .about {
@@ -1148,4 +1140,58 @@
   height: 100%;
   pointer-events: none;
   z-index: 60;
+}
+
+/* -------------------------------------------------------------- noscript */
+
+.noscript {
+  max-width: 30rem;
+  margin: 4rem auto;
+  padding: 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* ------------------------------------------------------- theme selector */
+
+.segmented {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--nest);
+  border-radius: 999px;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 0.45rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.segmented button:hover {
+  color: var(--ink);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+}
+
+.row.rowtall {
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.row.rowtall .segmented {
+  flex: none;
+  width: 13rem;
 }

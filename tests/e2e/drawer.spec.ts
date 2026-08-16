@@ -16,17 +16,56 @@ test.beforeEach(async ({ page }) => {
   await clearStorage(page);
 });
 
-test("the settings sheet is two rows plus reset, and nothing else", async ({ page }) => {
+test("the settings sheet holds theme, two backup rows, and reset", async ({ page }) => {
   await addItem(page, "shopping");
   await openDrawer(page);
 
   await expect(page.locator(".drawer-head h2")).toHaveText("Settings");
-  await expect(page.locator(".row")).toHaveCount(3);
+  await expect(page.locator(".row")).toHaveCount(4);
   await expect(page.locator('[data-act="save"] .row-label')).toHaveText("Save a copy");
   await expect(page.locator('[data-act="restore"] .row-label')).toHaveText("Load from a file");
   await expect(page.locator('[data-act="erase"] .row-label')).toHaveText("Erase everything");
   await expect(page.locator(".advanced")).toHaveCount(0);
   await expect(page.locator("textarea")).toHaveCount(0);
+});
+
+test("the theme choice applies immediately and survives a reload", async ({ page }) => {
+  await openDrawer(page);
+  await expect(page.locator('[data-theme-choice="system"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.*/);
+
+  await page.locator('[data-theme-choice="dark"]').click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator('[data-theme-choice="dark"]')).toHaveAttribute("aria-pressed", "true");
+  // The browser chrome follows the app, not just the OS.
+  await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute(
+    "content",
+    "#0e1116",
+  );
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await openDrawer(page);
+  await page.locator('[data-theme-choice="system"]').click();
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.*/);
+});
+
+test("a theme choice is not carried in a backup", async ({ page }) => {
+  await openDrawer(page);
+  await page.locator('[data-theme-choice="dark"]').click();
+
+  const download = page.waitForEvent("download");
+  await page.locator('[data-act="save"]').click();
+  const stream = await (await download).createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+
+  // The theme belongs to this browser, not to the list.
+  expect(Buffer.concat(chunks).toString("utf8")).not.toContain("theme");
 });
 
 test("the drawer summarises what a backup would contain", async ({ page }) => {

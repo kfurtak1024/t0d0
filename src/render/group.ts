@@ -5,7 +5,7 @@ import { KeyedList, type Keyed } from "./list";
 import { createTask } from "./task";
 
 export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
-  const box = document.createElement("div");
+  const box = document.createElement("li");
   box.className = "group";
   box.dataset["id"] = group.id;
 
@@ -34,7 +34,7 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
   body.className = "gbody";
   const inner = document.createElement("div");
   inner.className = "inner";
-  const items = document.createElement("div");
+  const items = document.createElement("ul");
   items.className = "items";
   inner.append(items);
   body.append(inner);
@@ -68,6 +68,11 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
     plus.classList.toggle("aimed", actions.isAimed(next.id));
     plus.setAttribute("aria-label", `Add to ${next.title}`);
     chevron.setAttribute("aria-expanded", String(!next.collapsed));
+    chevron.setAttribute(
+      "aria-label",
+      next.collapsed ? `Expand ${next.title}` : `Collapse ${next.title}`,
+    );
+    kill.setAttribute("aria-label", `Delete ${next.title}`);
 
     list.patch(next.items);
   };

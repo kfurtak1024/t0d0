@@ -3,7 +3,7 @@ import { allTasks, isComplete, isDone, overallProgress } from "./progress";
 import { createGroup } from "./render/group";
 import { KeyedList } from "./render/list";
 import { hueAt, makeRing, paintRing } from "./render/ring";
-import { createTask, popRing } from "./render/task";
+import { createTask, popRing, tickOf } from "./render/task";
 import type { RowActions } from "./render/context";
 import { onExternalChange } from "./storage";
 import type { Store } from "./store";
@@ -28,7 +28,7 @@ function el(selector: string): HTMLElement {
 
 export class App {
   #store: Store;
-  #reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  #motion = matchMedia("(prefers-reduced-motion: reduce)");
 
   #list = el("#list");
   #empty = el("#empty");
@@ -124,6 +124,10 @@ export class App {
     });
     this.#confetti = new Confetti(el("#confetti") as HTMLCanvasElement);
 
+    this.#store.onSaveFailed(() => {
+      this.#toast.show("Can't save — this list will be lost on reload");
+    });
+
     this.#wire();
     this.#store.subscribe(() => {
       this.#render();
@@ -159,7 +163,7 @@ export class App {
     const after = T.findTask(this.#state, id);
     if (after && !wasDone && isDone(after)) {
       const row = this.#rows.get(id)?.element ?? this.#list.querySelector(`[data-id="${id}"]`);
-      if (row && !this.#reduced) popRing(row as HTMLElement);
+      if (row && !this.#motion.matches) popRing(row as HTMLElement);
       this.#vibrate(12);
     }
     this.#checkComplete();
@@ -181,7 +185,7 @@ export class App {
     };
 
     const entry = this.#rows.get(id);
-    if (entry && !this.#reduced) {
+    if (entry && !this.#motion.matches) {
       entry.element.classList.add("leaving");
       setTimeout(finish, EXIT_MS);
     } else {
@@ -229,7 +233,7 @@ export class App {
     const complete = isComplete(allTasks(this.#state.list));
     if (complete && this.#armed) {
       this.#armed = false;
-      if (!this.#reduced) {
+      if (!this.#motion.matches) {
         const box = this.#totalRing.getBoundingClientRect();
         this.#confetti.burst({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
       }
@@ -286,7 +290,7 @@ export class App {
   }
 
   #tweenPct(target: number): void {
-    if (this.#reduced) {
+    if (this.#motion.matches) {
       this.#shownPct = target;
       this.#pct.textContent = `${String(target)}%`;
       return;
@@ -378,12 +382,10 @@ export class App {
     const id = row instanceof HTMLElement ? row.dataset["id"] : undefined;
     if (id === undefined) return;
 
-    if (event.key === " ") {
-      event.preventDefault();
-      this.#bump(id, event.shiftKey ? -1 : 1);
-      this.#refocus(id);
-      return;
-    }
+    // Only the tick is the row's handle: Tab from a delete button must stay a
+    // plain focus move, not a structural edit.
+    if (!(document.activeElement instanceof HTMLElement)) return;
+    if (!document.activeElement.classList.contains("tick")) return;
 
     if (event.key === "Tab") {
       const dir = event.shiftKey ? "out" : "in";
@@ -397,8 +399,9 @@ export class App {
 
   #refocus(id: string): void {
     requestAnimationFrame(() => {
-      const element = this.#list.querySelector(`.task[data-id="${id}"]`);
-      if (element instanceof HTMLElement) element.focus();
+      const row = this.#list.querySelector(`.task[data-id="${id}"]`);
+      const tick = row instanceof HTMLElement ? tickOf(row) : null;
+      tick?.focus();
     });
   }
 }

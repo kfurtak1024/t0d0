@@ -13,9 +13,19 @@ export class Store {
   #state: State;
   #undo: State | null = null;
   #listeners = new Set<Listener>();
+  #onSaveFailed: (() => void) | null = null;
 
   constructor(initial: State) {
     this.#state = initial;
+  }
+
+  /** Called once when a write cannot reach storage. */
+  onSaveFailed(handler: () => void): void {
+    this.#onSaveFailed = handler;
+  }
+
+  #persist(): void {
+    if (!save(this.#state)) this.#onSaveFailed?.();
   }
 
   get state(): State {
@@ -35,7 +45,7 @@ export class Store {
     if (next === this.#state) return;
     if (undoable) this.#undo = this.#state;
     this.#state = next;
-    save(this.#state);
+    this.#persist();
     this.#emit();
   }
 
@@ -43,7 +53,7 @@ export class Store {
   replace(next: State, { undoable = false }: { undoable?: boolean } = {}): void {
     if (undoable) this.#undo = this.#state;
     this.#state = next;
-    save(this.#state);
+    this.#persist();
     this.#emit();
   }
 
@@ -51,7 +61,7 @@ export class Store {
     if (this.#undo === null) return false;
     this.#state = this.#undo;
     this.#undo = null;
-    save(this.#state);
+    this.#persist();
     this.#emit();
     return true;
   }

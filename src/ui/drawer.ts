@@ -2,6 +2,7 @@ import { normalize } from "../normalize";
 import { allTasks } from "../progress";
 import { icon, type IconName } from "../render/context";
 import type { State } from "../types";
+import { loadTheme, saveTheme, THEMES, type Theme } from "../theme";
 import { trapFocus } from "./focus";
 
 const CONFIRM_MS = 5000;
@@ -68,6 +69,25 @@ export class Drawer {
     });
 
     this.#wireDropTarget();
+    this.#wireTheme();
+  }
+
+  #wireTheme(): void {
+    for (const el of this.#veil.querySelectorAll("[data-theme-choice]")) {
+      el.addEventListener("click", () => {
+        const choice = el.getAttribute("data-theme-choice");
+        if (!(THEMES as readonly string[]).includes(choice ?? "")) return;
+        saveTheme(choice as Theme);
+        this.#paintTheme();
+      });
+    }
+  }
+
+  #paintTheme(): void {
+    const current = loadTheme();
+    for (const el of this.#veil.querySelectorAll("[data-theme-choice]")) {
+      el.setAttribute("aria-pressed", String(el.getAttribute("data-theme-choice") === current));
+    }
   }
 
   get isOpen(): boolean {
@@ -84,6 +104,7 @@ export class Drawer {
 
     this.#clearStaged();
     this.#clearErase();
+    this.#paintTheme();
     this.#veil.hidden = false;
     this.#release = trapFocus(this.#panel);
   }

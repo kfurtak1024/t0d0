@@ -21,6 +21,8 @@
       content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#ebeff6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
     <meta name="description" content="One list you prune each morning and tick through the day." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -28,7 +30,7 @@
     <title>t0d0</title>
   </head>
   <body>
-    <div class="app">
+    <main class="app">
       <header class="top">
         <h1 class="brand">t<i>0</i>d<i>0</i></h1>
         <div class="headline">
@@ -39,14 +41,14 @@
         <button class="more" id="databtn" type="button" aria-label="Settings">⋯</button>
       </header>
 
-      <main class="list" id="list"></main>
+      <ul class="list" id="list"></ul>
 
       <button class="endday" id="closeday" type="button" hidden>
         That's the day <span aria-hidden="true">→</span>
       </button>
 
       <p class="empty" id="empty" hidden>Nothing here yet.<br />Type below to add today's list.</p>
-    </div>
+    </main>
 
     <div class="composer">
       <div class="composer-inner">
@@ -99,6 +101,25 @@
         </header>
 
         <div class="drawer-body">
+          <section class="sect">
+            <h3 class="sect-title">Appearance</h3>
+            <div class="rows">
+              <div class="row rowtall">
+                <span class="row-main"><span class="row-label">Theme</span></span>
+                <span class="segmented" role="group" aria-label="Theme">
+                  <button type="button" data-theme-choice="system" aria-pressed="true">
+                    System
+                  </button>
+                  <button type="button" data-theme-choice="light" aria-pressed="false">
+                    Light
+                  </button>
+                  <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+                </span>
+              </div>
+            </div>
+            <p class="footnote">System follows whatever your device is set to.</p>
+          </section>
+
           <section class="sect">
             <h3 class="sect-title">Backup</h3>
             <div class="rows">
@@ -155,9 +176,19 @@
           <footer class="about">
             <p>
               t0d0 — by
-              <a href="https://github.com/kfurtak1024" rel="noreferrer">Krzysztof Furtak</a>
+              <a href="https://github.com/kfurtak1024" target="_blank" rel="noopener noreferrer"
+                >Krzysztof Furtak</a
+              >
             </p>
-            <p><a href="https://github.com/kfurtak1024/t0d0" rel="noreferrer">Source</a> · MIT</p>
+            <p>
+              <a
+                href="https://github.com/kfurtak1024/t0d0"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Source</a
+              >
+              · MIT
+            </p>
           </footer>
         </div>
 
@@ -165,6 +196,13 @@
         <div class="dropveil" aria-hidden="true"><span>Drop a file to load it</span></div>
       </div>
     </div>
+
+    <noscript>
+      <p class="noscript">
+        t0d0 needs JavaScript. Your list is stored in this browser and nothing is sent anywhere, so
+        there is no server-rendered version to fall back to.
+      </p>
+    </noscript>
 
     <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 

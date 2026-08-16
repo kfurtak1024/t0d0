@@ -37,6 +37,7 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon.png", "robots.txt"],
       manifest: {
+        id: "/",
         name: "t0d0",
         short_name: "t0d0",
         description: "One list you prune each morning and tick through the day.",

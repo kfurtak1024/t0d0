@@ -21,8 +21,9 @@ These are decisions, not defaults. Changing one is a conversation, not a refacto
 - **No history.** Ticks are cleared, never archived. No streaks, no yesterday, no stats
   beyond the current list.
 - **One level of grouping.** The type system forbids deeper nesting; keep it that way.
-- **Offline-first.** Everything lives in one `localStorage` key. It must work with the
-  network off, and never lose the list on a failed write.
+- **Offline-first.** The list lives in one `localStorage` key. It must work with the
+  network off, and a write that cannot reach storage must say so rather than
+  pretend — `save()` returns false and the app surfaces it.
 
 ## Domain model
 
@@ -41,6 +42,9 @@ Invariants worth defending in review:
   root beside groups; there is no implicit "Inbox".
 - **Progress is `mean(count / target)`** over tasks, so one `[20]` item cannot swamp the
   ring. Empty groups are excluded from totals and render no ring.
+- **The theme lives in its own storage key**, never in the list. It is a property
+  of this browser, so putting it in `State` would export it in a backup and
+  import someone else's choice.
 - **All external data goes through `normalize()`** — stored JSON and pasted imports alike.
   It repairs rather than trusts: clamps `target` to 1–99, clamps `count` to `target`, drops
   empty text, regenerates duplicate ids. Never parse straight into state.
@@ -74,6 +78,7 @@ Node version is pinned in `.nvmrc`. Use `npm ci`, not `npm install`, in automati
 ## Where things live
 
 ```
+src/theme.ts      theme preference, in its own storage key
 src/state.ts      types, normalize, load/save, all state transitions
 src/parse.ts      "# Title" and "[n]" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula
@@ -104,8 +109,11 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
 - Conventional Commits. Work on a branch, PR into `main`; pushing `main` deploys.
 - Comments explain **why**, not what. The keyed patch and the celebration guard deserve
   comments; a `for` loop does not.
-- Accessibility is not optional: real `<input type="checkbox">` semantics, visible focus,
-  `aria-live` on progress, ≥44px touch targets. `@media (hover: hover)` is the correct
+- Accessibility is not optional. The tick is a real `<button>` carrying
+  `role="checkbox"` with `aria-checked`, or `role="spinbutton"` with
+  `aria-valuenow`/`aria-valuemax` once an item is counted — the ring inside it is
+  `aria-hidden`. The list is a `<ul>` of `<li>`. Every control clears 44px via an
+  invisible `::after` hit area rather than by growing visually. `@media (hover: hover)` is the correct
   fork for pointer affordances — never a width breakpoint. Every dialog traps focus via
   `src/ui/focus.ts` and hands it back on close; `aria-modal` alone does nothing for Tab.
 
