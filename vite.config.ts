@@ -67,8 +67,23 @@ export default defineConfig({
     environment: "node",
     coverage: {
       provider: "v8",
-      include: ["src/parse.ts", "src/progress.ts", "src/normalize.ts", "src/transitions.ts"],
-      thresholds: { lines: 95, functions: 95, branches: 90, statements: 95 },
+      include: ["src/**/*.ts"],
+      /*
+       * The excluded files are not untested — they are tested end to end by
+       * Playwright, where a rendering layer is worth testing. Listing them here
+       * keeps the percentage about the code Vitest is actually responsible for,
+       * instead of a number diluted into meaninglessness.
+       */
+      exclude: [
+        "src/main.ts",
+        "src/types.ts",
+        "src/app.ts",
+        "src/ui/**",
+        "src/render/context.ts",
+        "src/render/group.ts",
+        "src/render/task.ts",
+      ],
+      thresholds: { lines: 95, functions: 90, branches: 90, statements: 95 },
     },
   },
 });

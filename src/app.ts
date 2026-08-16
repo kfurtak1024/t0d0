@@ -52,6 +52,7 @@ export class App {
   #armed = true;
   #shownPct = 0;
   #tweenRaf = 0;
+  #storageWarned = false;
   /** A delete waiting out its exit animation, cancellable until it lands. */
   #pendingDelete: {
     id: string;
@@ -130,7 +131,14 @@ export class App {
     });
     this.#confetti = new Confetti(el("#confetti") as HTMLCanvasElement);
 
-    this.#store.onSaveFailed(() => {
+    // Warn once per outage, and again if storage comes back and fails afresh.
+    this.#store.onPersist((ok) => {
+      if (ok) {
+        this.#storageWarned = false;
+        return;
+      }
+      if (this.#storageWarned) return;
+      this.#storageWarned = true;
       this.#toast.show("Can't save — this list will be lost on reload");
     });
 

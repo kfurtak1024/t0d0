@@ -492,7 +492,7 @@
 }
 
 .endday.ripe {
-  color: #fff;
+  color: var(--on-accent);
   background: oklch(var(--ring-l) var(--ring-c) 150);
   border-color: transparent;
   box-shadow: var(--shadow-lift);
@@ -505,7 +505,7 @@
 }
 
 .endday.ripe:hover {
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .endday:active {
@@ -582,7 +582,7 @@
   display: grid;
   place-items: center;
   background: oklch(var(--ring-l) var(--ring-c) 268);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 1.25rem;
   line-height: 1;
   transition: transform 0.4s var(--spring);
@@ -770,7 +770,7 @@
   font-size: 0.92rem;
   font-weight: 650;
   background: oklch(var(--ring-l) var(--ring-c) 268);
-  color: #fff;
+  color: var(--on-accent);
   transition: transform 0.4s var(--spring);
 }
 
@@ -932,7 +932,7 @@
 
 .row.danger .row-label,
 .row.danger .row-end {
-  color: oklch(56% 0.17 25);
+  color: var(--danger);
 }
 
 .footnote {
@@ -961,7 +961,7 @@
 }
 
 .staged.bad {
-  border-color: oklch(56% 0.17 25 / 55%);
+  border-color: color-mix(in oklab, var(--danger) 55%, transparent);
 }
 
 .staged-name {
@@ -992,7 +992,7 @@
   border-radius: 11px;
   font-size: 0.85rem;
   font-weight: 650;
-  color: #fff;
+  color: var(--on-accent);
   background: oklch(var(--ring-l) var(--ring-c) 268);
   transition: transform 0.4s var(--spring);
 }
@@ -1007,7 +1007,7 @@
 }
 
 .btn.danger {
-  background: oklch(56% 0.17 25);
+  background: var(--danger);
 }
 
 /* -------------------------------------------------------- erase confirm */
@@ -1019,7 +1019,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.65rem 0.7rem 0.65rem 0.95rem;
-  background: oklch(56% 0.17 25 / 10%);
+  background: var(--danger);
 }
 
 .confirmbar[hidden] {
@@ -1030,11 +1030,7 @@
   flex: 1;
   font-size: 0.88rem;
   font-weight: 650;
-  color: oklch(56% 0.17 25);
-}
-
-:root[data-theme="dark"] .confirmbar-text {
-  color: oklch(72% 0.15 25);
+  color: var(--danger);
 }
 
 .confirmbar-actions {

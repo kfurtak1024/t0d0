@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { normalize } from "../src/normalize";
 import { allTasks } from "../src/progress";
@@ -93,5 +94,110 @@ describe("normalize", () => {
   it("truncates oversized text instead of rejecting the item", () => {
     const state = normalize(wrap([{ kind: "task", text: "x".repeat(1000) }]));
     expect((state?.list[0] as { text: string }).text).toHaveLength(200);
+  });
+});
+
+/*
+ * normalize()'s whole job is surviving input it did not produce, so hand-picked
+ * shapes only get us so far. These three properties hold for anything at all.
+ */
+describe("properties over arbitrary input", () => {
+  const anyJson = fc.jsonValue();
+
+  /*
+   * Deliberately takes `unknown` and re-checks everything the types promise.
+   * Typing it as State would let TypeScript "prove" the assertions away, and
+   * the point is to verify the runtime shape, not to trust the declaration.
+   */
+  const structurallyValid = (value: unknown): boolean => {
+    const isRecord = (v: unknown): v is Record<string, unknown> =>
+      typeof v === "object" && v !== null;
+    if (!isRecord(value)) return false;
+    if (value["v"] !== 1) return false;
+    const openedAt = value["openedAt"];
+    if (openedAt !== null && !Number.isFinite(openedAt)) return false;
+    if (!Array.isArray(value["list"])) return false;
+
+    const ids = new Set<string>();
+    const okTask = (task: unknown): boolean => {
+      if (!isRecord(task) || task["kind"] !== "task") return false;
+      const text = task["text"];
+      if (typeof text !== "string" || text.length === 0 || text.length > 200) return false;
+      const target = task["target"];
+      const count = task["count"];
+      if (typeof target !== "number" || !Number.isInteger(target)) return false;
+      if (target < 1 || target > 99) return false;
+      if (typeof count !== "number" || !Number.isInteger(count)) return false;
+      if (count < 0 || count > target) return false;
+      const id = task["id"];
+      if (typeof id !== "string" || ids.has(id)) return false;
+      ids.add(id);
+      return true;
+    };
+
+    for (const node of value["list"] as unknown[]) {
+      if (!isRecord(node)) return false;
+      if (node["kind"] === "group") {
+        const title = node["title"];
+        const id = node["id"];
+        if (typeof title !== "string" || title.length === 0) return false;
+        if (typeof id !== "string" || ids.has(id)) return false;
+        ids.add(id);
+        if (typeof node["collapsed"] !== "boolean") return false;
+        if (!Array.isArray(node["items"]) || !(node["items"] as unknown[]).every(okTask)) {
+          return false;
+        }
+      } else if (!okTask(node)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  it("never throws, whatever it is handed", () => {
+    fc.assert(
+      fc.property(anyJson, (value) => {
+        normalize(value);
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it("returns either null or a state that satisfies every invariant", () => {
+    fc.assert(
+      fc.property(anyJson, (value) => {
+        const result = normalize(value);
+        return result === null || structurallyValid(result);
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it("is idempotent — repairing a repaired state changes nothing", () => {
+    fc.assert(
+      fc.property(anyJson, (value) => {
+        const once = normalize(value);
+        if (once === null) return true;
+        return JSON.stringify(normalize(once)) === JSON.stringify(once);
+      }),
+      { numRuns: 500 },
+    );
+  });
+
+  it("keeps everything usable out of a plausible list", () => {
+    const task = fc.record({
+      kind: fc.constant("task"),
+      id: fc.string({ minLength: 1, maxLength: 8 }),
+      text: fc.string({ minLength: 1, maxLength: 30 }).filter((t) => t.trim().length > 0),
+      target: fc.integer({ min: -5, max: 200 }),
+      count: fc.integer({ min: -5, max: 200 }),
+    });
+    fc.assert(
+      fc.property(fc.array(task, { maxLength: 12 }), (tasks) => {
+        const result = normalize({ v: 1, openedAt: null, list: tasks });
+        return result !== null && result.list.length === tasks.length;
+      }),
+      { numRuns: 200 },
+    );
   });
 });

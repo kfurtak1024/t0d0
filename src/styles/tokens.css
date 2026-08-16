@@ -1,4 +1,8 @@
 /*
+  Text tokens are chosen to clear WCAG AA (4.5:1) on every surface they are used
+  on — --bg, --card and --nest — and tests/e2e/a11y.spec.ts enforces it. --muted
+  sits near 6.5:1 so there is still a visible tier between it and --faint.
+
   Every colour is defined on bare :root as the complete light palette, then
   redefined for dark. Nothing may declare a colour only inside a media query —
   that is how a page ends up painting one theme's text on the other's ground.
@@ -9,8 +13,8 @@
   --card: #ffffff;
   --nest: #f4f7fc;
   --ink: #191d26;
-  --muted: #6b7486;
-  --faint: #a4acbb;
+  --muted: #4b5466;
+  --faint: #646c7b;
   --line: #e3e8f1;
   --track: #dfe5ef;
   --field: #ffffff;
@@ -18,6 +22,12 @@
   /* Lightness and chroma for the progress hue sweep; hue is set per element. */
   --ring-l: 56%;
   --ring-c: 0.15;
+
+  /* Text sitting on a filled accent, and the destructive red. Both flip with
+     the theme: the accent lightens in dark mode, so white stops being legible
+     on it, and the red has to lighten to stay readable on a dark surface. */
+  --on-accent: #ffffff;
+  --danger: oklch(56% 0.17 25);
 
   --shadow-card: 0 1px 2px rgb(20 26 40 / 5%), 0 6px 16px -6px rgb(20 26 40 / 10%);
   --shadow-lift: 0 2px 4px rgb(20 26 40 / 6%), 0 14px 30px -10px rgb(20 26 40 / 18%);
@@ -64,13 +74,15 @@
     --card: #171b22;
     --nest: #1d222b;
     --ink: #e8ecf3;
-    --muted: #98a1b2;
-    --faint: #6a7385;
+    --muted: #9da6b7;
+    --faint: #818a9c;
     --line: #252b35;
     --track: #2a313d;
     --field: #1d222b;
     --ring-l: 74%;
     --ring-c: 0.14;
+    --on-accent: #10141a;
+    --danger: oklch(74% 0.15 25);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
     --shadow-lift: 0 2px 4px rgb(0 0 0 / 40%), 0 14px 30px -10px rgb(0 0 0 / 60%);
     --sheet-veil: rgb(6 8 12 / 60%);
@@ -82,13 +94,15 @@
   --card: #171b22;
   --nest: #1d222b;
   --ink: #e8ecf3;
-  --muted: #98a1b2;
-  --faint: #6a7385;
+  --muted: #9da6b7;
+  --faint: #818a9c;
   --line: #252b35;
   --track: #2a313d;
   --field: #1d222b;
   --ring-l: 74%;
   --ring-c: 0.14;
+  --on-accent: #10141a;
+  --danger: oklch(74% 0.15 25);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
   --shadow-lift: 0 2px 4px rgb(0 0 0 / 40%), 0 14px 30px -10px rgb(0 0 0 / 60%);
   --sheet-veil: rgb(6 8 12 / 60%);

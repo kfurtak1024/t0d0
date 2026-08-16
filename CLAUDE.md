@@ -100,7 +100,17 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
   pure functions over `State`, without a DOM.
 - The keyed patch has DOM tests asserting node identity survives an update.
 - Playwright covers the paths a unit test cannot: persistence across reload, the mobile
-  viewport, and the export/import round-trip.
+  viewport, the export/import round-trip, and a cold start with the network off.
+- `tests/e2e/a11y.spec.ts` is the net under the accessibility work: axe must report zero
+  WCAG 2.1 AA violations on the list, both dialogs and the empty state, and an ARIA
+  snapshot pins the roles, names and states of the whole list.
+- Text tokens must clear 4.5:1 on `--bg`, `--card` and `--nest`. Changing `--muted`,
+  `--faint` or `--danger` means re-running the a11y spec, not eyeballing it.
+- `normalize()` also gets property-based tests: over arbitrary JSON it never throws,
+  returns null or a structurally valid state, and is idempotent.
+- Coverage measures the pure and DOM-primitive layers only; `app.ts`, `src/ui/**` and the
+  row renderers are excluded because Playwright owns them. Thresholds are in
+  `vite.config.ts` and CI enforces them.
 - Every animation must have a `prefers-reduced-motion` path that still lands in a finished
   visual state — reduced motion means instant, not absent.
 

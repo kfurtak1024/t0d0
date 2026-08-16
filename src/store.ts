@@ -13,19 +13,22 @@ export class Store {
   #state: State;
   #undo: State | null = null;
   #listeners = new Set<Listener>();
-  #onSaveFailed: (() => void) | null = null;
+  #onPersist: ((ok: boolean) => void) | null = null;
 
   constructor(initial: State) {
     this.#state = initial;
   }
 
-  /** Called once when a write cannot reach storage. */
-  onSaveFailed(handler: () => void): void {
-    this.#onSaveFailed = handler;
+  /** Reports every write, so a caller can decide how loudly to react. */
+  onPersist(handler: (ok: boolean) => void): void {
+    this.#onPersist = handler;
   }
 
   #persist(): void {
-    if (!save(this.#state)) this.#onSaveFailed?.();
+    // Evaluated first on purpose: `handler?.(save(...))` short-circuits the
+    // argument too, so with no listener the state would never be written.
+    const persisted = save(this.#state);
+    this.#onPersist?.(persisted);
   }
 
   get state(): State {

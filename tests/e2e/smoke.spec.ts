@@ -174,10 +174,12 @@ test("progress is announced once, not once per animation frame", async ({ page }
   });
 
   await page.locator(".task", { hasText: "one" }).locator(".tick").click();
-  await page.waitForTimeout(800);
+  await expect(page.locator("#frac")).toHaveText("1 of 2");
 
-  const writes = await page.evaluate(() => (window as unknown as { writes: number }).writes);
-  expect(writes).toBe(1);
+  // The tween keeps rewriting #pct; #frac must settle at exactly one write.
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { writes: number }).writes))
+    .toBe(1);
 });
 
 test("a collapsed group leaves the tab order", async ({ page }) => {
@@ -225,8 +227,8 @@ test("undo during the delete animation puts the item back", async ({ page }) => 
   await row.locator(".kill").click();
   await page.keyboard.press("Control+z"); // inside the exit animation
 
-  await page.waitForTimeout(600);
   await expect(page.locator(".task", { hasText: "alpha" })).toBeVisible();
+  await expect(page.locator(".task", { hasText: "alpha" })).not.toHaveClass(/leaving/);
   await expect(page.locator(".list .task")).toHaveCount(2);
 });
 
@@ -250,9 +252,9 @@ test("deleting the last undone item still finishes the day", async ({ page }) =>
   const row = page.locator(".task", { hasText: "not yet" });
   await row.hover();
   await row.locator(".kill").click();
-  await page.waitForTimeout(900);
 
   await expect(page.locator("#frac")).toHaveText("1 of 1");
-  const draws = await page.evaluate(() => (window as unknown as { draws: number }).draws);
-  expect(draws).toBeGreaterThan(0);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { draws: number }).draws))
+    .toBeGreaterThan(0);
 });
