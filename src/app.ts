@@ -179,8 +179,9 @@ export class App {
 
     const after = T.findTask(this.#state, id);
     if (after && !wasDone && isDone(after)) {
-      const row = this.#rows.get(id)?.element ?? this.#list.querySelector(`[data-id="${id}"]`);
-      if (row && !this.#motion.matches) popRing(row as HTMLElement);
+      const row =
+        this.#rows.get(id)?.element ?? this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
+      if (row && !this.#motion.matches) popRing(row);
       this.#vibrate(12);
     }
   }

@@ -8,6 +8,12 @@ updates:
     groups:
       dev-dependencies:
         patterns: ["*"]
+    ignore:
+      # typescript-eslint peers on typescript <6.1, so a TypeScript 7 bump makes
+      # the whole group uninstallable and npm ci fails on ERESOLVE. Drop this
+      # once typescript-eslint ships support for the Go rewrite.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
