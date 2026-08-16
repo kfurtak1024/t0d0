@@ -9,10 +9,16 @@
     <!--
       Pages cannot set headers, so the policy lives here. It is also what keeps the
       "no network at runtime" rule honest: any stray external request fails loudly.
+
+      No frame-ancestors: it is header-only and silently ignored in a meta tag, so
+      listing it would claim a protection this deployment cannot actually provide.
+
+      The dev server injects stylesheets as inline <style>, which this correctly
+      refuses — see the dev-only relaxation in vite.config.ts. What ships is this.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="light dark" />
@@ -30,7 +36,7 @@
           <span class="frac" id="frac">0 of 0</span>
         </div>
         <div class="totalring" id="totalring"></div>
-        <button class="more" id="databtn" type="button" aria-label="Backup">⋯</button>
+        <button class="more" id="databtn" type="button" aria-label="Settings">⋯</button>
       </header>
 
       <main class="list" id="list"></main>
@@ -80,45 +86,83 @@
     </div>
 
     <div class="veil" id="dataveil" hidden>
-      <div class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="datatitle">
-        <h2 id="datatitle">Backup</h2>
+      <div
+        class="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="drawertitle"
+        tabindex="-1"
+      >
+        <header class="drawer-head">
+          <h2 id="drawertitle">Settings</h2>
+          <button class="drawer-close" type="button" aria-label="Close">✕</button>
+        </header>
 
-        <div class="block">
-          <p class="blocktitle">Export</p>
-          <p>Save your list as a file you can keep, or move to another browser.</p>
-          <div class="btnrow">
-            <button class="download" type="button">Download .json</button>
-            <button class="ghost copy" type="button">Copy</button>
-          </div>
-        </div>
-
-        <div class="block">
-          <p class="blocktitle">Import</p>
-          <div class="drop" tabindex="0" role="button" aria-label="Choose a backup file">
-            <b>Drop a .json backup here</b>
-            <span>or click to choose one</span>
-          </div>
-          <div class="preview" hidden>
-            <p class="pname"></p>
-            <p class="psum"></p>
-            <div class="btnrow">
-              <button class="ghost cancel" type="button">Cancel</button>
-              <button class="danger replace" type="button">Replace my list</button>
+        <div class="drawer-body">
+          <section class="sect">
+            <h3 class="sect-title">Backup</h3>
+            <div class="rows">
+              <button class="row" type="button" data-act="save">
+                <span class="row-main">
+                  <span class="row-label">Save a copy</span>
+                  <span class="row-sub" data-slot="counts"></span>
+                </span>
+                <span class="row-end" data-slot="save-end"></span>
+              </button>
+              <button class="row" type="button" data-act="restore">
+                <span class="row-main">
+                  <span class="row-label">Load from a file</span>
+                  <span class="row-sub">Replaces what's here</span>
+                </span>
+                <span class="row-end" data-slot="restore-end"></span>
+              </button>
             </div>
-          </div>
-          <input class="file" type="file" accept="application/json,.json" hidden />
+
+            <div class="staged" data-slot="staged" hidden>
+              <p class="staged-name"></p>
+              <p class="staged-sum"></p>
+              <div class="staged-actions">
+                <button class="btn ghost" type="button" data-act="import-cancel">Cancel</button>
+                <button class="btn danger" type="button" data-act="import-confirm">
+                  Replace my list
+                </button>
+              </div>
+            </div>
+
+            <p class="footnote" data-slot="backup-note">Files never leave your device.</p>
+          </section>
+
+          <section class="sect">
+            <h3 class="sect-title">Reset</h3>
+            <div class="rows">
+              <button class="row danger" type="button" data-act="erase">
+                <span class="row-main"><span class="row-label">Erase everything</span></span>
+                <span class="row-end" data-slot="erase-end"></span>
+              </button>
+              <div class="confirmbar" data-slot="erase-confirm" hidden>
+                <span class="confirmbar-text"></span>
+                <span class="confirmbar-actions">
+                  <button class="btn ghost" type="button" data-act="erase-cancel">Cancel</button>
+                  <button class="btn danger" type="button" data-act="erase-go">Erase</button>
+                </span>
+              </div>
+            </div>
+            <p class="footnote">
+              Removes every item and group. Undo covers it, but only until you close the tab.
+            </p>
+          </section>
+
+          <footer class="about">
+            <p>
+              t0d0 — by
+              <a href="https://github.com/kfurtak1024" rel="noreferrer">Krzysztof Furtak</a>
+            </p>
+            <p><a href="https://github.com/kfurtak1024/t0d0" rel="noreferrer">Source</a> · MIT</p>
+          </footer>
         </div>
 
-        <details class="raw">
-          <summary>Show raw JSON</summary>
-          <textarea class="json" spellcheck="false" aria-label="List as JSON"></textarea>
-          <div class="btnrow">
-            <button class="ghost use-text" type="button">Use this text</button>
-          </div>
-        </details>
-
-        <p class="status"></p>
-        <button class="close dismiss" type="button">Close</button>
+        <input class="file" type="file" accept="application/json,.json" hidden />
+        <div class="dropveil" aria-hidden="true"><span>Drop a file to load it</span></div>
       </div>
     </div>
 

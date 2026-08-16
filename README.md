@@ -47,7 +47,7 @@ that rather than merely promising it.
 - **A rewarding tick.** Springy rings that sweep indigo → green as the day fills in, a wiping strike-through, and confetti when everything is done.
 - **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one.
 - **Offline and installable.** A real PWA; open it with the network off.
-- **Backups.** Export a `.json` file, drag one back in. Import previews what it holds before replacing anything.
+- **Backups.** Save a `.json` copy, drop one back in. Loading previews what the file holds before replacing anything, and erasing takes two deliberate presses.
 
 ## Using it
 
@@ -65,7 +65,7 @@ that rather than merely promising it.
 | <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | move a focused item into the group above, or back out |
 | <kbd>Space</kbd>                                 | tick the focused item                                 |
 | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, an import, or a cleared day            |
-| `⋯`                                              | export a backup, or import one                        |
+| `⋯`                                              | save a copy, load one back, or erase everything       |
 
 ## Quick start
 

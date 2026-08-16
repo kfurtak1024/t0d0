@@ -107,3 +107,17 @@ test("the closer only appears once there is something to close", async ({ page }
   await addItem(page, "shopping");
   await expect(page.locator("#closeday")).toBeVisible();
 });
+
+test("a finished top-level item gets the same green frame as a cleared group", async ({ page }) => {
+  await addItem(page, "shopping");
+  const row = page.locator(".list > .task", { hasText: "shopping" });
+
+  const plain = await row.evaluate((el) => getComputedStyle(el).boxShadow);
+  await row.locator(".ring").click();
+  await expect(row).toHaveClass(/done/);
+
+  const finished = await row.evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(finished).not.toBe(plain);
+  // Same completion green the group frame uses.
+  expect(finished).toMatch(/oklch/);
+});

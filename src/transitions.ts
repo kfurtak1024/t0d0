@@ -161,3 +161,8 @@ export function clearTicks(state: State): State {
   next.openedAt = null;
   return next;
 }
+
+/** Start over completely. Undoable, but deliberately hard to reach. */
+export function eraseAll(state: State): State {
+  return { v: state.v, openedAt: null, list: [] };
+}

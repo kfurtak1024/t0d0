@@ -11,7 +11,17 @@ export interface RowActions {
 
 const SVG = "http://www.w3.org/2000/svg";
 
-export function icon(kind: "chev" | "x"): SVGSVGElement {
+const PATHS = {
+  chev: "M4 6 L8 10 L12 6",
+  x: "M4 4 L12 12 M12 4 L4 12",
+  download: "M8 2 V10.5 M4.5 7 L8 10.5 L11.5 7 M3 13.5 H13",
+  upload: "M8 10.5 V2 M4.5 5.5 L8 2 L11.5 5.5 M3 13.5 H13",
+  trash: "M3 4.5 H13 M6.5 4.5 V3 H9.5 V4.5 M4.8 4.5 L5.4 13.5 H10.6 L11.2 4.5",
+} as const;
+
+export type IconName = keyof typeof PATHS;
+
+export function icon(kind: IconName): SVGSVGElement {
   const svg = document.createElementNS(SVG, "svg");
   svg.setAttribute("viewBox", "0 0 16 16");
   svg.setAttribute("width", "14");
@@ -24,7 +34,7 @@ export function icon(kind: "chev" | "x"): SVGSVGElement {
   svg.setAttribute("aria-hidden", "true");
 
   const path = document.createElementNS(SVG, "path");
-  path.setAttribute("d", kind === "chev" ? "M4 6 L8 10 L12 6" : "M4 4 L12 12 M12 4 L4 12");
+  path.setAttribute("d", PATHS[kind]);
   svg.append(path);
   return svg;
 }

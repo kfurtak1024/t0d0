@@ -10,7 +10,7 @@ import type { Store } from "./store";
 import * as T from "./transitions";
 import { raw } from "./parse";
 import type { Group, Node, State, Task } from "./types";
-import { BackupPanel } from "./ui/backup";
+import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
 import { beginEdit } from "./ui/edit";
 import { DaySheet } from "./ui/sheet";
@@ -44,7 +44,7 @@ export class App {
   #rows: KeyedList<Node>;
   #toast: Toast;
   #sheet: DaySheet;
-  #backup: BackupPanel;
+  #drawer: Drawer;
   #confetti: Confetti;
 
   #destId: string | null = null;
@@ -110,15 +110,18 @@ export class App {
       this.#store.apply(T.clearTicks(this.#state), { undoable: true });
       this.#toast.show("Ticks cleared");
     });
-    this.#backup = new BackupPanel(
-      el("#dataveil"),
-      () => this.#state,
-      (next) => {
+    this.#drawer = new Drawer(el("#dataveil"), {
+      current: () => this.#state,
+      onReplace: (next) => {
         this.#replace(next, true);
         const count = allTasks(next.list).length;
         this.#toast.show(`Imported ${String(count)} item${count === 1 ? "" : "s"}`);
       },
-    );
+      onErase: () => {
+        this.#replace(T.eraseAll(this.#state), true);
+        this.#toast.show("Everything erased");
+      },
+    });
     this.#confetti = new Confetti(el("#confetti") as HTMLCanvasElement);
 
     this.#wire();
@@ -326,7 +329,7 @@ export class App {
       this.#sheet.show(this.#state, Date.now());
     });
     (el("#databtn") as HTMLButtonElement).addEventListener("click", () => {
-      this.#backup.show();
+      this.#drawer.show();
     });
 
     document.addEventListener("keydown", (event) => {
@@ -351,14 +354,22 @@ export class App {
   }
 
   #onKeyDown(event: KeyboardEvent): void {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+    // Inside a text field, Ctrl-Z means undo the typing, not undo the app.
+    const target = event.target;
+    const inField =
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement);
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && !inField) {
       event.preventDefault();
       if (this.#store.undo()) this.#toast.hide();
       return;
     }
     if (event.key === "Escape") {
       if (this.#sheet.isOpen) this.#sheet.hide();
-      if (this.#backup.isOpen) this.#backup.hide();
+      if (this.#drawer.isOpen) this.#drawer.hide();
     }
     if (this.#editingId !== null) return;
 

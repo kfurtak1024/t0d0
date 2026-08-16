@@ -1,5 +1,6 @@
 import { summarise } from "../progress";
 import type { State } from "../types";
+import { trapFocus } from "./focus";
 
 function formatElapsed(ms: number): string {
   const minutes = Math.round(ms / 60_000);
@@ -17,6 +18,7 @@ export class DaySheet {
   #label: HTMLElement;
   #cleared: HTMLElement;
   #elapsed: HTMLElement;
+  #release: (() => void) | null = null;
 
   constructor(veil: HTMLElement, onConfirm: () => void) {
     this.#veil = veil;
@@ -59,9 +61,13 @@ export class DaySheet {
       summary.elapsedMs === null ? "" : `${formatElapsed(summary.elapsedMs)} since you started`;
 
     this.#veil.hidden = false;
+    this.#release = trapFocus(this.#veil);
   }
 
   hide(): void {
+    if (this.#veil.hidden) return;
     this.#veil.hidden = true;
+    this.#release?.();
+    this.#release = null;
   }
 }

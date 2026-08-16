@@ -46,6 +46,9 @@ Invariants worth defending in review:
   empty text, regenerates duplicate ids. Never parse straight into state.
 - **Celebration fires only on the transition into complete**, and only for a non-empty
   list. Re-arm when progress drops below 100%.
+- **Destructive actions confirm in place**, never in a dialog stacked on a dialog: the
+  control swaps into a confirm state and reverts on a timeout. Erase, and replace-on-
+  import, both follow this.
 
 ## Input syntax
 
@@ -75,7 +78,7 @@ src/state.ts      types, normalize, load/save, all state transitions
 src/parse.ts      "# Title" and "[n]" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula
 src/render/       keyed DOM patching — list, task, group, ring
-src/ui/           toast, day-summary sheet, backup panel, confetti
+src/ui/           toast, day-summary sheet, drawer (backup/reset/about), confetti
 src/styles/       tokens.css first, then base.css, then app.css
 ```
 
@@ -103,7 +106,8 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
   comments; a `for` loop does not.
 - Accessibility is not optional: real `<input type="checkbox">` semantics, visible focus,
   `aria-live` on progress, ≥44px touch targets. `@media (hover: hover)` is the correct
-  fork for pointer affordances — never a width breakpoint.
+  fork for pointer affordances — never a width breakpoint. Every dialog traps focus via
+  `src/ui/focus.ts` and hands it back on close; `aria-modal` alone does nothing for Tab.
 
 ## Deliberately out of scope
 

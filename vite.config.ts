@@ -1,6 +1,27 @@
 // vitest/config re-exports Vite's defineConfig with the `test` block typed.
 import { defineConfig } from "vitest/config";
+import type { Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+
+/**
+ * The dev server serves every stylesheet as an injected inline `<style>`, which
+ * the shipped `style-src 'self'` correctly refuses — so without this the dev
+ * server renders unstyled.
+ *
+ * Relax exactly that one directive, and only while serving. The policy in
+ * index.html stays strict and is what actually ships; `apply: "serve"` makes it
+ * impossible for this to leak into a build.
+ */
+function relaxCspForDev(): Plugin {
+  return {
+    name: "t0d0:dev-csp",
+    apply: "serve",
+    transformIndexHtml: {
+      order: "pre",
+      handler: (html) => html.replace("style-src 'self';", "style-src 'self' 'unsafe-inline';"),
+    },
+  };
+}
 
 export default defineConfig({
   // Served from the root of a custom domain, so no subpath prefix.
@@ -11,6 +32,7 @@ export default defineConfig({
     modulePreload: { polyfill: false },
   },
   plugins: [
+    relaxCspForDev(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon.png", "robots.txt"],

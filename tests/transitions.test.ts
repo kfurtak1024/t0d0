@@ -204,6 +204,26 @@ describe("clearTicks", () => {
   });
 });
 
+describe("eraseAll", () => {
+  it("empties the list and closes the day", () => {
+    const state = build(["# Morning", "a", "b", "# Work", "c"]);
+    const erased = T.eraseAll(state);
+    expect(erased.list).toEqual([]);
+    expect(erased.openedAt).toBeNull();
+    expect(erased.v).toBe(1);
+  });
+
+  it("leaves the state it was given alone", () => {
+    const state = build(["a"]);
+    T.eraseAll(state);
+    expect(state.list).toHaveLength(1);
+  });
+
+  it("is safe on an already empty list", () => {
+    expect(T.eraseAll(empty()).list).toEqual([]);
+  });
+});
+
 describe("purity", () => {
   it("never mutates the state it is given", () => {
     const before = build(["# Morning", "a"]);
