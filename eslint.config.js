@@ -26,11 +26,24 @@ export default defineConfig([
     rules: { "@typescript-eslint/no-non-null-assertion": "off" },
   },
   {
-    // Build-time Node script: no DOM, and no type information to hang rules off.
+    /*
+     * Build-time Node scripts, with no type information to hang rules off. They
+     * also contain page.evaluate callbacks, which run in the browser — hence
+     * both sets of globals in one place.
+     */
     files: ["scripts/**/*.mjs", "eslint.config.js"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
-      globals: { console: "readonly", Buffer: "readonly", process: "readonly" },
+      globals: {
+        console: "readonly",
+        Buffer: "readonly",
+        process: "readonly",
+        fetch: "readonly",
+        setTimeout: "readonly",
+        document: "readonly",
+        localStorage: "readonly",
+        getComputedStyle: "readonly",
+      },
     },
     rules: { "no-console": "off" },
   },

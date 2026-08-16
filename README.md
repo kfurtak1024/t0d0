@@ -87,6 +87,7 @@ npm run dev
 | `npm run lint`          | ESLint                                                                              |
 | `npm run format`        | Prettier                                                                            |
 | `npm run icons`         | regenerate the favicon and PWA icons                                                |
+| `npm run screenshots`   | regenerate the README screenshots from the built app                                |
 | **`npm run check`**     | **lint + typecheck + test — the gate CI runs**                                      |
 
 Node version is pinned in [`.nvmrc`](./.nvmrc).

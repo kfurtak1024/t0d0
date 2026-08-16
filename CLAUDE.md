@@ -71,6 +71,8 @@ npm test           # vitest, unit + DOM
 npm run test:coverage  # the same, with the thresholds CI enforces
 npm run test:e2e   # playwright
 npm run lint       # eslint
+npm run icons      # regenerate the favicon and PWA icons
+npm run screenshots  # regenerate the README screenshots from the built app
 npm run check      # lint + typecheck + test — what CI runs
 ```
 
@@ -113,6 +115,25 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
   `vite.config.ts` and CI enforces them.
 - Every animation must have a `prefers-reduced-motion` path that still lands in a finished
   visual state — reduced motion means instant, not absent.
+
+## Keeping the README honest
+
+Two committed artefacts are generated from the app, not drawn by hand, and
+nothing in CI checks that they are current — so they are your job:
+
+- **Run `npm run screenshots` whenever the list changes how it looks.** That
+  means any edit to `src/styles/**` (especially the palette tokens), to the row
+  or group markup, or to spacing in the list. The script builds, serves, and
+  captures both themes into `.github/`. It is deterministic: re-running with no
+  visual change rewrites the same bytes, so it never creates a noisy diff.
+- **Run `npm run icons` if the ring mark changes.**
+
+A screenshot diff is not worth gating in CI — across machines it is all font
+antialiasing and no signal — which is exactly why it has to be a habit here.
+
+Also treat these README claims as facts that rot, and check them when they
+change: the gzipped bundle size (badge and prose), the scripts table, the
+keyboard table, and the module map under "How it's built".
 
 ## Conventions
 
