@@ -142,9 +142,6 @@ build. Pages **Source** must be set to _GitHub Actions_ — there is no director
 deliberately out of scope — recurring items, streaks, history, and Pomodoro timers are all
 "no" on purpose.
 
-[`prototype/index.html`](./prototype/index.html) is the original single-file prototype this
-was ported from. It is kept for reference and is not part of the build.
-
 ## License
 
 MIT © [Krzysztof Furtak](https://github.com/kfurtak1024) — see [LICENSE](./LICENSE).

@@ -68,6 +68,7 @@ npm run dev        # vite dev server
 npm run build      # typecheck, then production build
 npm run preview    # serve dist/ locally
 npm test           # vitest, unit + DOM
+npm run test:coverage  # the same, with the thresholds CI enforces
 npm run test:e2e   # playwright
 npm run lint       # eslint
 npm run check      # lint + typecheck + test — what CI runs

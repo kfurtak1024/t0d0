@@ -18,7 +18,7 @@ export const findTask = (state: State, id: string): Task | undefined =>
   allTasks(state.list).find((task) => task.id === id);
 
 /** The group a task sits in, or undefined when it lives at the root. */
-export const ownerOf = (state: State, id: string): Group | undefined =>
+const ownerOf = (state: State, id: string): Group | undefined =>
   state.list.find(
     (node): node is Group => node.kind === "group" && node.items.some((task) => task.id === id),
   );

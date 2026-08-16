@@ -3,17 +3,12 @@
  * being swapped for an input, so nothing in the row moves and no transition is
  * interrupted mid-flight.
  */
-export interface EditSession {
-  id: string;
-}
-
 export function beginEdit(
   element: HTMLElement,
-  id: string,
   initial: string,
   commit: (value: string) => void,
   cancel: () => void,
-): EditSession {
+): void {
   element.textContent = initial;
   element.contentEditable = "true";
   element.spellcheck = false;
@@ -53,6 +48,4 @@ export function beginEdit(
 
   element.addEventListener("keydown", onKey);
   element.addEventListener("blur", onBlur);
-
-  return { id };
 }

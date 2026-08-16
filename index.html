@@ -34,8 +34,8 @@
       <header class="top">
         <h1 class="brand">t<i>0</i>d<i>0</i></h1>
         <div class="headline">
-          <span class="pct" id="pct" aria-live="polite">0%</span>
-          <span class="frac" id="frac">0 of 0</span>
+          <span class="pct" id="pct" aria-hidden="true">0%</span>
+          <span class="frac" id="frac" role="status">0 of 0</span>
         </div>
         <div class="totalring" id="totalring"></div>
         <button class="more" id="databtn" type="button" aria-label="Settings">⋯</button>
@@ -76,7 +76,7 @@
     </div>
 
     <div class="veil" id="veil" hidden>
-      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle">
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle" tabindex="-1">
         <h2 id="sheettitle">Today</h2>
         <p class="score">0 of 0</p>
         <p class="of">done</p>

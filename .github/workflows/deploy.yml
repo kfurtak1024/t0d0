@@ -32,6 +32,9 @@ jobs:
       - name: Lint, typecheck, unit tests
         run: npm run check
 
+      - name: Coverage thresholds
+        run: npm run test:coverage
+
       - name: Install browsers
         run: npx playwright install --with-deps chromium webkit
 

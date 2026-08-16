@@ -57,6 +57,9 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
 
   const update = (next: Group): void => {
     box.classList.toggle("collapsed", next.collapsed);
+    // Collapsing hides the rows visually; inert takes them out of the tab order
+    // too, so nobody focuses a row they cannot see.
+    body.toggleAttribute("inert", next.collapsed);
     if (!actions.isEditing(next.id)) title.textContent = next.title;
 
     const done = next.items.filter(isDone).length;

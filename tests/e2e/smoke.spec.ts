@@ -154,3 +154,105 @@ test("the list is a list", async ({ page }) => {
   await expect(page.locator("#list > li")).toHaveCount(1);
   await expect(page.locator(".items > li")).toHaveCount(1);
 });
+
+test("progress is announced once, not once per animation frame", async ({ page }) => {
+  await addItem(page, "one");
+  await addItem(page, "two");
+
+  // The tweened percentage is decorative; the fraction is what gets announced.
+  await expect(page.locator("#pct")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator("#frac")).toHaveRole("status");
+
+  await page.evaluate(() => {
+    (window as unknown as { writes: number }).writes = 0;
+    const frac = document.getElementById("frac");
+    if (frac) {
+      new MutationObserver(() => {
+        (window as unknown as { writes: number }).writes++;
+      }).observe(frac, { childList: true, characterData: true, subtree: true });
+    }
+  });
+
+  await page.locator(".task", { hasText: "one" }).locator(".tick").click();
+  await page.waitForTimeout(800);
+
+  const writes = await page.evaluate(() => (window as unknown as { writes: number }).writes);
+  expect(writes).toBe(1);
+});
+
+test("a collapsed group leaves the tab order", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "eat breakfast");
+
+  const hidden = page.locator(".items [data-id] .tick").first();
+  await expect(hidden).toBeVisible();
+
+  await page.locator(".chev").click();
+  await expect(page.locator(".group")).toHaveClass(/collapsed/);
+  await expect(page.locator(".gbody")).toHaveAttribute("inert", "");
+
+  // Not merely invisible — unreachable.
+  const reachable = await page.evaluate(() => {
+    const tick = document.querySelector<HTMLElement>(".items [data-id] .tick");
+    tick?.focus();
+    return document.activeElement === tick;
+  });
+  expect(reachable).toBe(false);
+});
+
+test("the day card does not open with the destructive button focused", async ({ page }) => {
+  await addItem(page, "shopping");
+  await page.locator(".tick").first().click();
+  await page.locator("#closeday").click();
+
+  await expect(page.locator("#veil")).toBeVisible();
+  const onConfirm = await page.evaluate(
+    () => document.activeElement?.classList.contains("confirm") ?? false,
+  );
+  expect(onConfirm).toBe(false);
+
+  // Enter on open must not clear the day.
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#frac")).toHaveText("1 of 1");
+});
+
+test("undo during the delete animation puts the item back", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  const row = page.locator(".task", { hasText: "alpha" });
+  await row.hover();
+  await row.locator(".kill").click();
+  await page.keyboard.press("Control+z"); // inside the exit animation
+
+  await page.waitForTimeout(600);
+  await expect(page.locator(".task", { hasText: "alpha" })).toBeVisible();
+  await expect(page.locator(".list .task")).toHaveCount(2);
+});
+
+test("deleting the last undone item still finishes the day", async ({ page }) => {
+  await addItem(page, "done one");
+  await addItem(page, "not yet");
+  await page.locator(".task", { hasText: "done one" }).locator(".tick").click();
+
+  await page.evaluate(() => {
+    (window as unknown as { draws: number }).draws = 0;
+    const ctx = (document.getElementById("confetti") as HTMLCanvasElement).getContext("2d");
+    if (ctx) {
+      const original = ctx.fillRect.bind(ctx);
+      ctx.fillRect = (...args: Parameters<typeof original>) => {
+        (window as unknown as { draws: number }).draws++;
+        original(...args);
+      };
+    }
+  });
+
+  const row = page.locator(".task", { hasText: "not yet" });
+  await row.hover();
+  await row.locator(".kill").click();
+  await page.waitForTimeout(900);
+
+  await expect(page.locator("#frac")).toHaveText("1 of 1");
+  const draws = await page.evaluate(() => (window as unknown as { draws: number }).draws);
+  expect(draws).toBeGreaterThan(0);
+});

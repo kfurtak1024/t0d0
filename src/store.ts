@@ -32,10 +32,6 @@ export class Store {
     return this.#state;
   }
 
-  get canUndo(): boolean {
-    return this.#undo !== null;
-  }
-
   /**
    * Apply a transition. `undoable` transitions stash the previous state; the
    * rest (ticking, collapsing) are cheap to reverse by hand and would only

@@ -3,7 +3,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(["dist/**", "dev-dist/**", "coverage/**", "prototype/**", "playwright-report/**"]),
+  globalIgnores(["dist/**", "dev-dist/**", "coverage/**", "playwright-report/**"]),
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   {

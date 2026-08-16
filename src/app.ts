@@ -1,4 +1,3 @@
-import { normalize } from "./normalize";
 import { allTasks, isComplete, isDone, overallProgress } from "./progress";
 import { createGroup } from "./render/group";
 import { KeyedList } from "./render/list";
@@ -8,8 +7,9 @@ import type { RowActions } from "./render/context";
 import { onExternalChange } from "./storage";
 import type { Store } from "./store";
 import * as T from "./transitions";
-import { raw } from "./parse";
-import type { Group, Node, State, Task } from "./types";
+import { raw, uid } from "./parse";
+import { SCHEMA_VERSION } from "./types";
+import type { Group, Node, State } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
 import { beginEdit } from "./ui/edit";
@@ -52,6 +52,12 @@ export class App {
   #armed = true;
   #shownPct = 0;
   #tweenRaf = 0;
+  /** A delete waiting out its exit animation, cancellable until it lands. */
+  #pendingDelete: {
+    id: string;
+    element: HTMLElement;
+    timer: ReturnType<typeof setTimeout>;
+  } | null = null;
 
   constructor(store: Store) {
     this.#store = store;
@@ -104,7 +110,7 @@ export class App {
     el("#totalring").append(this.#totalRing);
 
     this.#toast = new Toast(el("#toast"), () => {
-      this.#store.undo();
+      this.#undo();
     });
     this.#sheet = new DaySheet(el("#veil"), () => {
       this.#store.apply(T.clearTicks(this.#state), { undoable: true });
@@ -131,6 +137,9 @@ export class App {
     this.#wire();
     this.#store.subscribe(() => {
       this.#render();
+      // Every state change, not just a tick: deleting the last undone item
+      // finishes the day just as much as ticking it does.
+      this.#checkComplete();
     });
   }
 
@@ -166,10 +175,11 @@ export class App {
       if (row && !this.#motion.matches) popRing(row as HTMLElement);
       this.#vibrate(12);
     }
-    this.#checkComplete();
   }
 
   #remove(id: string): void {
+    // One at a time: a second delete lands the first rather than racing it.
+    this.#flushDelete();
     const group = T.findGroup(this.#state, id);
     const label = group
       ? `Deleted “${group.title}”${
@@ -187,17 +197,55 @@ export class App {
     const entry = this.#rows.get(id);
     if (entry && !this.#motion.matches) {
       entry.element.classList.add("leaving");
-      setTimeout(finish, EXIT_MS);
+      this.#pendingDelete = {
+        id,
+        element: entry.element,
+        timer: setTimeout(() => {
+          this.#pendingDelete = null;
+          finish();
+        }, EXIT_MS),
+      };
     } else {
       finish();
     }
   }
 
+  /** Let the queued delete happen now. */
+  #flushDelete(): void {
+    const pending = this.#pendingDelete;
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.#pendingDelete = null;
+    this.#store.apply(T.remove(this.#state, pending.id), { undoable: true });
+  }
+
+  /**
+   * Undo pressed inside the exit animation means "put that back" — the state
+   * change has not happened yet, so cancelling the animation is the undo.
+   */
+  #undo(): void {
+    const pending = this.#pendingDelete;
+    if (pending) {
+      clearTimeout(pending.timer);
+      pending.element.classList.remove("leaving");
+      this.#pendingDelete = null;
+      this.#toast.hide();
+      return;
+    }
+    if (this.#store.undo()) this.#toast.hide();
+  }
+
   #replace(next: State, undoable: boolean): void {
+    const pending = this.#pendingDelete;
+    if (pending) {
+      clearTimeout(pending.timer);
+      this.#pendingDelete = null;
+    }
     this.#destId = null;
     this.#rows.clear();
-    this.#store.replace(next, { undoable });
+    // Armed before the notify, so an all-done import does not celebrate itself.
     this.#armed = !isComplete(allTasks(next.list));
+    this.#store.replace(next, { undoable });
   }
 
   #beginEdit(element: HTMLElement, id: string, isGroup: boolean): void {
@@ -213,7 +261,6 @@ export class App {
     this.#editingId = id;
     beginEdit(
       element,
-      id,
       initial,
       (value) => {
         this.#editingId = null;
@@ -272,7 +319,9 @@ export class App {
 
     paintRing(this.#totalRing, tasks.length ? progress : 0, 1);
     this.#totalRing.style.opacity = tasks.length ? "1" : "0.3";
-    this.#frac.textContent = `${String(tasks.filter(isDone).length)} of ${String(tasks.length)}`;
+    const frac = `${String(tasks.filter(isDone).length)} of ${String(tasks.length)}`;
+    // Writing the same text still fires the live region, so only write changes.
+    if (this.#frac.textContent !== frac) this.#frac.textContent = frac;
     this.#tweenPct(Math.round(progress * 100));
   }
 
@@ -368,7 +417,7 @@ export class App {
 
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && !inField) {
       event.preventDefault();
-      if (this.#store.undo()) this.#toast.hide();
+      this.#undo();
       return;
     }
     if (event.key === "Escape") {
@@ -406,21 +455,21 @@ export class App {
   }
 }
 
-export const seed = (): State =>
-  normalize({
-    v: 1,
-    openedAt: null,
-    list: [
-      {
-        kind: "group",
-        title: "Morning",
-        collapsed: false,
-        items: [
-          { kind: "task", text: "eat breakfast", target: 1, count: 0 },
-          { kind: "task", text: "walk the dog", target: 1, count: 0 },
-        ],
-      },
-      { kind: "task", text: "make calls", target: 3, count: 0 },
-      { kind: "task", text: "shopping", target: 1, count: 0 },
-    ] satisfies unknown[] as (Task | Group)[],
-  }) as State;
+export const seed = (): State => ({
+  v: SCHEMA_VERSION,
+  openedAt: null,
+  list: [
+    {
+      kind: "group",
+      id: uid(),
+      title: "Morning",
+      collapsed: false,
+      items: [
+        { kind: "task", id: uid(), text: "eat breakfast", target: 1, count: 0 },
+        { kind: "task", id: uid(), text: "walk the dog", target: 1, count: 0 },
+      ],
+    },
+    { kind: "task", id: uid(), text: "make calls", target: 3, count: 0 },
+    { kind: "task", id: uid(), text: "shopping", target: 1, count: 0 },
+  ],
+});

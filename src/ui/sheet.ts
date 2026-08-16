@@ -18,10 +18,12 @@ export class DaySheet {
   #label: HTMLElement;
   #cleared: HTMLElement;
   #elapsed: HTMLElement;
+  #panel: HTMLElement;
   #release: (() => void) | null = null;
 
   constructor(veil: HTMLElement, onConfirm: () => void) {
     this.#veil = veil;
+    this.#panel = veil.querySelector(".sheet") as HTMLElement;
     this.#score = veil.querySelector(".score") as HTMLElement;
     this.#label = veil.querySelector(".of") as HTMLElement;
     this.#cleared = veil.querySelector(".cleared") as HTMLElement;
@@ -61,7 +63,8 @@ export class DaySheet {
       summary.elapsedMs === null ? "" : `${formatElapsed(summary.elapsedMs)} since you started`;
 
     this.#veil.hidden = false;
-    this.#release = trapFocus(this.#veil);
+    // Not the confirm button: Enter would clear the day on sight.
+    this.#release = trapFocus(this.#veil, this.#panel);
   }
 
   hide(): void {

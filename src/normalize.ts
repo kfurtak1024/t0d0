@@ -77,5 +77,3 @@ export function normalize(input: unknown): State | null {
     list,
   };
 }
-
-export const emptyState = (): State => ({ v: SCHEMA_VERSION, openedAt: null, list: [] });

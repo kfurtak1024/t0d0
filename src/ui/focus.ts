@@ -15,7 +15,7 @@ const FOCUSABLE = [
  * nothing for the Tab key. Without this, tabbing out of an open sheet lands on
  * the list behind it, where the app's own Tab handling then moves items around.
  */
-export function trapFocus(container: HTMLElement): () => void {
+export function trapFocus(container: HTMLElement, initial?: HTMLElement): () => void {
   const restoreTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   const targets = (): HTMLElement[] =>
@@ -23,8 +23,10 @@ export function trapFocus(container: HTMLElement): () => void {
       (el) => !el.hidden && el.offsetParent !== null,
     );
 
-  const first = targets()[0];
-  if (first) first.focus();
+  // Default to the first control, but let a dialog whose first control is
+  // destructive nominate somewhere safer.
+  const start = initial ?? targets()[0];
+  if (start) start.focus();
   else container.focus();
 
   const onKeyDown = (event: KeyboardEvent): void => {
