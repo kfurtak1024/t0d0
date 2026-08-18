@@ -56,6 +56,18 @@ export class Store {
     this.#emit();
   }
 
+  /**
+   * Nominate where the next undo lands.
+   *
+   * A drag is a run of individually cheap steps that together are one gesture.
+   * Marking each of them undoable would spend the single undo slot on the last
+   * millimetre; this lets the caller apply them freely and then offer the one
+   * reversal a user would actually ask for — back to before the drag.
+   */
+  stageUndo(state: State): void {
+    this.#undo = state;
+  }
+
   undo(): boolean {
     if (this.#undo === null) return false;
     this.#state = this.#undo;

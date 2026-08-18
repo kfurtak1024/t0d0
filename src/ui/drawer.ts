@@ -1,4 +1,5 @@
 import { normalize } from "../normalize";
+import type { Prefs } from "../prefs";
 import { allTasks } from "../progress";
 import { icon, type IconName } from "../render/context";
 import type { State } from "../types";
@@ -16,6 +17,8 @@ const plural = (n: number, word: string): string => `${String(n)} ${word}${n ===
 
 export interface DrawerHandlers {
   current: () => State;
+  prefs: () => Prefs;
+  onPrefs: (next: Prefs) => void;
   onReplace: (state: State) => void;
   onErase: () => void;
 }
@@ -70,6 +73,32 @@ export class Drawer {
 
     this.#wireDropTarget();
     this.#wireTheme();
+    this.#wirePrefs();
+  }
+
+  /**
+   * Preferences are keyed by name, so a new one is a row in the markup plus a
+   * field on `Prefs` — no wiring per switch.
+   */
+  #wirePrefs(): void {
+    for (const el of this.#veil.querySelectorAll<HTMLElement>("[data-pref]")) {
+      el.addEventListener("click", () => {
+        const name = el.dataset["pref"];
+        if (!name || !(name in this.#handlers.prefs())) return;
+        const key = name as keyof Prefs;
+        this.#handlers.onPrefs({ ...this.#handlers.prefs(), [key]: !this.#handlers.prefs()[key] });
+        this.#paintPrefs();
+      });
+    }
+  }
+
+  #paintPrefs(): void {
+    const prefs = this.#handlers.prefs();
+    for (const el of this.#veil.querySelectorAll<HTMLElement>("[data-pref]")) {
+      const name = el.dataset["pref"];
+      if (!name || !(name in prefs)) continue;
+      el.setAttribute("aria-checked", String(prefs[name as keyof Prefs]));
+    }
   }
 
   #wireTheme(): void {
@@ -105,6 +134,7 @@ export class Drawer {
     this.#clearStaged();
     this.#clearErase();
     this.#paintTheme();
+    this.#paintPrefs();
     this.#veil.hidden = false;
     this.#release = trapFocus(this.#panel);
   }

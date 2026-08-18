@@ -38,7 +38,7 @@ const settled = async (page: Page): Promise<void> => {
   await expect
     .poll(() =>
       page.evaluate(() =>
-        [...document.querySelectorAll(".task, .group, .drawer, .sheet")]
+        [...document.querySelectorAll(".task, .group, .drawer, .sheet, .rowmenu")]
           .filter((el) => el.checkVisibility())
           .every((el) => getComputedStyle(el).opacity === "1"),
       ),
@@ -92,34 +92,53 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
     - list:
       - listitem:
         - button "Collapse Morning" [expanded]
-        - text: Morning
+        - text: Morning 1/2
         - button "Add to Morning": +
+        - button "More for Morning": ⋯
         - button "Delete Morning"
-        - text: 1/2
         - list:
           - listitem:
             - checkbox "eat breakfast" [checked]
             - text: eat breakfast
+            - button "More for eat breakfast": ⋯
             - button "Delete eat breakfast"
           - listitem:
             - checkbox "walk the dog"
             - text: walk the dog
+            - button "More for walk the dog": ⋯
             - button "Delete walk the dog"
       - listitem:
         - button "Expand Later"
-        - text: Later
+        - text: Later empty
         - button "Add to Later": +
+        - button "More for Later": ⋯
         - button "Delete Later"
-        - text: empty
         - list
       - listitem:
         - spinbutton "make calls"
         - text: make calls [3]
         - 'button "make calls: one fewer"': 1/3
+        - button "More for make calls": ⋯
         - button "Delete make calls"
       - listitem:
         - checkbox "shopping" [checked]
         - text: shopping
+        - button "More for shopping": ⋯
         - button "Delete shopping"
   `);
+});
+
+test("the row menu is a menu, and axe agrees", async ({ page }) => {
+  await seedStorage(page, A_DAY);
+  await page.locator('.task:has-text("make calls") .dots').click();
+
+  await expect(page.locator(".rowmenu")).toMatchAriaSnapshot(`
+    - menu:
+      - menuitem "Move up Alt+↑"
+      - menuitem "Move down Alt+↓"
+      - menuitem "Into “Later” Tab"
+  `);
+
+  const { violations } = await scan(page);
+  expect(violations.map((v) => `${v.id}: ${String(v.nodes.length)}`)).toEqual([]);
 });

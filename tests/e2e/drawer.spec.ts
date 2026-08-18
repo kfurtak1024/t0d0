@@ -16,12 +16,12 @@ test.beforeEach(async ({ page }) => {
   await clearStorage(page);
 });
 
-test("the settings sheet holds theme, two backup rows, and reset", async ({ page }) => {
+test("the settings sheet holds theme, behaviour, two backup rows, and reset", async ({ page }) => {
   await addItem(page, "shopping");
   await openDrawer(page);
 
   await expect(page.locator(".drawer-head h2")).toHaveText("Settings");
-  await expect(page.locator(".row")).toHaveCount(4);
+  await expect(page.locator(".row")).toHaveCount(5);
   await expect(page.locator('[data-act="save"] .row-label')).toHaveText("Save a copy");
   await expect(page.locator('[data-act="restore"] .row-label')).toHaveText("Load from a file");
   await expect(page.locator('[data-act="erase"] .row-label')).toHaveText("Erase everything");
@@ -186,6 +186,54 @@ test("cancelling the erase leaves the list alone", async ({ page }) => {
   await expect(page.locator(".confirmbar")).toBeHidden();
   await expect(page.locator('[data-act="erase"]')).toBeVisible();
   await expect(page.locator(".task", { hasText: "shopping" })).toBeVisible();
+});
+
+/*
+ * The bottom sheet enters from a full height below the fold. Focusing a control
+ * inside it while it is down there makes the browser scroll that control into
+ * view — which scrolls the veil, so the panel appears half-way through its slide
+ * and then drifts on the scroller's timing instead of its own. The fix is
+ * focus({ preventScroll: true }) in ui/focus.ts, plus a veil that cannot scroll
+ * on phones; this is the net under both.
+ */
+test("the settings sheet slides up without dragging the backdrop with it", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 720 });
+  await clearStorage(page);
+  await addItem(page, "shopping");
+
+  await page.locator("#databtn").click();
+
+  const worst = await page.evaluate(async () => {
+    const veil = document.getElementById("dataveil");
+    if (!veil) return -1;
+    let max = 0;
+    const started = performance.now();
+    await new Promise<void>((done) => {
+      const tick = (): void => {
+        max = Math.max(max, veil.scrollTop);
+        if (performance.now() - started < 600) requestAnimationFrame(tick);
+        else done();
+      };
+      requestAnimationFrame(tick);
+    });
+    return max;
+  });
+
+  // Not "small" — the backdrop has no business moving at all.
+  expect(worst).toBe(0);
+
+  // And the panel is where it belongs, with focus in it rather than lost.
+  await expect(page.locator(".drawer")).toBeVisible();
+  const landed = await page.evaluate(() => {
+    const box = document.querySelector(".drawer")?.getBoundingClientRect();
+    return box ? box.bottom <= innerHeight + 1 && box.top < innerHeight : false;
+  });
+  expect(landed).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.querySelector(".drawer")?.contains(document.activeElement) ?? false,
+    ),
+  ).toBe(true);
 });
 
 test("the drawer traps focus and gives it back on close", async ({ page }) => {

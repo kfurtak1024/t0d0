@@ -17,7 +17,7 @@ file, and losing it should cost nothing.
 [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE)
 
 [![Runtime dependencies](https://img.shields.io/badge/runtime_deps-0-158A62)](#no-dependencies-is-a-feature)
-[![Bundle](https://img.shields.io/badge/bundle-13.4_kB_gzipped-158A62)](#no-dependencies-is-a-feature)
+[![Bundle](https://img.shields.io/badge/bundle-17.0_kB_gzipped-158A62)](#no-dependencies-is-a-feature)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json)
 [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
 
@@ -45,6 +45,9 @@ that rather than merely promising it.
 - **Counted items.** `make calls [3]` takes three ticks, and partial progress counts.
 - **A rewarding tick.** Springy rings that sweep indigo → green as the day fills in, a wiping strike-through, and confetti when everything is done.
 - **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one.
+- **Reorderable, three ways.** Drag by the grip and the row goes where you point, in or out of a group. `Alt`+arrows and the `⋯` menu move it among its own siblings and stop there — changing level is its own command, so a move never re-nests anything behind your back. One undo puts a whole drag back.
+- **Untickable.** Tap a finished item again and it comes back. A counted item counts up instead, and resets from its menu.
+- **Groups that fold when they're done.** On by default; Settings → Behaviour turns it off.
 - **Offline and installable.** A real PWA; open it with the network off.
 - **Light, dark, or whatever your device says.** Settings → Theme, remembered per browser.
 - **Backups.** Save a `.json` copy, drop one back in. Loading previews what the file holds before replacing anything, and erasing takes two deliberate presses.
@@ -57,16 +60,19 @@ that rather than merely promising it.
 | `make calls [3]` | a task that takes three ticks          |
 | `# Morning`      | a group, with the composer aimed at it |
 
-| Do this                                          | To                                                                   |
-| ------------------------------------------------ | -------------------------------------------------------------------- |
-| Click a ring                                     | tick, or count up one                                                |
-| Shift-click a ring                               | count back down — on touch, tap the `1/3` label                      |
-| Click any text                                   | edit in place; `Enter` commits, `Escape` reverts                     |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | with a tick focused, move that item into the group above or back out |
-| <kbd>Space</kbd> / <kbd>Enter</kbd>              | tick the focused item                                                |
-| <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                |
-| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, an import, or a cleared day                           |
-| `⋯`                                              | theme, save a copy, load one back, erase everything                  |
+| Do this                                          | To                                                                    |
+| ------------------------------------------------ | --------------------------------------------------------------------- |
+| Click a ring                                     | tick it, or untick it — a counted item counts up instead              |
+| Shift-click a ring                               | count back down — on touch, tap the `1/3` label                       |
+| Drag the `⠿` grip                                | move a row, in and out of groups as it travels; `Escape` calls it off |
+| Click any text                                   | edit in place; `Enter` commits, `Escape` reverts                      |
+| <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>         | move the focused row up or down among its siblings                    |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | with a tick focused, move that item into the group above or back out  |
+| <kbd>Space</kbd> / <kbd>Enter</kbd>              | tick the focused item                                                 |
+| <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                 |
+| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, a move, an import, or a cleared day                    |
+| `⋯` on a row                                     | move it up or down; take it in or out of a group; reset a count       |
+| `⋯` in the header                                | theme, folding, save a copy, load one back, erase everything          |
 
 ## Quick start
 
@@ -95,7 +101,7 @@ Node version is pinned in [`.nvmrc`](./.nvmrc).
 ## No dependencies is a feature
 
 The shipped page contains **zero third-party code**. No framework, no UI library, no
-animation library — 13.4 kB gzipped, all of it written here. Vite, TypeScript, Vitest,
+animation library — 17.0 kB gzipped, all of it written here. Vite, TypeScript, Vitest,
 Playwright, and ESLint are build-time only.
 
 That isn't austerity for its own sake. This is a tool one person opens every morning, and
@@ -104,8 +110,10 @@ it should still run untouched in ten years without an upgrade treadmill. The
 rather than by discipline.
 
 The motion comes from the platform: `@starting-style` for enter and exit, one shared
-spring expressed as a CSS [`linear()`](./src/styles/tokens.css) easing curve, and a
-`stroke-dashoffset` transition for the arcs.
+spring expressed as a CSS [`linear()`](./src/styles/tokens.css) easing curve, a
+`stroke-dashoffset` transition for the arcs, and the Web Animations API for the
+[FLIP](./src/render/flip.ts) pass that makes a reordered row travel rather than teleport.
+Dragging is Pointer Events, which is one code path for mouse, finger and pen.
 
 ## How it's built
 
@@ -114,18 +122,25 @@ src/
 ├─ types.ts parse.ts progress.ts normalize.ts   pure, DOM-free, heavily tested
 ├─ transitions.ts                               every state change as State → State
 ├─ storage.ts store.ts                          persistence and one level of undo
-├─ theme.ts                                     appearance, in its own storage key
-├─ render/    list.ts ring.ts task.ts group.ts  keyed DOM patching
-├─ ui/        drawer sheet toast edit focus confetti
+├─ theme.ts prefs.ts                            appearance and behaviour, own storage keys
+├─ render/    list.ts flip.ts ring.ts task.ts   keyed DOM patching, and FLIP
+├─ ui/        drawer sheet menu drag toast edit focus confetti
 └─ styles/    tokens.css base.css app.css
 ```
 
-Two pieces are worth knowing about:
+Three pieces are worth knowing about:
 
 **[`src/render/list.ts`](./src/render/list.ts)** is a keyed patch. It exists so updating a
 row never destroys its DOM node — rebuilding the list wholesale would cancel in-flight
 transitions and drop focus mid-edit, which on a page whose entire point is how the ticking
 feels is not a small bug.
+
+**[`src/ui/drag.ts`](./src/ui/drag.ts)** is dragging built out of the reorder step rather
+than beside it. A drag is not its own idea of where a row should land; it applies the same
+single step the keyboard uses, each time the pointer crosses a row. Reversibility comes
+along already tested, and one undo covers the whole gesture. The one thing it asks for
+differently is `scope`: a drag may re-nest a row, because the pointer is already saying
+where it goes, while "Move up" keeps it among its siblings.
 
 **[`src/normalize.ts`](./src/normalize.ts)** is the single gate for data arriving from
 outside, whether from local storage or a pasted import. It repairs rather than trusts:

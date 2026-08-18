@@ -68,6 +68,26 @@ describe("undo", () => {
     expect(store.undo()).toBe(false);
   });
 
+  /*
+   * A drag applies a run of cheap steps that are one gesture to the person
+   * making it. Marking each undoable would spend the slot on the last
+   * millimetre of the drag.
+   */
+  it("lets a caller nominate where a run of changes should undo to", () => {
+    const store = new Store(state("start"));
+    const before = store.state;
+
+    store.apply(state("step one"));
+    store.apply(state("step two"));
+    expect(store.undo()).toBe(false);
+
+    store.stageUndo(before);
+    expect(store.undo()).toBe(true);
+    expect((store.state.list[0] as { text: string }).text).toBe("start");
+    // And still exactly one level: the staged point is spent, not a history.
+    expect(store.undo()).toBe(false);
+  });
+
   it("is exactly one level deep — undo cannot walk back a history", () => {
     const store = new Store(state("one"));
     store.apply(state("two"), { undoable: true });

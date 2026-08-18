@@ -23,11 +23,19 @@ export function trapFocus(container: HTMLElement, initial?: HTMLElement): () => 
       (el) => !el.hidden && el.offsetParent !== null,
     );
 
-  // Default to the first control, but let a dialog whose first control is
-  // destructive nominate somewhere safer.
+  /*
+   * Default to the first control, but let a dialog whose first control is
+   * destructive nominate somewhere safer.
+   *
+   * preventScroll is not a nicety: the dialog is mid-entry animation here, so
+   * the control being focused is still translated off-screen. Left to itself the
+   * browser scrolls the veil to reveal it, the panel appears half-way through
+   * its slide, and the scroll then unwinds on its own timing — which on a phone
+   * reads as the sheet fighting its own animation.
+   */
   const start = initial ?? targets()[0];
-  if (start) start.focus();
-  else container.focus();
+  if (start) start.focus({ preventScroll: true });
+  else container.focus({ preventScroll: true });
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== "Tab") return;

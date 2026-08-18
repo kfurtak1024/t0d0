@@ -1,6 +1,6 @@
 import { isDone } from "../progress";
 import type { Task } from "../types";
-import { button, icon, type RowActions } from "./context";
+import { button, grip, icon, menuButton, type RowActions } from "./context";
 import type { Keyed } from "./list";
 import { makeRing, paintRing } from "./ring";
 
@@ -54,12 +54,30 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
   count.type = "button";
   count.className = "count";
 
+  const dots = menuButton("More");
+
   const kill = button("kill", "Delete");
   kill.append(icon("x"));
 
-  // Shift-click steps back down; on touch the count label does the same job.
+  // The row re-reads itself on every update, so handlers below decide from the
+  // current task rather than the one this was built with.
+  let current = task;
+
+  /*
+   * A plain item toggles, which is what `role="checkbox"` already promises —
+   * before this the tick reported aria-checked and had no way back, and on a
+   * phone (no Shift, no arrow keys, no count label) a mis-tap was permanent.
+   *
+   * A counted item does not toggle: counting up is the whole point of it, so
+   * stepping down stays on the count label, the arrows, and the row menu.
+   */
   tick.addEventListener("click", (event) => {
-    actions.bump(task.id, event.shiftKey ? -1 : 1);
+    if (event.shiftKey) {
+      actions.bump(current.id, -1);
+      return;
+    }
+    const undo = current.target === 1 && isDone(current);
+    actions.bump(current.id, undo ? -1 : 1);
   });
   tick.addEventListener("keydown", (event) => {
     // Spinbutton conventions, and a way down that isn't Shift-click.
@@ -75,6 +93,9 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
   count.addEventListener("click", () => {
     actions.bump(task.id, -1);
   });
+  dots.addEventListener("click", () => {
+    actions.openMenu(dots, task.id);
+  });
   kill.addEventListener("click", () => {
     actions.remove(task.id);
   });
@@ -82,9 +103,10 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     actions.beginEdit(label, task.id, false);
   });
 
-  row.append(tick, label, count, kill);
+  row.append(grip(), tick, label, count, dots, kill);
 
   const update = (next: Task): void => {
+    current = next;
     row.classList.toggle("done", isDone(next));
 
     // The arc count is baked into the ring, so a changed target needs a new one.
@@ -117,6 +139,7 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
       }
     }
     tick.setAttribute("aria-label", next.text);
+    dots.setAttribute("aria-label", `More for ${next.text}`);
     kill.setAttribute("aria-label", `Delete ${next.text}`);
   };
 

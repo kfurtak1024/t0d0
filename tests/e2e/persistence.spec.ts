@@ -18,6 +18,24 @@ test("the list and its ticks survive a reload", async ({ page }) => {
   );
 });
 
+/*
+ * A first run is empty, not seeded with a demo day. Sample items would sit in
+ * the one place the app promises is yours, and deleting them would be the first
+ * thing you ever did with it.
+ */
+test("a browser that has never opened it starts with nothing", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.clear();
+  });
+  await page.reload();
+
+  await expect(page.locator(".list > li")).toHaveCount(0);
+  await expect(page.locator("#empty")).toBeVisible();
+  await expect(page.locator("#closeday")).toBeHidden();
+  await expect(page.locator("#frac")).toHaveText("0 of 0");
+});
+
 test("a corrupt store falls back to a usable app instead of a blank page", async ({ page }) => {
   await seedRaw(page, "{ this is not json");
 

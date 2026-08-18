@@ -1,6 +1,6 @@
 import { parse } from "./parse";
 import { allTasks } from "./progress";
-import { LIMITS } from "./types";
+import { LIMITS, SCHEMA_VERSION } from "./types";
 import type { Group, Node, State, Task } from "./types";
 
 /**
@@ -11,6 +11,15 @@ import type { Group, Node, State, Task } from "./types";
 
 const clone = (state: State): State => structuredClone(state);
 
+/**
+ * What a first run starts from: nothing.
+ *
+ * Deliberately not a demo list. Sample items are someone else's day sitting in
+ * the one place this app promises is yours, and the first thing a new user has
+ * to do is delete them. The empty state says what to type instead.
+ */
+export const blank = (): State => ({ v: SCHEMA_VERSION, openedAt: null, list: [] });
+
 export const findGroup = (state: State, id: string): Group | undefined =>
   state.list.find((node): node is Group => node.kind === "group" && node.id === id);
 
@@ -18,7 +27,7 @@ export const findTask = (state: State, id: string): Task | undefined =>
   allTasks(state.list).find((task) => task.id === id);
 
 /** The group a task sits in, or undefined when it lives at the root. */
-const ownerOf = (state: State, id: string): Group | undefined =>
+export const ownerOf = (state: State, id: string): Group | undefined =>
   state.list.find(
     (node): node is Group => node.kind === "group" && node.items.some((task) => task.id === id),
   );
@@ -107,16 +116,140 @@ export function toggleCollapse(state: State, id: string): State {
   return next;
 }
 
+/** Fold a group shut, no-op when it already is — auto-collapse leans on this. */
+export function collapse(state: State, id: string): State {
+  const before = findGroup(state, id);
+  if (!before || before.collapsed) return state;
+  return toggleCollapse(state, id);
+}
+
+export type ReorderDirection = "up" | "down";
+
+/**
+ * How far a single step is allowed to reach.
+ *
+ * `list` treats the list as one sequence, so a step crosses group boundaries.
+ * `level` keeps a row among its own siblings: an item in a group moves within
+ * that group and stops at its ends; an item at the root moves past whole groups
+ * rather than into them.
+ *
+ * Both exist because the two ways of asking mean different things. Dragging is
+ * direct manipulation — the pointer is over a place, and that is where the row
+ * goes, nesting included. "Move up" is a command about the row you are looking
+ * at, and a command that quietly changed an item's nesting would be doing more
+ * than it said. Changing level has its own commands: Tab / Shift-Tab, and the
+ * menu's "Into" / "Out of".
+ */
+export type ReorderScope = "list" | "level";
+
+/** Whether the row has a neighbouring position to take, within `scope`. */
+export function canReorder(
+  state: State,
+  id: string,
+  dir: ReorderDirection,
+  scope: ReorderScope = "list",
+): boolean {
+  const owner = ownerOf(state, id);
+  if (owner) {
+    if (scope === "list") {
+      // A grouped task can always step at least as far as the root beside it.
+      return true;
+    }
+    const index = owner.items.findIndex((task) => task.id === id);
+    if (index < 0) return false;
+    return dir === "up" ? index > 0 : index < owner.items.length - 1;
+  }
+
+  const index = state.list.findIndex((node) => node.id === id);
+  if (index < 0) return false;
+  return dir === "up" ? index > 0 : index < state.list.length - 1;
+}
+
+/**
+ * Move a row one step through the list as it reads on screen.
+ *
+ * Within `list` scope that step crosses group boundaries deliberately: a task at
+ * the top of a group steps out above it, and a task that walks into a group
+ * enters at the near end. So every position is reachable by repeating one key.
+ *
+ * Either way each step is its own inverse, which is what makes holding the key
+ * down feel like dragging rather than like guessing.
+ */
+export function reorder(
+  state: State,
+  id: string,
+  dir: ReorderDirection,
+  scope: ReorderScope = "list",
+): State {
+  if (!canReorder(state, id, dir, scope)) return state;
+  const next = clone(state);
+  const step = dir === "up" ? -1 : 1;
+
+  const owner = ownerOf(next, id);
+  if (owner) {
+    const index = owner.items.findIndex((task) => task.id === id);
+    const task = owner.items[index];
+    if (!task) return state;
+
+    const neighbour = owner.items[index + step];
+    if (neighbour) {
+      owner.items[index] = neighbour;
+      owner.items[index + step] = task;
+      return next;
+    }
+
+    // Off the end of the group. Staying at this level means staying put.
+    if (scope === "level") return state;
+
+    // Otherwise land at the root on the near side of the group.
+    owner.items.splice(index, 1);
+    const at = next.list.findIndex((node) => node.id === owner.id);
+    next.list.splice(dir === "up" ? at : at + 1, 0, task);
+    return next;
+  }
+
+  const index = next.list.findIndex((node) => node.id === id);
+  const node = next.list[index];
+  const neighbour = next.list[index + step];
+  if (!node || !neighbour) return state;
+
+  // A group moves as one block; only a task can be swallowed by another group,
+  // and only when the step is allowed to change what level the task is on.
+  if (scope === "list" && node.kind === "task" && neighbour.kind === "group") {
+    next.list.splice(index, 1);
+    if (dir === "up") neighbour.items.push(node);
+    else neighbour.items.unshift(node);
+    // Entering a folded group would look like the item vanishing.
+    neighbour.collapsed = false;
+    return next;
+  }
+
+  next.list[index] = neighbour;
+  next.list[index + step] = node;
+  return next;
+}
+
 export type MoveDirection = "in" | "out";
+
+/** The nearest group above a root task — the one it would move into. */
+export function groupAbove(state: State, id: string): Group | undefined {
+  const index = state.list.findIndex((node) => node.id === id);
+  if (index < 0 || state.list[index]?.kind !== "task") return undefined;
+  for (let i = index - 1; i >= 0; i--) {
+    const candidate = state.list[i];
+    if (candidate?.kind === "group") return candidate;
+  }
+  return undefined;
+}
 
 /** Whether Tab / Shift-Tab has anywhere to put this task. */
 export function canMove(state: State, id: string, dir: MoveDirection): boolean {
   const owner = ownerOf(state, id);
+  // Only tasks nest, so a group can never answer yes — the ⋯ menu asks about
+  // rows of both kinds, where Tab only ever reached a task.
   if (dir === "out") return owner !== undefined;
   if (owner) return false;
-  const index = state.list.findIndex((node) => node.id === id);
-  if (index < 0) return false;
-  return state.list.slice(0, index).some((node) => node.kind === "group");
+  return groupAbove(state, id) !== undefined;
 }
 
 /** Move a task into the group above it, or back out to the root beneath its group. */
@@ -129,14 +262,7 @@ export function move(state: State, id: string, dir: MoveDirection): State {
     const task = next.list[index];
     if (index < 0 || task?.kind !== "task") return state;
 
-    let group: Group | undefined;
-    for (let i = index - 1; i >= 0; i--) {
-      const candidate = next.list[i];
-      if (candidate?.kind === "group") {
-        group = candidate;
-        break;
-      }
-    }
+    const group = groupAbove(next, id);
     if (!group) return state;
 
     next.list.splice(index, 1);

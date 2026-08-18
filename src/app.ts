@@ -1,23 +1,28 @@
 import { allTasks, isComplete, isDone, overallProgress } from "./progress";
 import { createGroup } from "./render/group";
+import { flip } from "./render/flip";
 import { KeyedList } from "./render/list";
 import { hueAt, makeRing, paintRing } from "./render/ring";
 import { createTask, popRing, tickOf } from "./render/task";
 import type { RowActions } from "./render/context";
+import { loadPrefs, savePrefs, type Prefs } from "./prefs";
 import { onExternalChange } from "./storage";
 import type { Store } from "./store";
 import * as T from "./transitions";
-import { raw, uid } from "./parse";
-import { SCHEMA_VERSION } from "./types";
+import { raw } from "./parse";
 import type { Group, Node, State } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
+import { Dragger } from "./ui/drag";
 import { beginEdit } from "./ui/edit";
+import { RowMenu, type MenuItem } from "./ui/menu";
 import { DaySheet } from "./ui/sheet";
 import { Toast } from "./ui/toast";
 
 const STALE_MS = 16 * 60 * 60 * 1000;
 const EXIT_MS = 200;
+/** Long enough for the tick to finish landing before the group folds over it. */
+const COLLAPSE_MS = 520;
 
 /** Query a required element, failing loudly rather than silently rendering nothing. */
 function el(selector: string): HTMLElement {
@@ -46,13 +51,20 @@ export class App {
   #sheet: DaySheet;
   #drawer: Drawer;
   #confetti: Confetti;
+  #menu = new RowMenu();
 
+  #prefs: Prefs = loadPrefs();
   #destId: string | null = null;
   #editingId: string | null = null;
   #armed = true;
   #shownPct = 0;
   #tweenRaf = 0;
   #storageWarned = false;
+  #collapseTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Set by the moves, so only a rearrangement animates as one. */
+  #animateNext = false;
+  /** The list as it stood before the current drag, for undo and for Escape. */
+  #beforeDrag: State | null = null;
   /** A delete waiting out its exit animation, cancellable until it lands. */
   #pendingDelete: {
     id: string;
@@ -74,7 +86,20 @@ export class App {
         this.#beginEdit(element, id, isGroup);
       },
       toggleCollapse: (id) => {
+        // Folding by hand outranks folding on your behalf: a pending
+        // auto-collapse must not re-shut a group you just opened.
+        clearTimeout(this.#collapseTimer);
         this.#store.apply(T.toggleCollapse(this.#state, id));
+      },
+      openMenu: (anchor, id) => {
+        this.#menu.open(
+          anchor,
+          () => this.#menuItems(id),
+          () =>
+            this.#list.querySelector<HTMLElement>(
+              `[data-id="${id}"] > .dots, [data-id="${id}"] > .ghead > .dots`,
+            ),
+        );
       },
       aim: (id) => {
         this.#destId = this.#destId === id ? null : id;
@@ -119,6 +144,11 @@ export class App {
     });
     this.#drawer = new Drawer(el("#dataveil"), {
       current: () => this.#state,
+      prefs: () => this.#prefs,
+      onPrefs: (next) => {
+        this.#prefs = next;
+        savePrefs(next);
+      },
       onReplace: (next) => {
         this.#replace(next, true);
         const count = allTasks(next.list).length;
@@ -130,6 +160,44 @@ export class App {
       },
     });
     this.#confetti = new Confetti(el("#confetti") as HTMLCanvasElement);
+
+    /*
+     * A drag is the same one-step reorder the keyboard uses, applied as the
+     * pointer crosses rows — so the steps are not individually undoable. The
+     * whole gesture is: one Ctrl-Z puts the list back where the drag found it.
+     */
+    new Dragger(this.#list, {
+      step: (id, dir, scope) => {
+        if (!T.canReorder(this.#state, id, dir, scope)) return false;
+        /*
+         * No FLIP here, unlike every other move. The drag decides its next step
+         * by measuring where rows are, and getBoundingClientRect reports an
+         * in-flight transform — so animating the neighbours would have the
+         * gesture reading positions that have not settled yet, and stepping
+         * differently depending on how fast the pointer was going. The row under
+         * the finger is the continuity; the rest snap.
+         */
+        this.#store.apply(T.reorder(this.#state, id, dir, scope));
+        return true;
+      },
+      onStart: () => {
+        this.#menu.close(false);
+        this.#beforeDrag = this.#state;
+      },
+      onEnd: (_id, moved) => {
+        if (moved && this.#beforeDrag) this.#store.stageUndo(this.#beforeDrag);
+        this.#beforeDrag = null;
+      },
+      onCancel: () => {
+        // Escape mid-drag means "never mind", so the list goes back untouched
+        // and nothing is left on the undo slot to explain.
+        if (this.#beforeDrag) {
+          this.#animateNext = true;
+          this.#store.apply(this.#beforeDrag);
+        }
+        this.#beforeDrag = null;
+      },
+    });
 
     // Warn once per outage, and again if storage comes back and fails afresh.
     this.#store.onPersist((ok) => {
@@ -183,7 +251,32 @@ export class App {
         this.#rows.get(id)?.element ?? this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
       if (row && !this.#motion.matches) popRing(row);
       this.#vibrate(12);
+      this.#autoCollapse(id);
     }
+  }
+
+  /**
+   * Fold a finished group shut, if the preference is on.
+   *
+   * Only on the transition into finished, and on a delay: the tick landing is
+   * the reward, so the group waits for it to play out before folding over it.
+   * Re-checked when the timer fires, because by then the list may have moved on.
+   */
+  #autoCollapse(taskId: string): void {
+    if (!this.#prefs.autoCollapseDone) return;
+    const owner = T.ownerOf(this.#state, taskId);
+    if (!owner || owner.items.length === 0 || !owner.items.every(isDone)) return;
+
+    const groupId = owner.id;
+    const fold = (): void => {
+      const group = T.findGroup(this.#state, groupId);
+      if (!group || group.items.length === 0 || !group.items.every(isDone)) return;
+      this.#store.apply(T.collapse(this.#state, groupId));
+    };
+
+    clearTimeout(this.#collapseTimer);
+    if (this.#motion.matches) fold();
+    else this.#collapseTimer = setTimeout(fold, COLLAPSE_MS);
   }
 
   #remove(id: string): void {
@@ -219,6 +312,105 @@ export class App {
     }
   }
 
+  /* -------------------------------------------------------------- ordering */
+
+  /**
+   * "Move up" and "Move down", from the ⋯ menu or Alt+Arrow.
+   *
+   * Level-scoped: a command named after a direction should move the row in that
+   * direction, not quietly re-nest it. Changing level is asked for explicitly —
+   * Tab / Shift-Tab, or the menu's "Into" / "Out of". Dragging is the exception,
+   * because there the pointer is already saying where the row should land.
+   */
+  #reorder(id: string, dir: T.ReorderDirection): void {
+    if (!T.canReorder(this.#state, id, dir, "level")) return;
+    this.#animateNext = true;
+    this.#store.apply(T.reorder(this.#state, id, dir, "level"), { undoable: true });
+    this.#reveal(id);
+  }
+
+  #move(id: string, dir: T.MoveDirection): void {
+    if (!T.canMove(this.#state, id, dir)) return;
+    this.#animateNext = true;
+    this.#store.apply(T.move(this.#state, id, dir), { undoable: true });
+    this.#reveal(id);
+  }
+
+  /** What the ⋯ menu offers for one row, read fresh each time it repaints. */
+  #menuItems(id: string): MenuItem[] {
+    const items: MenuItem[] = [
+      {
+        label: "Move up",
+        hint: "Alt+↑",
+        disabled: !T.canReorder(this.#state, id, "up", "level"),
+        keepOpen: true,
+        onSelect: () => {
+          this.#reorder(id, "up");
+        },
+      },
+      {
+        label: "Move down",
+        hint: "Alt+↓",
+        disabled: !T.canReorder(this.#state, id, "down", "level"),
+        keepOpen: true,
+        onSelect: () => {
+          this.#reorder(id, "down");
+        },
+      },
+    ];
+
+    // A counted item cannot toggle the way a plain one does — tapping up is the
+    // point of it — so its way back to zero lives here.
+    const task = T.findTask(this.#state, id);
+    if (task && task.target > 1 && task.count > 0) {
+      items.push({
+        label: "Reset to 0",
+        onSelect: () => {
+          this.#bump(id, -task.count);
+        },
+      });
+    }
+
+    // Nesting is reachable by stepping, but only one row at a time; on a phone
+    // that is a lot of taps to cross a long group, so it gets its own entry.
+    const owner = T.ownerOf(this.#state, id);
+    const above = T.groupAbove(this.#state, id);
+    if (owner) {
+      items.push({
+        label: `Out of “${owner.title}”`,
+        hint: "Shift+Tab",
+        onSelect: () => {
+          this.#move(id, "out");
+        },
+      });
+    } else if (above) {
+      items.push({
+        label: `Into “${above.title}”`,
+        hint: "Tab",
+        onSelect: () => {
+          this.#move(id, "in");
+        },
+      });
+    }
+
+    return items;
+  }
+
+  /**
+   * Bring a row on screen, clearing the fixed composer.
+   *
+   * `nearest` plus the row's own scroll-margin means an item already in view
+   * does not move at all — nothing is more disorienting than the list jumping
+   * when you added something you could already see.
+   */
+  #reveal(id: string): void {
+    const row = this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
+    row?.scrollIntoView({
+      block: "nearest",
+      behavior: this.#motion.matches ? "auto" : "smooth",
+    });
+  }
+
   /** Let the queued delete happen now. */
   #flushDelete(): void {
     const pending = this.#pendingDelete;
@@ -250,6 +442,9 @@ export class App {
       clearTimeout(pending.timer);
       this.#pendingDelete = null;
     }
+    // The row this menu was opened against is about to stop existing.
+    this.#menu.close(false);
+    clearTimeout(this.#collapseTimer);
     this.#destId = null;
     this.#rows.clear();
     // Armed before the notify, so an all-done import does not celebrate itself.
@@ -314,7 +509,21 @@ export class App {
   #render(): void {
     if (this.#destId !== null && !T.findGroup(this.#state, this.#destId)) this.#destId = null;
 
-    this.#rows.patch(this.#state.list);
+    // Only reorders pay for the FLIP measurement — reading every row's box on
+    // every tick would be layout thrash for an animation nothing asked for.
+    const animate = this.#animateNext && !this.#motion.matches;
+    this.#animateNext = false;
+    flip(
+      // The dragged row is glued to the pointer; animating it to its new layout
+      // box would be a second owner of its transform, fighting the finger.
+      [...this.#list.querySelectorAll<HTMLElement>(".task, .group")].filter(
+        (row) => !row.classList.contains("dragging"),
+      ),
+      () => {
+        this.#rows.patch(this.#state.list);
+      },
+      { instant: !animate },
+    );
     this.#renderDest();
 
     const tasks = allTasks(this.#state.list);
@@ -376,6 +585,9 @@ export class App {
       if (result.added) {
         this.#destId = result.destId;
         this.#store.apply(result.state);
+        // The composer is pinned to the bottom of a list that grows off the
+        // screen behind it, so adding without this types into the void.
+        this.#reveal(result.added.id);
       }
       this.#input.value = "";
       this.#input.focus();
@@ -430,55 +642,58 @@ export class App {
       return;
     }
     if (event.key === "Escape") {
+      if (this.#menu.isOpen) this.#menu.close();
       if (this.#sheet.isOpen) this.#sheet.hide();
       if (this.#drawer.isOpen) this.#drawer.hide();
     }
     if (this.#editingId !== null) return;
 
     const active = document.activeElement;
-    const row = active instanceof HTMLElement ? active.closest(".task") : null;
-    const id = row instanceof HTMLElement ? row.dataset["id"] : undefined;
+    // A nested tick matches its own row before its group, which is what makes
+    // Alt+Arrow move the item rather than everything around it.
+    const row = active instanceof HTMLElement ? active.closest(".task, .group") : null;
+    if (!(row instanceof HTMLElement) || !(active instanceof HTMLElement)) return;
+    const id = row.dataset["id"];
     if (id === undefined) return;
+    const handle = row.classList.contains("group") ? "chev" : "tick";
 
-    // Only the tick is the row's handle: Tab from a delete button must stay a
-    // plain focus move, not a structural edit.
-    if (!(document.activeElement instanceof HTMLElement)) return;
-    if (!document.activeElement.classList.contains("tick")) return;
+    // Alt is free on a row, so any control on it can start a move; the row's own
+    // handle takes the focus back afterwards.
+    if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      const dir = event.key === "ArrowUp" ? "up" : "down";
+      // Same scope the ⋯ menu uses — the menu prints Alt+Arrow as this command's
+      // shortcut, so the two have to be the same command. And only swallow the
+      // key when there is somewhere to go.
+      if (!T.canReorder(this.#state, id, dir, "level")) return;
+      event.preventDefault();
+      this.#reorder(id, dir);
+      this.#refocus(id, handle);
+      return;
+    }
+
+    // Only the tick is the row's handle for Tab: tabbing off a delete button
+    // must stay a plain focus move, not a structural edit.
+    if (!active.classList.contains("tick")) return;
 
     if (event.key === "Tab") {
       const dir = event.shiftKey ? "out" : "in";
       // Only swallow Tab when there is somewhere to go, so focus can still escape.
       if (!T.canMove(this.#state, id, dir)) return;
       event.preventDefault();
-      this.#store.apply(T.move(this.#state, id, dir), { undoable: true });
+      this.#move(id, dir);
       this.#refocus(id);
     }
   }
 
-  #refocus(id: string): void {
+  /** Put focus back on the row's own handle once it has been re-rendered. */
+  #refocus(id: string, handle = "tick"): void {
     requestAnimationFrame(() => {
-      const row = this.#list.querySelector(`.task[data-id="${id}"]`);
-      const tick = row instanceof HTMLElement ? tickOf(row) : null;
-      tick?.focus();
+      const row = this.#list.querySelector(`[data-id="${id}"]`);
+      const control =
+        handle === "tick" && row instanceof HTMLElement
+          ? tickOf(row)
+          : (row?.querySelector<HTMLElement>(`:scope > .ghead > .${handle}`) ?? null);
+      control?.focus();
     });
   }
 }
-
-export const seed = (): State => ({
-  v: SCHEMA_VERSION,
-  openedAt: null,
-  list: [
-    {
-      kind: "group",
-      id: uid(),
-      title: "Morning",
-      collapsed: false,
-      items: [
-        { kind: "task", id: uid(), text: "eat breakfast", target: 1, count: 0 },
-        { kind: "task", id: uid(), text: "walk the dog", target: 1, count: 0 },
-      ],
-    },
-    { kind: "task", id: uid(), text: "make calls", target: 3, count: 0 },
-    { kind: "task", id: uid(), text: "shopping", target: 1, count: 0 },
-  ],
-});

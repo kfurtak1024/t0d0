@@ -42,9 +42,12 @@ Invariants worth defending in review:
   root beside groups; there is no implicit "Inbox".
 - **Progress is `mean(count / target)`** over tasks, so one `[20]` item cannot swamp the
   ring. Empty groups are excluded from totals and render no ring.
-- **The theme lives in its own storage key**, never in the list. It is a property
-  of this browser, so putting it in `State` would export it in a backup and
-  import someone else's choice.
+- **The theme and the preferences live in their own storage keys**, never in the
+  list. They are properties of this browser, so putting them in `State` would
+  export them in a backup and import someone else's choices.
+- **Auto-collapse fires only on the transition into finished**, like the
+  celebration, and after a delay — the tick landing is the reward, so the group
+  waits for it before folding. Folding by hand cancels a pending fold.
 - **All external data goes through `normalize()`** — stored JSON and pasted imports alike.
   It repairs rather than trusts: clamps `target` to 1–99, clamps `count` to `target`, drops
   empty text, regenerates duplicate ids. Never parse straight into state.
@@ -53,6 +56,23 @@ Invariants worth defending in review:
 - **Destructive actions confirm in place**, never in a dialog stacked on a dialog: the
   control swaps into a confirm state and reverts on a timeout. Erase, and replace-on-
   import, both follow this.
+- **Reordering is one step, applied repeatedly.** `reorder()` moves a row a single
+  place and **is its own inverse**, so repeating it reaches any position. Everything else
+  is a way of asking for that step — `Alt`+arrows, the `⋯` menu, and the drag, which just
+  applies it each time the pointer crosses a row. Do not add a second, parallel notion of
+  "where this should land"; the inverse property is unit-tested and is what keeps all
+  three inputs agreeing.
+- **A step's `scope` says whether it may change nesting, and the answer follows from
+  how it was asked for.** Dragging is `"list"`: the pointer is over a place, so the row
+  goes there, into or out of a group included. "Move up" is `"level"`: a command named
+  after a direction moves the row among its own siblings and stops at the ends, because
+  one that silently re-nested an item would be doing more than it said. Changing level is
+  its own command — `Tab` / `Shift-Tab`, or the menu's "Into" / "Out of". The `⋯` menu
+  prints `Alt+↑` beside "Move up", so **those two must stay the same command**; scoping
+  one and not the other makes the hint a lie.
+- **A plain item's tick toggles; a counted one does not.** `role="checkbox"` promises a
+  way back, and on a phone there is no Shift and no arrow key. `target > 1` counts up,
+  and steps down via the count label or the row menu.
 
 ## Input syntax
 
@@ -82,13 +102,41 @@ Node version is pinned in `.nvmrc`. Use `npm ci`, not `npm install`, in automati
 
 ```
 src/theme.ts      theme preference, in its own storage key
-src/state.ts      types, normalize, load/save, all state transitions
+src/prefs.ts      behaviour preferences, in their own storage key
+src/types.ts      Task, Group, State, and the limits
+src/normalize.ts  the single gate for data arriving from outside
+src/storage.ts    load/save against one localStorage key
+src/store.ts      the live state, persistence, and one level of undo
+src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title" and "[n]" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula
-src/render/       keyed DOM patching — list, task, group, ring
-src/ui/           toast, day-summary sheet, drawer (backup/reset/about), confetti
+src/render/       keyed DOM patching — list, task, group, ring, flip
+src/ui/           toast, day-summary sheet, drawer, row menu, drag, confetti
 src/styles/       tokens.css first, then base.css, then app.css
 ```
+
+There is **no demo list**. A first run starts empty; `blank()` is what `load()` falls back
+to. Seeding sample items puts someone else's day in the one place the app promises is
+yours, and makes deleting them the first thing anyone does.
+
+The drag decides by asking which row is under the pointer, and for a group the answer is
+a band, not the card: **from the middle of its `.ghead` down to a sliver above its bottom
+edge.** Above that line you are addressing the group as a row in the list; below it you
+are addressing its contents. That one split is doing three jobs — dropping onto a title
+puts the item in, dragging out over the same header takes it out, and a short card (an
+empty group is barely taller than its header) still has a band left to drop into. The
+sliver at the bottom is the matching exit downwards, which the last item of the last group
+has no other route to.
+
+**Entering and leaving must read the same lines.** The pointer is always in exactly one of
+above / inside / below, which is what stops a step undoing itself on the next frame. If
+you widen one region, narrow the other by the same amount, and re-check by measurement —
+this went wrong twice, in both directions, and neither was visible by eye.
+
+Hit areas are `::after` overlays, so **where two overlap, the later one in the DOM wins**.
+That is why the grip's is asymmetric — a symmetric 44px box put the tick's overlay on top
+of the grip's own dots. Changing a row's controls means re-checking this with
+`elementFromPoint`, not by eye.
 
 `src/render/list.ts` holds the keyed patch. It exists so editing a row never destroys its
 DOM node — that would kill focus mid-edit and cancel in-flight transitions. If you find
@@ -157,5 +205,4 @@ Say no to these unless the user explicitly reopens the decision:
 - Pomodoro countdowns, enforced breaks, or any timer that interrupts
 - Streaks, history, archives, or completion stats over time
 - Accounts, sync, or any server
-- Drag-and-drop reordering (Tab / Shift-Tab moves items; a `⋯` menu covers touch)
 - Merge-on-import — import replaces, and undo covers it

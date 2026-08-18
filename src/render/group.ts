@@ -1,6 +1,6 @@
 import { isDone } from "../progress";
 import type { Group, Task } from "../types";
-import { button, icon, type RowActions } from "./context";
+import { button, grip, icon, menuButton, type RowActions } from "./context";
 import { KeyedList, type Keyed } from "./list";
 import { createTask } from "./task";
 
@@ -21,14 +21,18 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
   const plus = button("plus", `Add to ${group.title}`);
   plus.textContent = "+";
 
+  const dots = menuButton("More");
+
   const kill = button("kill", "Delete group");
   kill.append(icon("x"));
 
   const count = document.createElement("div");
   count.className = "gcount";
 
-  // Count sits flush right, after the actions, so it never shifts when they appear.
-  head.append(chevron, title, plus, kill, count);
+  // The tally belongs to the title, so it sits with it; the actions go right,
+  // where a task row keeps its own. They fade rather than unmount, so arriving
+  // on hover shifts nothing.
+  head.append(grip(), chevron, title, count, plus, dots, kill);
 
   const body = document.createElement("div");
   body.className = "gbody";
@@ -50,6 +54,9 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
   });
   plus.addEventListener("click", () => {
     actions.aim(group.id);
+  });
+  dots.addEventListener("click", () => {
+    actions.openMenu(dots, group.id);
   });
   title.addEventListener("click", () => {
     actions.beginEdit(title, group.id, true);
@@ -75,6 +82,7 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
       "aria-label",
       next.collapsed ? `Expand ${next.title}` : `Collapse ${next.title}`,
     );
+    dots.setAttribute("aria-label", `More for ${next.title}`);
     kill.setAttribute("aria-label", `Delete ${next.title}`);
 
     list.patch(next.items);

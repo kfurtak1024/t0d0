@@ -31,6 +31,44 @@ test("a counted item needs one tap per unit", async ({ page }) => {
   await expect(row).toHaveClass(/done/);
 });
 
+/*
+ * A mis-tap has to be recoverable with the same finger that made it. Shift-click
+ * and the arrow keys do not exist on a phone, and a plain item has no count
+ * label to tap, so the tick itself has to go both ways.
+ */
+test("tapping a finished plain item unticks it", async ({ page }) => {
+  await addItem(page, "shopping");
+  const row = page.locator(".task", { hasText: "shopping" });
+  const tick = row.locator(".tick");
+
+  await tick.click();
+  await expect(row).toHaveClass(/done/);
+  await expect(tick).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("#frac")).toHaveText("1 of 1");
+
+  await tick.click();
+  await expect(row).not.toHaveClass(/done/);
+  await expect(tick).toHaveAttribute("aria-checked", "false");
+  await expect(page.locator("#frac")).toHaveText("0 of 1");
+});
+
+test("a counted item counts up instead of toggling, and resets from the menu", async ({ page }) => {
+  await addItem(page, "make calls [3]");
+  const row = page.locator(".task", { hasText: "make calls" });
+
+  for (let i = 0; i < 3; i++) await row.locator(".tick").click();
+  await expect(row.locator(".count")).toHaveText("3/3");
+
+  // Tapping a finished counted item must not wipe three taps of progress.
+  await row.locator(".tick").click();
+  await expect(row.locator(".count")).toHaveText("3/3");
+
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: "Reset to 0" }).click();
+  await expect(row.locator(".count")).toHaveText("0/3");
+  await expect(row).not.toHaveClass(/done/);
+});
+
 test("tapping the count steps back down", async ({ page }) => {
   await addItem(page, "make calls [3]");
   const row = page.locator(".task", { hasText: "make calls" });

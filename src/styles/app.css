@@ -92,6 +92,10 @@
   transition:
     opacity 0.22s var(--ease),
     transform 0.3s var(--ease);
+  /* The composer floats over the end of the list, so a row scrolled into view
+     has to clear it — otherwise "reveal the item you just added" reveals it
+     underneath the thing you added it with. */
+  scroll-margin: 1rem 0 calc(var(--composer-h, 8rem) + 1rem);
 }
 
 @starting-style {
@@ -126,6 +130,7 @@
 }
 
 .ghead {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -147,8 +152,9 @@
   transform: rotate(-90deg);
 }
 
+/* Takes only the width it needs, so the tally can sit right beside it. */
 .gtitle {
-  flex: 1;
+  flex: 0 1 auto;
   font-weight: 700;
   font-size: 0.88rem;
   letter-spacing: 0.015em;
@@ -158,13 +164,12 @@
 
 .gcount {
   flex: none;
+  /* Everything after this is an action, and actions live on the right. */
+  margin-right: auto;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  min-width: 2.5rem;
-  text-align: right;
-  padding-left: 0.2rem;
 }
 
 .group.clear .gcount {
@@ -205,6 +210,7 @@
 /* ------------------------------------------------------------------ rows */
 
 .task {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -234,6 +240,72 @@
   touch-action: manipulation;
 }
 
+/* ----------------------------------------------------------------- grip */
+
+/*
+  Six dots drawn in CSS rather than set in a font: the app ships no webfont and
+  the braille glyph that would do this is not reliably installed anywhere.
+
+  `touch-action: none` is what makes a drag a drag on a phone — without it the
+  browser claims the gesture as a scroll before the first pointermove arrives.
+*/
+.grip {
+  flex: none;
+  position: relative;
+  align-self: center;
+  width: 8px;
+  height: 12px;
+  /* Buys room for the hit areas to sit side by side rather than overlapping —
+     see the note on ::after below. */
+  margin-right: 0.45rem;
+  color: var(--faint);
+  background-image: radial-gradient(circle, currentcolor 1.1px, transparent 1.3px);
+  background-size: 4px 4px;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.16s;
+}
+
+/*
+  44px tall but only 25 wide, and the width is the interesting number.
+
+  Hit areas here are ::after overlays, so where two of them overlap the later
+  one in the DOM wins — and the tick sits after the grip. A symmetric 44px box
+  put the tick's overlay over the grip's own dots: pressing them ticked the item
+  instead of dragging it. So this reaches left into the card's padding, where
+  nothing else lives, and stops short of the gap on the right. 25px still clears
+  the 24px floor, and the drag has keyboard and menu equivalents; the tick has
+  none, so it keeps the contested space.
+*/
+.grip::after {
+  content: "";
+  position: absolute;
+  inset: -16px -3px -16px -14px;
+}
+
+.task.dragging,
+.group.dragging {
+  position: relative;
+  z-index: 30;
+  transform: translateY(var(--drag-y, 0));
+  box-shadow: var(--shadow-lift);
+  cursor: grabbing;
+  /* The pointer owns this row's transform; a transition would trail the finger,
+     and pointer-events would make the row hit-test itself instead of the list
+     underneath it. */
+  transition: none;
+  pointer-events: none;
+}
+
+.group.dragging {
+  opacity: 0.97;
+}
+
+body.dragging-row {
+  user-select: none;
+  cursor: grabbing;
+}
+
 /*
   Hit areas, not paint areas. Every interactive control below the 44px guideline
   grows an invisible target via ::after, so the tap size is honest without the
@@ -242,6 +314,7 @@
 .tick::after,
 .kill::after,
 .plus::after,
+.dots::after,
 .count::after,
 .more::after,
 .add::after,
@@ -389,7 +462,8 @@
 }
 
 .kill,
-.plus {
+.plus,
+.dots {
   flex: none;
   position: relative;
   width: 1.6rem;
@@ -404,12 +478,15 @@
     background 0.16s;
 }
 
-.plus {
+.plus,
+.dots {
   font-size: 1.05rem;
   line-height: 1;
 }
 
-.kill:hover {
+.kill:hover,
+.dots:hover,
+.dots[aria-expanded="true"] {
   color: var(--ink);
   background: var(--nest);
 }
@@ -424,15 +501,44 @@
 /* Hover is the right fork, not width: it asks whether a control can hide. */
 @media (hover: hover) {
   .kill,
-  .plus {
+  .plus,
+  .dots,
+  .grip {
     opacity: 0;
   }
 
+  /*
+    Where the grip only appears on hover, it must not hold a column open for
+    itself the rest of the time — an empty 25px gutter on every row shifted the
+    whole list off the header's axis. So on these devices it leaves the flow and
+    sits in the margin beside the card, the way a document outline handle does.
+    On touch it stays in the flow above, because there it is always visible and
+    has to be somewhere real.
+  */
+  .grip {
+    position: absolute;
+    left: -1.15rem;
+    margin-right: 0;
+  }
+
+  .items > .task > .grip {
+    left: -1.3rem;
+  }
+
   .task:hover .kill,
+  .task:hover .dots,
+  .task:hover .grip,
   .ghead:hover .kill,
   .ghead:hover .plus,
+  .ghead:hover .dots,
+  .ghead:hover .grip,
+  .task.dragging .grip,
+  .group.dragging .grip,
   .kill:focus-visible,
-  .plus:focus-visible {
+  .plus:focus-visible,
+  .dots:focus-visible,
+  /* An open menu has to keep its own handle on screen. */
+  .dots[aria-expanded="true"] {
     opacity: 1;
   }
 }
@@ -675,6 +781,78 @@
   padding: 0.28rem 0.7rem;
   border-radius: 999px;
   background: var(--nest);
+}
+
+/* -------------------------------------------------------------- row menu */
+
+/*
+  The ⋯ menu. Reordering has to be possible with a thumb and drag-and-drop is
+  out, so the moves are listed as commands. It renders into <body> and is placed
+  from script, because inside the row it would be clipped by the group's own
+  overflow the moment it opened on a nested item.
+*/
+.rowmenu {
+  position: fixed;
+  z-index: 50;
+  min-width: 12rem;
+  /* A group title goes in one of these labels, so it needs a ceiling. */
+  max-width: min(19rem, calc(100vw - 2rem));
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lift);
+  animation: rise 0.3s var(--ease);
+}
+
+.rowmenu[hidden] {
+  display: none;
+}
+
+.rowmenu:focus {
+  outline: none;
+}
+
+.rowmenu button {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  /* Tall enough to hit on its own — a menu row has the space to be honest
+     about it, so there is no invisible ::after to add here. */
+  min-height: 2.75rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.rowmenu button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowmenu button:hover:not(:disabled) {
+  background: var(--nest);
+}
+
+/* Spent moves stay in place rather than unmounting: a menu that reflows under
+   a finger mid-tap is worse than one with a dead row in it. */
+.rowmenu button:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.rowmenu kbd {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--faint);
+  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------- sheets */
@@ -1099,6 +1277,10 @@
   .veil:has(.drawer) {
     place-items: end center;
     padding: 0;
+    /* The sheet starts a full height below the fold and scrolls itself once it
+       is up, so the veil has nothing to scroll — and if it could, the entry
+       animation would be dragging the backdrop's scroll position with it. */
+    overflow: hidden;
   }
 
   .drawer {
@@ -1190,4 +1372,43 @@
 .row.rowtall .segmented {
   flex: none;
   width: 13rem;
+}
+
+/* ------------------------------------------------------------- switches */
+
+.switch {
+  flex: none;
+  position: relative;
+  width: 2.9rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: var(--track);
+  transition: background 0.22s var(--ease);
+}
+
+/* Reads as a 27px control, answers to a 44px thumb. */
+.switch::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+}
+
+.switch .knob {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.3s var(--spring);
+}
+
+.switch[aria-checked="true"] {
+  background: oklch(var(--ring-l) var(--ring-c) 268);
+}
+
+.switch[aria-checked="true"] .knob {
+  transform: translateX(1.2rem);
 }
