@@ -1,4 +1,5 @@
 import { summarise } from "../progress";
+import { need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
 
@@ -23,17 +24,17 @@ export class DaySheet {
 
   constructor(veil: HTMLElement, onConfirm: () => void) {
     this.#veil = veil;
-    this.#panel = veil.querySelector(".sheet") as HTMLElement;
-    this.#score = veil.querySelector(".score") as HTMLElement;
-    this.#label = veil.querySelector(".of") as HTMLElement;
-    this.#cleared = veil.querySelector(".cleared") as HTMLElement;
-    this.#elapsed = veil.querySelector(".dur") as HTMLElement;
+    this.#panel = need(veil, ".sheet");
+    this.#score = need(veil, ".score");
+    this.#label = need(veil, ".of");
+    this.#cleared = need(veil, ".cleared");
+    this.#elapsed = need(veil, ".dur");
 
-    (veil.querySelector(".confirm") as HTMLButtonElement).addEventListener("click", () => {
+    need(veil, ".confirm").addEventListener("click", () => {
       onConfirm();
       this.hide();
     });
-    (veil.querySelector(".dismiss") as HTMLButtonElement).addEventListener("click", () => {
+    need(veil, ".dismiss").addEventListener("click", () => {
       this.hide();
     });
     veil.addEventListener("click", (event) => {

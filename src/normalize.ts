@@ -9,6 +9,14 @@ const text = (value: unknown): string =>
   typeof value === "string" ? value.trim().slice(0, LIMITS.text) : "";
 
 /**
+ * Ids are interpolated into `[data-id="…"]` selectors by the drag, the row menu
+ * and the focus restore, so an imported id carrying a quote is not cosmetic:
+ * `querySelector` throws and the gesture dies. Repairing the id here is the
+ * single fix; escaping at every call site is four fixes and a future fifth.
+ */
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
  * The single gate for data entering the app from outside — stored JSON and
  * pasted imports alike.
  *
@@ -30,7 +38,7 @@ export function normalize(input: unknown): State | null {
 
   const seen = new Set<string>();
   const takeId = (value: unknown): string => {
-    let id = typeof value === "string" && value.length > 0 ? value : uid();
+    let id = typeof value === "string" && ID.test(value) ? value : uid();
     while (seen.has(id)) id = uid();
     seen.add(id);
     return id;

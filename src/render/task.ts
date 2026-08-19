@@ -80,14 +80,18 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     actions.bump(current.id, undo ? -1 : 1);
   });
   tick.addEventListener("keydown", (event) => {
-    // Spinbutton conventions, and a way down that isn't Shift-click.
+    // Spinbutton conventions, and a way down that isn't Shift-click — but only
+    // for a counted item. A plain one reports role="checkbox", which Space and
+    // Enter already toggle; arrows are not a checkbox interaction, and having
+    // them tick it made the key table in the README a lie.
+    if (current.target <= 1) return;
     if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
       event.preventDefault();
-      actions.bump(task.id, -1);
+      actions.bump(current.id, -1);
     }
     if (event.key === "ArrowUp" || event.key === "ArrowRight") {
       event.preventDefault();
-      actions.bump(task.id, 1);
+      actions.bump(current.id, 1);
     }
   });
   count.addEventListener("click", () => {

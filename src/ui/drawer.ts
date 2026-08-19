@@ -4,6 +4,7 @@ import { allTasks } from "../progress";
 import { icon, type IconName } from "../render/context";
 import type { State } from "../types";
 import { loadTheme, saveTheme, THEMES, type Theme } from "../theme";
+import { need } from "./dom";
 import { trapFocus } from "./focus";
 
 const CONFIRM_MS = 5000;
@@ -151,9 +152,7 @@ export class Drawer {
   /* ------------------------------------------------------------- plumbing */
 
   #need(selector: string): HTMLElement {
-    const found = this.#veil.querySelector(selector);
-    if (!(found instanceof HTMLElement)) throw new Error(`drawer is missing ${selector}`);
-    return found;
+    return need(this.#veil, selector);
   }
 
   #slot(name: string): HTMLElement {

@@ -13,6 +13,7 @@ import { raw } from "./parse";
 import type { Group, Node, State } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
+import { need } from "./ui/dom";
 import { Dragger } from "./ui/drag";
 import { beginEdit } from "./ui/edit";
 import { RowMenu, type MenuItem } from "./ui/menu";
@@ -24,12 +25,8 @@ const EXIT_MS = 200;
 /** Long enough for the tick to finish landing before the group folds over it. */
 const COLLAPSE_MS = 520;
 
-/** Query a required element, failing loudly rather than silently rendering nothing. */
-function el(selector: string): HTMLElement {
-  const node = document.querySelector(selector);
-  if (!(node instanceof HTMLElement)) throw new Error(`missing element: ${selector}`);
-  return node;
-}
+/** Query a required element of the page, failing loudly rather than rendering nothing. */
+const el = (selector: string): HTMLElement => need(document, selector);
 
 export class App {
   #store: Store;

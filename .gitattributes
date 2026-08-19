@@ -1,0 +1,11 @@
+* text=auto eol=lf
+
+# Regenerated from the app by `npm run screenshots` and `npm run icons`, and
+# reviewed by looking at the app rather than at the diff.
+.github/screenshot-*.png binary linguist-generated=true
+.github/banner-*.svg     linguist-generated=true
+public/icon-*.png        binary linguist-generated=true
+public/apple-touch-icon.png binary linguist-generated=true
+public/favicon.svg       linguist-generated=true
+
+package-lock.json        linguist-generated=true

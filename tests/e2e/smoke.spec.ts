@@ -173,6 +173,12 @@ test("the tick is a real control with the right role and state", async ({ page }
   await page.keyboard.press("Space");
   await expect(check).toHaveAttribute("aria-checked", "true");
 
+  // Arrows are a spinbutton interaction. On a checkbox they must do nothing —
+  // Space and Enter are already the way back, and the key table says arrows
+  // count an [n] item.
+  await page.keyboard.press("ArrowDown");
+  await expect(check).toHaveAttribute("aria-checked", "true");
+
   const spin = page.locator(".task", { hasText: "make calls" }).locator(".tick");
   await expect(spin).toHaveRole("spinbutton");
   await expect(spin).toHaveAttribute("aria-valuemax", "3");
@@ -295,4 +301,39 @@ test("deleting the last undone item still finishes the day", async ({ page }) =>
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { draws: number }).draws))
     .toBeGreaterThan(0);
+});
+
+/*
+ * Editing is the only place the app makes an element contenteditable, and it
+ * asks for "plaintext-only" — a value a browser is entitled to reject with a
+ * SyntaxError rather than ignore. Nothing else here would notice if it did.
+ */
+test("a label edits in place, commits on Enter and reverts on Escape", async ({ page }) => {
+  await addItem(page, "shopping");
+  const label = page.locator(".task .label");
+
+  await label.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("groceries");
+  await page.keyboard.press("Enter");
+  await expect(label).toHaveText("groceries");
+
+  await label.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("never mind");
+  await page.keyboard.press("Escape");
+  await expect(label).toHaveText("groceries");
+});
+
+test("editing keeps the [n] visible and round-trips it", async ({ page }) => {
+  await addItem(page, "make calls [3]");
+  const label = page.locator(".task .label");
+
+  await label.click();
+  // The raw form comes back with the bracket, so the quantity stays editable.
+  await expect(label).toHaveText("make calls [3]");
+  await page.keyboard.press("Escape");
+
+  await expect(label).toContainText("make calls");
+  await expect(page.locator(".task .count")).toHaveText("0/3");
 });
