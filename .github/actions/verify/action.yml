@@ -95,11 +95,15 @@ runs:
     # Runs here rather than only before a deploy: with main protected, a check
     # that can only fail after the merge fails in the one place nothing can be
     # done about it.
+    #
+    # All of dist, not just dist/assets — vite-plugin-pwa emits the service worker
+    # and Workbox's precache runtime at the root, and a browser downloads those
+    # like everything else. Measuring assets alone hid 5 kB of them.
     - name: Check bundle budget
       shell: bash
       run: |
-        size=$(find dist/assets -name '*.js' -o -name '*.css' | xargs cat | gzip -9 | wc -c)
-        echo "gzipped assets: ${size} bytes"
+        size=$(find dist -name '*.js' -o -name '*.css' | xargs cat | gzip -9 | wc -c)
+        echo "gzipped js and css: ${size} bytes"
         if [ "$size" -gt 61440 ]; then
           echo "::error::bundle is over the 60 KB budget — did a dependency sneak in?"
           exit 1
