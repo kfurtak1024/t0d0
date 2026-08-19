@@ -99,12 +99,17 @@ runs:
     # All of dist, not just dist/assets — vite-plugin-pwa emits the service worker
     # and Workbox's precache runtime at the root, and a browser downloads those
     # like everything else. Measuring assets alone hid 5 kB of them.
+    #
+    # The limit sits a little above the real size rather than far above it, so
+    # growth is a decision someone makes rather than something that just happens.
+    # Raising it is fine — but the README badge states this number, so move both.
     - name: Check bundle budget
       shell: bash
       run: |
+        limit=25600
         size=$(find dist -name '*.js' -o -name '*.css' | xargs cat | gzip -9 | wc -c)
-        echo "gzipped js and css: ${size} bytes"
-        if [ "$size" -gt 61440 ]; then
-          echo "::error::bundle is over the 60 KB budget — did a dependency sneak in?"
+        echo "gzipped js and css: ${size} of ${limit} bytes"
+        if [ "$size" -gt "$limit" ]; then
+          echo "::error::bundle is ${size} bytes, over the 25 kB budget — did a dependency sneak in?"
           exit 1
         fi
