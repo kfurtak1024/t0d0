@@ -9,6 +9,10 @@ description: The full gate — lint, typecheck, tests, end-to-end, and the bundl
 # repository's ruleset requires a status check by name. The name has to stay
 # "Lint, typecheck, test" or every pull request waits forever for a check that
 # no longer reports under that name.
+#
+# The cost of that choice is visibility: all of this reports as one step in the
+# job UI and in the API, so a slow run is undiagnosable without reading the whole
+# log. Hence the clock stamps below, rendered into the job summary at the end.
 
 inputs:
   artifact-suffix:
@@ -18,13 +22,22 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Begin timings
+      shell: bash
+      run: echo "$(date +%s) start" > "$RUNNER_TEMP/phases"
+
     - uses: actions/setup-node@v7
       with:
         node-version-file: .nvmrc
         cache: npm
 
-    - run: npm ci
-      shell: bash
+    - shell: bash
+      run: echo "$(date +%s) setup node" >> "$RUNNER_TEMP/phases"
+
+    - shell: bash
+      run: |
+        npm ci
+        echo "$(date +%s) npm ci" >> "$RUNNER_TEMP/phases"
 
     # Zero runtime dependencies is the first hard constraint in CLAUDE.md, and
     # until now nothing enforced it.
@@ -41,8 +54,10 @@ runs:
         '
 
     - name: Lint, format, typecheck, unit tests, coverage thresholds
-      run: npm run check
       shell: bash
+      run: |
+        npm run check
+        echo "$(date +%s) npm run check" >> "$RUNNER_TEMP/phases"
 
     - uses: actions/upload-artifact@v7
       if: ${{ !cancelled() }}
@@ -64,22 +79,30 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
+    - shell: bash
+      run: echo "$(date +%s) cache restore (hit=${{ steps.browsers.outputs.cache-hit == 'true' }})" >> "$RUNNER_TEMP/phases"
+
     - name: Install browsers
       if: steps.browsers.outputs.cache-hit != 'true'
-      run: npx playwright install --with-deps chromium webkit
       shell: bash
+      run: npx playwright install --with-deps chromium webkit
 
     # The apt packages live outside the cached directory, so a hit still needs
     # them. The cache saves the download, not the system dependencies.
     - name: Install browser system dependencies
       if: steps.browsers.outputs.cache-hit == 'true'
-      run: npx playwright install-deps chromium webkit
       shell: bash
+      run: npx playwright install-deps chromium webkit
+
+    - shell: bash
+      run: echo "$(date +%s) browsers ready" >> "$RUNNER_TEMP/phases"
 
     - name: End-to-end tests
-      # A test that only passes on retry is a bug, not weather.
-      run: npm run test:e2e -- --fail-on-flaky-tests
       shell: bash
+      # A test that only passes on retry is a bug, not weather.
+      run: |
+        npm run test:e2e -- --fail-on-flaky-tests
+        echo "$(date +%s) end-to-end tests" >> "$RUNNER_TEMP/phases"
 
     - uses: actions/upload-artifact@v7
       if: ${{ !cancelled() }}
@@ -89,8 +112,10 @@ runs:
         retention-days: 7
 
     - name: Build
-      run: npm run build
       shell: bash
+      run: |
+        npm run build
+        echo "$(date +%s) build" >> "$RUNNER_TEMP/phases"
 
     # Runs here rather than only before a deploy: with main protected, a check
     # that can only fail after the merge fails in the one place nothing can be
@@ -113,3 +138,24 @@ runs:
           echo "::error::bundle is ${size} bytes, over the 25 kB budget — did a dependency sneak in?"
           exit 1
         fi
+
+    # Where the time went, on the job summary rather than buried in the log.
+    # Runs even when the gate failed: a slow run and a broken run are often the
+    # same run, and the timings are how you tell which phase to look at.
+    - name: Timings
+      if: ${{ !cancelled() }}
+      shell: bash
+      run: |
+        {
+          echo "### Gate timings"
+          echo
+          echo "| phase | seconds |"
+          echo "| --- | ---: |"
+          prev=""
+          while read -r ts label; do
+            if [ -n "$prev" ]; then
+              echo "| ${label} | $((ts - prev)) |"
+            fi
+            prev="$ts"
+          done < "$RUNNER_TEMP/phases"
+        } >> "$GITHUB_STEP_SUMMARY"
