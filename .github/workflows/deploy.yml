@@ -7,59 +7,31 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# A follow-up push cancels the in-flight run rather than racing it to the CDN.
+# One deployment at a time. Runs queued behind the in-flight one collapse to the
+# newest, but the in-flight one is never cancelled: killing a run part-way
+# through publishing can leave the Pages deployment stuck.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     name: Verify and build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Read-only, and deliberately not pages:write — this job runs npm ci and the
+    # whole test toolchain, and has no business holding a token that can publish.
+    # configure-pages only reads the site's metadata (enablement defaults false).
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/verify
         with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      - name: Lint, typecheck, unit tests
-        run: npm run check
-
-      - name: Coverage thresholds
-        run: npm run test:coverage
-
-      - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        with:
-          name: coverage-${{ github.job }}
-          path: coverage/
-          retention-days: 7
-
-      - name: Install browsers
-        run: npx playwright install --with-deps chromium webkit
-
-      - name: End-to-end tests
-        # A test that only passes on retry is a bug, not weather.
-        run: npm run test:e2e -- --fail-on-flaky-tests
-
-      - name: Build
-        run: npm run build
-
-      - name: Check bundle budget
-        run: |
-          size=$(find dist/assets -name '*.js' -o -name '*.css' | xargs cat | gzip -9 | wc -c)
-          echo "gzipped assets: ${size} bytes"
-          if [ "$size" -gt 61440 ]; then
-            echo "::error::bundle is over the 60 KB budget — did a dependency sneak in?"
-            exit 1
-          fi
+          artifact-suffix: deploy
 
       - uses: actions/configure-pages@v6
 
@@ -71,6 +43,11 @@ jobs:
     name: Publish to Pages
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job that can publish, and it does nothing else.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

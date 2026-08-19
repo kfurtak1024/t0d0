@@ -66,11 +66,10 @@ const waitForServer = async (timeoutMs = 30_000) => {
   throw new Error(`preview server never answered on ${URL}`);
 };
 
-const server = spawn(
-  "npx",
-  ["vite", "preview", "--port", String(PORT), "--strictPort"],
-  { cwd: ROOT, stdio: "ignore" },
-);
+const server = spawn("npx", ["vite", "preview", "--port", String(PORT), "--strictPort"], {
+  cwd: ROOT,
+  stdio: "ignore",
+});
 
 try {
   await waitForServer();

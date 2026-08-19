@@ -4,43 +4,26 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+# A newer push to the same pull request makes the in-flight run irrelevant.
+# Nothing here deploys, so cancelling it costs nothing.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
+    # This name is the required status check on main. Renaming it stops the rule
+    # matching, and every pull request then waits for a check that never reports
+    # — so change it here and in the ruleset together, or not at all.
     name: Lint, typecheck, test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/verify
         with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      - name: Lint, typecheck, unit tests
-        run: npm run check
-
-      - name: Coverage thresholds
-        run: npm run test:coverage
-
-      - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        with:
-          name: coverage-${{ github.job }}
-          path: coverage/
-          retention-days: 7
-
-      - name: Install browsers
-        run: npx playwright install --with-deps chromium webkit
-
-      - name: End-to-end tests
-        # A test that only passes on retry is a bug, not weather.
-        run: npm run test:e2e -- --fail-on-flaky-tests
-
-      - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+          artifact-suffix: ci

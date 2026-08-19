@@ -1,0 +1,85 @@
+name: Verify
+description: The full gate — lint, typecheck, tests, end-to-end, and the bundle budget.
+
+# Both workflows run exactly this, so the gate a pull request clears and the gate
+# a deploy clears cannot drift apart.
+#
+# A composite action rather than a reusable workflow on purpose: a reusable
+# workflow renames the check run to "<caller job> / <called job>", and this
+# repository's ruleset requires a status check by name. The name has to stay
+# "Lint, typecheck, test" or every pull request waits forever for a check that
+# no longer reports under that name.
+
+inputs:
+  artifact-suffix:
+    description: Distinguishes the uploads when both workflows run this gate.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+
+    - run: npm ci
+      shell: bash
+
+    # Zero runtime dependencies is the first hard constraint in CLAUDE.md, and
+    # until now nothing enforced it.
+    - name: No runtime dependencies
+      shell: bash
+      run: |
+        node -e '
+          const deps = require("./package.json").dependencies ?? {};
+          const names = Object.keys(deps);
+          if (names.length > 0) {
+            console.error("::error::runtime dependencies are not allowed: " + names.join(", "));
+            process.exit(1);
+          }
+        '
+
+    - name: Lint, format, typecheck, unit tests, coverage thresholds
+      run: npm run check
+      shell: bash
+
+    - uses: actions/upload-artifact@v7
+      if: ${{ !cancelled() }}
+      with:
+        name: coverage-${{ inputs.artifact-suffix }}
+        path: coverage/
+        retention-days: 7
+
+    - name: Install browsers
+      run: npx playwright install --with-deps chromium webkit
+      shell: bash
+
+    - name: End-to-end tests
+      # A test that only passes on retry is a bug, not weather.
+      run: npm run test:e2e -- --fail-on-flaky-tests
+      shell: bash
+
+    - uses: actions/upload-artifact@v7
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report-${{ inputs.artifact-suffix }}
+        path: playwright-report/
+        retention-days: 7
+
+    - name: Build
+      run: npm run build
+      shell: bash
+
+    # Runs here rather than only before a deploy: with main protected, a check
+    # that can only fail after the merge fails in the one place nothing can be
+    # done about it.
+    - name: Check bundle budget
+      shell: bash
+      run: |
+        size=$(find dist/assets -name '*.js' -o -name '*.css' | xargs cat | gzip -9 | wc -c)
+        echo "gzipped assets: ${size} bytes"
+        if [ "$size" -gt 61440 ]; then
+          echo "::error::bundle is over the 60 KB budget — did a dependency sneak in?"
+          exit 1
+        fi
