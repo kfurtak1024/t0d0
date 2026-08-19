@@ -91,9 +91,10 @@ npm test           # vitest, unit + DOM
 npm run test:coverage  # the same, with the thresholds CI enforces
 npm run test:e2e   # playwright
 npm run lint       # eslint
+npm run format:check  # prettier, in check mode
 npm run icons      # regenerate the favicon and PWA icons
 npm run screenshots  # regenerate the README screenshots from the built app
-npm run check      # lint + typecheck + test — what CI runs
+npm run check      # lint + format + typecheck + test:coverage — exactly what CI runs
 ```
 
 Node version is pinned in `.nvmrc`. Use `npm ci`, not `npm install`, in automation.
@@ -111,7 +112,7 @@ src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title" and "[n]" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula
 src/render/       keyed DOM patching — list, task, group, ring, flip
-src/ui/           toast, day-summary sheet, drawer, row menu, drag, confetti
+src/ui/           toast, day-summary sheet, drawer, row menu, drag, confetti, dom
 src/styles/       tokens.css first, then base.css, then app.css
 ```
 

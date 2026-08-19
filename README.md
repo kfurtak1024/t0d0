@@ -91,10 +91,11 @@ npm run dev
 | `npm run test:coverage` | the same, with the thresholds CI enforces                                           |
 | `npm run test:e2e`      | Playwright — Chromium, WebKit and mobile Safari, plus axe and an offline cold start |
 | `npm run lint`          | ESLint                                                                              |
-| `npm run format`        | Prettier                                                                            |
+| `npm run format`        | Prettier, writing in place                                                          |
+| `npm run format:check`  | Prettier in check mode — fails on anything unformatted                              |
 | `npm run icons`         | regenerate the favicon and PWA icons                                                |
 | `npm run screenshots`   | regenerate the README screenshots from the built app                                |
-| **`npm run check`**     | **lint + typecheck + test — the gate CI runs**                                      |
+| **`npm run check`**     | **lint + format + typecheck + tests with coverage — the gate CI runs**              |
 
 Node version is pinned in [`.nvmrc`](./.nvmrc).
 
@@ -124,7 +125,7 @@ src/
 ├─ storage.ts store.ts                          persistence and one level of undo
 ├─ theme.ts prefs.ts                            appearance and behaviour, own storage keys
 ├─ render/    list.ts flip.ts ring.ts task.ts   keyed DOM patching, and FLIP
-├─ ui/        drawer sheet menu drag toast edit focus confetti
+├─ ui/        drawer sheet menu drag toast edit focus confetti dom
 └─ styles/    tokens.css base.css app.css
 ```
 
@@ -155,12 +156,6 @@ progress formula, repair, and every state transition — are covered without a b
 Pushing to `main` runs the full gate, builds, and publishes to GitHub Pages via Actions.
 Nothing is committed back to the repo; `public/CNAME` carries the custom domain into every
 build. Pages **Source** must be set to _GitHub Actions_ — there is no directory to point at.
-
-## Design notes
-
-[`CLAUDE.md`](./CLAUDE.md) records the constraints, the model invariants, and what is
-deliberately out of scope — recurring items, streaks, history, and Pomodoro timers are all
-"no" on purpose.
 
 ## License
 
