@@ -16,8 +16,6 @@ file, and losing it should cost nothing.
 [![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE)
 
-[![Runtime dependencies](https://img.shields.io/badge/runtime_deps-0-158A62)](#no-dependencies-is-a-feature)
-[![Bundle](https://img.shields.io/badge/app_bundle-17.0_kB_gzipped-158A62)](#no-dependencies-is-a-feature)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json)
 [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
 
@@ -99,30 +97,6 @@ npm run dev
 
 Node version is pinned in [`.nvmrc`](./.nvmrc).
 
-## No dependencies is a feature
-
-The page contains **zero third-party code**. No framework, no UI library, no animation
-library — 17.0 kB gzipped, all of it written here. Vite, TypeScript, Vitest, Playwright,
-and ESLint are build-time only.
-
-There is one exception, and it is named rather than buried: making the app installable
-means shipping a service worker, and `vite-plugin-pwa` generates that precache from
-Workbox — about 5 kB gzipped that nobody here wrote. It runs in the worker rather than
-the page, it makes no network requests of its own, and CI's bundle budget measures it
-along with everything else a browser downloads. Moving to `injectManifest` would replace
-it with a hand-written worker; until then, 22.8 kB is the honest total.
-
-That isn't austerity for its own sake. This is a tool one person opens every morning, and
-it should still run untouched in ten years without an upgrade treadmill. The
-[CSP](./index.html) blocks every external origin, so the promise holds by construction
-rather than by discipline.
-
-The motion comes from the platform: `@starting-style` for enter and exit, one shared
-spring expressed as a CSS [`linear()`](./src/styles/tokens.css) easing curve, a
-`stroke-dashoffset` transition for the arcs, and the Web Animations API for the
-[FLIP](./src/render/flip.ts) pass that makes a reordered row travel rather than teleport.
-Dragging is Pointer Events, which is one code path for mouse, finger and pen.
-
 ## How it's built
 
 ```
@@ -157,6 +131,12 @@ yields a working app, not a blank page.
 
 Everything above `render/` is pure, which is why the interesting rules — parsing, the
 progress formula, repair, and every state transition — are covered without a browser.
+
+The motion comes from the platform: `@starting-style` for enter and exit, one shared
+spring expressed as a CSS [`linear()`](./src/styles/tokens.css) easing curve, a
+`stroke-dashoffset` transition for the arcs, and the Web Animations API for the
+[FLIP](./src/render/flip.ts) pass that makes a reordered row travel rather than teleport.
+Dragging is Pointer Events, which is one code path for mouse, finger and pen.
 
 ## Deploying
 

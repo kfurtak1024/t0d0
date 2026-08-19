@@ -184,8 +184,8 @@ A screenshot diff is not worth gating in CI — across machines it is all font
 antialiasing and no signal — which is exactly why it has to be a habit here.
 
 Also treat these README claims as facts that rot, and check them when they
-change: the gzipped bundle size (badge and prose), the scripts table, the
-keyboard table, and the module map under "How it's built".
+change: the scripts table, the keyboard table, and the module map under "How
+it's built".
 
 ## Conventions
 
