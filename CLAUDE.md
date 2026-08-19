@@ -13,7 +13,10 @@ These are decisions, not defaults. Changing one is a conversation, not a refacto
 
 - **Zero runtime dependencies.** No framework, no UI library, no animation library. Build
   and test tooling (Vite, TypeScript, Vitest, Playwright, ESLint) is fine. The app should
-  still run untouched in ten years.
+  still run untouched in ten years. The one thing that ships and is not ours is Workbox's
+  precache runtime (~5 kB gzipped), which `vite-plugin-pwa` emits into the service worker;
+  the CI budget measures it, and `injectManifest` is the way out if it ever stops earning
+  its place.
 - **No network at runtime.** No fonts, analytics, CDNs, telemetry, or API calls. The CSP
   meta tag enforces this — if a change needs an exception, the change is wrong.
 - **No dates.** `openedAt` is the only timestamp in the app, and it exists solely so the
@@ -181,8 +184,8 @@ A screenshot diff is not worth gating in CI — across machines it is all font
 antialiasing and no signal — which is exactly why it has to be a habit here.
 
 Also treat these README claims as facts that rot, and check them when they
-change: the gzipped bundle size (badge and prose), the scripts table, the
-keyboard table, and the module map under "How it's built".
+change: the scripts table, the keyboard table, and the module map under "How
+it's built".
 
 ## Conventions
 

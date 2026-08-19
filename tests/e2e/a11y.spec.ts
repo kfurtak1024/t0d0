@@ -8,6 +8,20 @@ import { seedStorage } from "./helpers";
  * to <div>s with click handlers.
  */
 
+/*
+ * Scan with reduced motion on. The helper below used to say reduced motion
+ * "collapses the durations" while nothing actually enabled it, so the only
+ * guard was the opacity poll — which a `border-color` or `background`
+ * transition sails straight past, and axe then samples a blended colour and
+ * reports a contrast failure that is gone a frame later. It cost a flaky
+ * WebKit run. Reduced motion is also the honest state to judge contrast in:
+ * the app's rule is that it lands in the finished visual state, instantly.
+ *
+ * Set on the context rather than per page, so it is in force from the very
+ * first paint — emulating it after navigation is already too late.
+ */
+test.use({ contextOptions: { reducedMotion: "reduce" } });
+
 const A_DAY = {
   v: 1,
   openedAt: Date.now() - 3 * 60 * 60 * 1000,
@@ -30,9 +44,10 @@ const A_DAY = {
 
 /**
  * Rows fade in via @starting-style, and scanning mid-transition reads blended
- * colours — reporting contrast failures that do not exist once settled. Reduced
- * motion collapses the durations; this waits for the result to actually land,
- * and only looks at what is on screen (hidden dialogs sit at opacity 0).
+ * colours — reporting contrast failures that do not exist once settled. The
+ * `test.use` above collapses the durations; this waits for the result to
+ * actually land, and only looks at what is on screen (hidden dialogs sit at
+ * opacity 0).
  */
 const settled = async (page: Page): Promise<void> => {
   await expect
