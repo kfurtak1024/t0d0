@@ -9,11 +9,13 @@ updates:
       dev-dependencies:
         patterns: ["*"]
     ignore:
-      # typescript-eslint peers on typescript <6.1, so a TypeScript 7 bump makes
-      # the whole group uninstallable and npm ci fails on ERESOLVE. Drop this
-      # once typescript-eslint ships support for the Go rewrite.
+      # typescript-eslint peers on typescript <6.1, so anything at or above that
+      # makes the whole group uninstallable and npm ci fails on ERESOLVE. The
+      # bound mirrors that peer range rather than blocking majors: 6.x stops at
+      # 6.0.3 today, but a 6.1 would be a minor, and a minor would sail through.
+      # Drop this once typescript-eslint ships support for the Go rewrite.
       - dependency-name: typescript
-        update-types: ["version-update:semver-major"]
+        versions: [">=6.1.0"]
 
   - package-ecosystem: github-actions
     # `/` covers .github/workflows only. The shared gate is a composite action
