@@ -10,7 +10,10 @@ export function beginEdit(
   cancel: () => void,
 ): void {
   element.textContent = initial;
-  element.contentEditable = "true";
+  // Not "true": the label holds one line of plain text, and a rich paste would
+  // otherwise drop styled nodes into the row mid-edit, while a multi-line one
+  // arrives back as its lines concatenated with no separator between them.
+  element.contentEditable = "plaintext-only";
   element.spellcheck = false;
   element.focus();
 

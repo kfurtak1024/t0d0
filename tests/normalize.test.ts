@@ -70,6 +70,22 @@ describe("normalize", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it("replaces ids that would not survive being put in a selector", () => {
+    // Ids are interpolated into `[data-id="…"]`, so a quote in one taken from an
+    // imported backup makes querySelector throw and kills the drag outright.
+    const hostile = ['a"b', "a]b", "a b", "a\\b", "", "x".repeat(65), "tab\tsep"];
+    const state = normalize(
+      wrap(hostile.map((id, i) => ({ kind: "task", id, text: `t${String(i)}` }))),
+    );
+    const ids = allTasks(state!.list).map((task) => task.id);
+
+    expect(ids).toHaveLength(hostile.length);
+    for (const id of ids) expect(id).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+    // And a well-formed id is left exactly as it was.
+    const kept = normalize(wrap([{ kind: "task", id: "keep-me_1", text: "a" }]));
+    expect(allTasks(kept!.list)[0]?.id).toBe("keep-me_1");
+  });
+
   it("keeps a group's items and coerces collapsed to a boolean", () => {
     const state = normalize(
       wrap([
@@ -104,6 +120,9 @@ describe("normalize", () => {
 describe("properties over arbitrary input", () => {
   const anyJson = fc.jsonValue();
 
+  /** What an id has to look like to be safe inside `[data-id="…"]`. */
+  const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
   /*
    * Deliberately takes `unknown` and re-checks everything the types promise.
    * Typing it as State would let TypeScript "prove" the assertions away, and
@@ -130,7 +149,7 @@ describe("properties over arbitrary input", () => {
       if (typeof count !== "number" || !Number.isInteger(count)) return false;
       if (count < 0 || count > target) return false;
       const id = task["id"];
-      if (typeof id !== "string" || ids.has(id)) return false;
+      if (typeof id !== "string" || ids.has(id) || !SAFE_ID.test(id)) return false;
       ids.add(id);
       return true;
     };
@@ -141,7 +160,7 @@ describe("properties over arbitrary input", () => {
         const title = node["title"];
         const id = node["id"];
         if (typeof title !== "string" || title.length === 0) return false;
-        if (typeof id !== "string" || ids.has(id)) return false;
+        if (typeof id !== "string" || ids.has(id) || !SAFE_ID.test(id)) return false;
         ids.add(id);
         if (typeof node["collapsed"] !== "boolean") return false;
         if (!Array.isArray(node["items"]) || !(node["items"] as unknown[]).every(okTask)) {
