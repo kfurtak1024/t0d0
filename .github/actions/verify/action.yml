@@ -51,8 +51,29 @@ runs:
         path: coverage/
         retention-days: 7
 
+    # The browser install is the most variable step in the gate — 50s to 222s
+    # across recent runs — and the binaries only change when Playwright does.
+    - name: Playwright version
+      id: playwright
+      shell: bash
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v6
+      id: browsers
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
     - name: Install browsers
+      if: steps.browsers.outputs.cache-hit != 'true'
       run: npx playwright install --with-deps chromium webkit
+      shell: bash
+
+    # The apt packages live outside the cached directory, so a hit still needs
+    # them. The cache saves the download, not the system dependencies.
+    - name: Install browser system dependencies
+      if: steps.browsers.outputs.cache-hit == 'true'
+      run: npx playwright install-deps chromium webkit
       shell: bash
 
     - name: End-to-end tests

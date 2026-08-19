@@ -16,7 +16,12 @@ updates:
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
-    directory: /
+    # `/` covers .github/workflows only. The shared gate is a composite action
+    # in its own directory, so it has to be named or the actions it pins — the
+    # cache, setup-node, upload-artifact — are never updated.
+    directories:
+      - /
+      - /.github/actions/verify
     schedule:
       interval: monthly
     groups:
