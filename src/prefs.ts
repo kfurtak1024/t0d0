@@ -1,7 +1,12 @@
 const KEY = "t0d0/prefs";
 
 export interface Prefs {
-  /** Fold a group shut the moment its last item is ticked. */
+  /**
+   * Send finished rows down below the work that is left — folding a group shut
+   * on the way, which is all this used to do and where the name comes from.
+   * Renaming it would read as unset and quietly turn itself back on for anyone
+   * who had switched it off, which is a poor trade for a tidier identifier.
+   */
   autoCollapseDone: boolean;
 }
 

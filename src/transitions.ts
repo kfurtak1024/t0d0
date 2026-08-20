@@ -234,8 +234,12 @@ export function reorder(
  * all done. An empty group is not finished, it is simply empty — the same rule
  * that keeps it out of the progress ring.
  */
-const finished = (node: Node): boolean =>
+export const isFinished = (node: Node): boolean =>
   node.kind === "task" ? isDone(node) : node.items.length > 0 && node.items.every(isDone);
+
+/** The row `id` names, if it is one of the list's own — never a nested task. */
+export const findRow = (state: State, id: string): Node | undefined =>
+  state.list.find((node) => node.id === id);
 
 /**
  * Drop a finished row to the foot of the unfinished list.
@@ -244,6 +248,10 @@ const finished = (node: Node): boolean =>
  * pile stays in the order it was earned rather than each new arrival burying the
  * last. Everything above it is still work, which is the point: what is left fits
  * on one screen for longer.
+ *
+ * A ticked task and a finished group travel the same way — the list does not
+ * care which kind of row is done with. Nested tasks stay put: a group is one
+ * block, and shuffling inside it would move rows nobody was looking at.
  *
  * Built out of the same single step everything else uses — one level-scoped
  * `reorder` at a time — rather than computing a destination index. A second idea
@@ -254,7 +262,7 @@ export function sink(state: State, id: string): State {
   for (;;) {
     const index = next.list.findIndex((node) => node.id === id);
     const below = index < 0 ? undefined : next.list[index + 1];
-    if (!below || finished(below)) return next;
+    if (!below || isFinished(below)) return next;
 
     const stepped = reorder(next, id, "down", "level");
     // reorder declines in place rather than throwing, and a decline it is not

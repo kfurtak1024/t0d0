@@ -463,11 +463,61 @@ describe("sink", () => {
     expect(shape(T.sink(state, "Morning"))).toEqual(["c", "# Morning", "  a", "  b"]);
   });
 
+  it("drops a ticked root item past the work that is left", () => {
+    const state = done(rows("a", "b", "# Work", "  c", "d"), "a");
+    expect(shape(T.sink(state, "a"))).toEqual(["b", "# Work", "  c", "d", "a"]);
+  });
+
+  it("stacks root items and groups in the one pile, in the order they finished", () => {
+    let state = done(rows("a", "b", "c"), "b");
+    state = T.sink(state, "b");
+    expect(shape(state)).toEqual(["a", "c", "b"]);
+
+    // `a` finishes second, so it comes to rest on top of `b`, not under it.
+    state = T.sink(done(state, "a"), "a");
+    expect(shape(state)).toEqual(["c", "a", "b"]);
+  });
+
+  it("leaves a nested task alone — a group travels as one block", () => {
+    const state = done(rows("# Morning", "  a", "  b"), "a");
+    expect(T.sink(state, "a")).toBe(state);
+  });
+
   it("never mutates the state it is given", () => {
     const state = done(rows("# Morning", "  a", "b"), "a");
     const snapshot = JSON.stringify(state);
     T.sink(state, "Morning");
     expect(JSON.stringify(state)).toBe(snapshot);
+  });
+});
+
+describe("isFinished", () => {
+  const row = (state: State, id: string) => T.findRow(state, id)!;
+
+  it("is a ticked task, or a group with every item ticked", () => {
+    let state = rows("a", "b", "# Morning", "  c", "# Work", "  d", "  e");
+    state = T.bump(state, "a", 1, NOW);
+    state = T.bump(state, "c", 1, NOW);
+    state = T.bump(state, "d", 1, NOW);
+
+    expect(T.isFinished(row(state, "a"))).toBe(true);
+    expect(T.isFinished(row(state, "b"))).toBe(false);
+    expect(T.isFinished(row(state, "Morning"))).toBe(true);
+    // Half a group is not a finished group.
+    expect(T.isFinished(row(state, "Work"))).toBe(false);
+  });
+
+  it("says no to an empty group, which is not finished but unstarted", () => {
+    expect(T.isFinished(row(rows("# Later"), "Later"))).toBe(false);
+  });
+});
+
+describe("findRow", () => {
+  it("finds a row of the list itself, and never a nested task", () => {
+    const state = rows("a", "# Morning", "  b");
+    expect(T.findRow(state, "a")?.id).toBe("a");
+    expect(T.findRow(state, "Morning")?.id).toBe("Morning");
+    expect(T.findRow(state, "b")).toBeUndefined();
   });
 });
 

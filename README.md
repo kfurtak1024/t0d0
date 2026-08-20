@@ -41,7 +41,7 @@ that rather than merely promising it.
 - **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one. Tomorrow opens on the whole list, every fold reopened.
 - **Reorderable, three ways.** Drag by the grip and the row goes where you point, in or out of a group. `Alt`+arrows and the `⋯` menu move it among its own siblings and stop there — changing level is its own command, so a move never re-nests anything behind your back. One undo puts a whole drag back.
 - **Untickable.** Tap a finished item again and it comes back. A counted item counts up instead, and resets from its menu.
-- **Groups that get out of the way.** Tick the last item in a group and it folds itself, then drops below the work that's left — settling on top of whatever finished before it, not under it. On by default; Settings → Behaviour turns it off.
+- **Finished work gets out of the way.** Tick something off and it drops below what's left, settling on top of whatever finished before it rather than burying it. A group waits for its last item, then folds shut as it goes. On by default; Settings → Behaviour turns it off.
 - **Offline and installable.** A real PWA; open it with the network off.
 - **Light, dark, or whatever your device says.** Settings → Theme, remembered per browser.
 - **Backups.** Save a `.json` copy, drop one back in. Loading previews what the file holds before replacing anything, and erasing takes two deliberate presses.
@@ -66,7 +66,7 @@ that rather than merely promising it.
 | <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                 |
 | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, a move, an import, or a cleared day                    |
 | `⋯` on a row                                     | move it up or down; take it in or out of a group; reset a count       |
-| `⋯` in the header                                | theme, folding, save a copy, load one back, erase everything          |
+| `⋯` in the header                                | theme, tidying, save a copy, load one back, erase everything          |
 
 ## Quick start
 
