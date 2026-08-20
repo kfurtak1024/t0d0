@@ -1,5 +1,5 @@
 import { parse } from "./parse";
-import { allTasks } from "./progress";
+import { allTasks, isDone } from "./progress";
 import { LIMITS, SCHEMA_VERSION } from "./types";
 import type { Group, Node, State, Task } from "./types";
 
@@ -229,6 +229,41 @@ export function reorder(
   return next;
 }
 
+/**
+ * A row with nothing left to do today: a ticked task, or a group whose items are
+ * all done. An empty group is not finished, it is simply empty — the same rule
+ * that keeps it out of the progress ring.
+ */
+const finished = (node: Node): boolean =>
+  node.kind === "task" ? isDone(node) : node.items.length > 0 && node.items.every(isDone);
+
+/**
+ * Drop a finished row to the foot of the unfinished list.
+ *
+ * It stops above the run of finished rows already resting at the bottom, so the
+ * pile stays in the order it was earned rather than each new arrival burying the
+ * last. Everything above it is still work, which is the point: what is left fits
+ * on one screen for longer.
+ *
+ * Built out of the same single step everything else uses — one level-scoped
+ * `reorder` at a time — rather than computing a destination index. A second idea
+ * of where a row belongs is exactly what that step exists to avoid.
+ */
+export function sink(state: State, id: string): State {
+  let next = state;
+  for (;;) {
+    const index = next.list.findIndex((node) => node.id === id);
+    const below = index < 0 ? undefined : next.list[index + 1];
+    if (!below || finished(below)) return next;
+
+    const stepped = reorder(next, id, "down", "level");
+    // reorder declines in place rather than throwing, and a decline it is not
+    // our business to predict would spin here forever.
+    if (stepped === next) return next;
+    next = stepped;
+  }
+}
+
 export type MoveDirection = "in" | "out";
 
 /** The nearest group above a root task — the one it would move into. */
@@ -280,10 +315,14 @@ export function move(state: State, id: string, dir: MoveDirection): State {
   return next;
 }
 
-/** End of day: zero every count, keep the curated list, forget the start time. */
+/** End of day: zero every count, unfold every group, keep the curated list, forget the start time. */
 export function clearTicks(state: State): State {
   const next = clone(state);
   for (const task of allTasks(next.list)) task.count = 0;
+  // Folds were earned by yesterday's ticks, and those are gone. Leaving them
+  // shut would open tomorrow on a list that hides most of itself, and the first
+  // thing anyone did would be to click every chevron.
+  for (const node of next.list) if (node.kind === "group") node.collapsed = false;
   next.openedAt = null;
   return next;
 }

@@ -50,7 +50,16 @@ Invariants worth defending in review:
   export them in a backup and import someone else's choices.
 - **Auto-collapse fires only on the transition into finished**, like the
   celebration, and after a delay — the tick landing is the reward, so the group
-  waits for it before folding. Folding by hand cancels a pending fold.
+  waits for it before folding. Folding by hand cancels a pending fold. The fold
+  and the drop that follows it are **one state change**, so the card travels
+  under FLIP instead of vanishing here and reappearing there.
+- **A finished group sinks to the foot of the unfinished list**, stopping above
+  the run of finished rows already resting there — the pile keeps the order it
+  was earned rather than each arrival burying the last. `sink()` gets there by
+  repeating the same level-scoped `reorder()` step, not by computing an index.
+- **Closing the day reopens every fold.** The folds were earned by ticks that
+  `clearTicks()` has just wiped; leaving them shut opens tomorrow on a list
+  hiding most of itself.
 - **All external data goes through `normalize()`** — stored JSON and pasted imports alike.
   It repairs rather than trusts: clamps `target` to 1–99, clamps `count` to `target`, drops
   empty text, regenerates duplicate ids. Never parse straight into state.

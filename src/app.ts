@@ -253,11 +253,15 @@ export class App {
   }
 
   /**
-   * Fold a finished group shut, if the preference is on.
+   * Fold a finished group shut and drop it below what is left, if the
+   * preference is on.
    *
    * Only on the transition into finished, and on a delay: the tick landing is
    * the reward, so the group waits for it to play out before folding over it.
    * Re-checked when the timer fires, because by then the list may have moved on.
+   *
+   * The fold and the drop are one state change so the card travels to its new
+   * place under FLIP rather than vanishing from one and appearing in the other.
    */
   #autoCollapse(taskId: string): void {
     if (!this.#prefs.autoCollapseDone) return;
@@ -268,7 +272,8 @@ export class App {
     const fold = (): void => {
       const group = T.findGroup(this.#state, groupId);
       if (!group || group.items.length === 0 || !group.items.every(isDone)) return;
-      this.#store.apply(T.collapse(this.#state, groupId));
+      this.#animateNext = true;
+      this.#store.apply(T.sink(T.collapse(this.#state, groupId), groupId));
     };
 
     clearTimeout(this.#collapseTimer);

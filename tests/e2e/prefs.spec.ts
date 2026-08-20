@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage } from "./helpers";
+import { addItem, clearStorage, settle, shape } from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
@@ -43,6 +43,36 @@ test("folding waits for the tick to land rather than snatching the row away", as
   // for a beat afterwards.
   await expect(group).not.toHaveClass(/collapsed/);
   await expect(group).toHaveClass(/collapsed/);
+});
+
+test("a folded group drops below the work that is left", async ({ page }) => {
+  await aDay(page);
+  await page.locator("#dest").selectOption("");
+  await addItem(page, "loose");
+  expect(await shape(page)).toEqual(["# Morning", "  eat breakfast", "  walk the dog", "loose"]);
+
+  await tick(page, "eat breakfast").click();
+  await tick(page, "walk the dog").click();
+  await expect(page.locator(".group", { hasText: "Morning" })).toHaveClass(/collapsed/);
+  await settle(page);
+
+  // Out of the way, not gone: what is left is what is on top.
+  expect(await shape(page)).toEqual(["loose", "# Morning", "  eat breakfast", "  walk the dog"]);
+});
+
+test("closing the day reopens every fold", async ({ page }) => {
+  await aDay(page);
+  const group = page.locator(".group", { hasText: "Morning" });
+
+  await tick(page, "eat breakfast").click();
+  await tick(page, "walk the dog").click();
+  await expect(group).toHaveClass(/collapsed/);
+
+  await page.locator("#closeday").click();
+  await page.locator("#veil .confirm").click();
+
+  // Tomorrow starts on a list that shows itself.
+  await expect(group).not.toHaveClass(/collapsed/);
 });
 
 test("re-opening a folded group by hand sticks", async ({ page }) => {

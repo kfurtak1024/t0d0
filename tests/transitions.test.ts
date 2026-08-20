@@ -420,6 +420,57 @@ describe("collapse", () => {
   });
 });
 
+describe("sink", () => {
+  const done = (state: State, ...texts: string[]): State =>
+    texts.reduce((acc, text) => T.bump(acc, taskOf(acc, text).id, 1, NOW), state);
+
+  it("drops a finished group past the work that is left", () => {
+    let state = rows("# Morning", "  a", "b", "# Work", "  c", "d");
+    state = done(state, "a");
+    expect(shape(T.sink(state, "Morning"))).toEqual([
+      "b",
+      "# Work",
+      "  c",
+      "d",
+      "# Morning",
+      "  a",
+    ]);
+  });
+
+  it("stops above the finished rows already at the bottom", () => {
+    let state = rows("# Morning", "  a", "b", "# Work", "  c", "d");
+    state = done(state, "a", "c", "d");
+    // Work sank when it finished; Morning lands on top of it, not under it.
+    state = T.sink(state, "Work");
+    expect(shape(T.sink(state, "Morning"))).toEqual([
+      "b",
+      "# Morning",
+      "  a",
+      "# Work",
+      "  c",
+      "d",
+    ]);
+  });
+
+  it("leaves a group with nowhere to go exactly where it is", () => {
+    const state = done(rows("a", "# Morning", "  b"), "b");
+    expect(T.sink(state, "Morning")).toBe(state);
+    expect(T.sink(state, "nope")).toBe(state);
+  });
+
+  it("moves a group as one block, taking its items with it", () => {
+    const state = done(rows("# Morning", "  a", "  b", "c"), "a", "b");
+    expect(shape(T.sink(state, "Morning"))).toEqual(["c", "# Morning", "  a", "  b"]);
+  });
+
+  it("never mutates the state it is given", () => {
+    const state = done(rows("# Morning", "  a", "b"), "a");
+    const snapshot = JSON.stringify(state);
+    T.sink(state, "Morning");
+    expect(JSON.stringify(state)).toBe(snapshot);
+  });
+});
+
 describe("clearTicks", () => {
   it("zeroes every count, keeps the list, and closes the day", () => {
     let state = build(["# Morning", "a", "make calls [3]"]);
@@ -432,11 +483,18 @@ describe("clearTicks", () => {
     expect(state.openedAt).toBeNull();
   });
 
-  it("leaves group structure and collapsed state alone", () => {
-    let state = build(["# Morning", "a"]);
-    state = T.toggleCollapse(state, groupOf(state, "Morning").id);
+  it("leaves group structure alone", () => {
+    const state = T.clearTicks(build(["# Morning", "a", "b"]));
+    expect(shape(state)).toEqual(["# Morning", "  a", "  b"]);
+  });
+
+  it("unfolds every group, however it came to be folded", () => {
+    let state = build(["# Morning", "a", "# Work", "b"]);
+    for (const title of ["Morning", "Work"]) {
+      state = T.toggleCollapse(state, groupOf(state, title).id);
+    }
     state = T.clearTicks(state);
-    expect(groupOf(state, "Morning").collapsed).toBe(true);
+    expect(state.list.every((node) => node.kind !== "group" || !node.collapsed)).toBe(true);
   });
 });
 
