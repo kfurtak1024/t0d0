@@ -20,6 +20,10 @@ jobs:
     name: Verify and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Named so the smoke check can prove *this* build is the one being served,
+    # rather than accepting whatever the CDN happens to still have cached.
+    outputs:
+      asset: ${{ steps.asset.outputs.name }}
     # Read-only, and deliberately not pages:write — this job runs npm ci and the
     # whole test toolchain, and has no business holding a token that can publish.
     # configure-pages only reads the site's metadata (enablement defaults false).
@@ -32,6 +36,14 @@ jobs:
       - uses: ./.github/actions/verify
         with:
           artifact-suffix: deploy
+
+      # Vite content-hashes this, so the name is unique to the build.
+      - id: asset
+        shell: bash
+        run: |
+          name=$(basename "$(find dist/assets -name '*.js' | head -1)")
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "built ${name}"
 
       - uses: actions/configure-pages@v6
 
@@ -54,3 +66,59 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # deploy-pages succeeding means the artifact was published, not that the site
+  # is being served. Everything between the two — DNS, the custom domain in
+  # public/CNAME, the CDN — was untested until here, and so was whether the CSP
+  # meta survives into the served HTML and the service worker is reachable.
+  #
+  # This cannot roll anything back. It tells you, which beats finding out from
+  # the app not opening tomorrow morning.
+  smoke:
+    name: Check the deployed site
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Touches neither the repository nor the API.
+    permissions: {}
+    steps:
+      - name: The live site serves this build
+        env:
+          SITE: https://t0d0.krfu.dev
+          ASSET: ${{ needs.build.outputs.asset }}
+        run: |
+          set -euo pipefail
+          echo "looking for ${ASSET} on ${SITE}"
+
+          # The CDN takes a moment to catch up, so poll rather than assume.
+          # Matching the hashed asset name is what makes this prove the new
+          # build is live instead of passing against a stale cached page.
+          for attempt in $(seq 1 20); do
+            html=$(curl -fsSL --max-time 20 "${SITE}/" || true)
+            if printf '%s' "${html}" | grep -qF "${ASSET}"; then
+              echo "serving this build, on attempt ${attempt}"
+              found=yes
+              break
+            fi
+            echo "not yet, attempt ${attempt}"
+            sleep 15
+          done
+
+          if [ "${found:-no}" != "yes" ]; then
+            echo "::error::${SITE} is not serving ${ASSET} — published, but not live"
+            exit 1
+          fi
+
+          if ! printf '%s' "${html}" | grep -qF "Content-Security-Policy"; then
+            echo "::error::the CSP meta tag is missing from the served page"
+            exit 1
+          fi
+
+          for path in /sw.js /manifest.webmanifest /favicon.svg; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${SITE}${path}")
+            echo "${path} -> ${code}"
+            if [ "${code}" != "200" ]; then
+              echo "::error::${path} returned ${code}"
+              exit 1
+            fi
+          done

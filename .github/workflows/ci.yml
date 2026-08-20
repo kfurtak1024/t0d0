@@ -3,6 +3,15 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+  # The app has no runtime dependencies and does not rot. The toolchain does — a
+  # Playwright browser update, a runner image change, an apt package that goes
+  # away. Without this you find out on the morning you need to ship something.
+  #
+  # Mid-month on purpose, so it does not land with Dependabot's monthly batch and
+  # leave you guessing which one broke. GitHub disables scheduled workflows after
+  # 60 days without activity in the repository; a push re-enables them.
+  schedule:
+    - cron: "0 6 15 * *"
 
 permissions:
   contents: read
