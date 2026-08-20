@@ -48,9 +48,29 @@ Invariants worth defending in review:
 - **The theme and the preferences live in their own storage keys**, never in the
   list. They are properties of this browser, so putting them in `State` would
   export them in a backup and import someone else's choices.
-- **Auto-collapse fires only on the transition into finished**, like the
-  celebration, and after a delay — the tick landing is the reward, so the group
-  waits for it before folding. Folding by hand cancels a pending fold.
+- **Tidying fires only on the transition into finished**, like the celebration,
+  and after a delay — the tick landing is the reward, so nothing moves over it
+  until it has played out. Folding a group by hand cancels that group's pending
+  tidy, and only that one. The fold and the drop are **one state change**, so
+  the card travels under FLIP instead of vanishing here and reappearing there.
+- **A finished row sinks to the foot of the unfinished list**, stopping above
+  the run of finished rows already resting there — the pile keeps the order it
+  was earned rather than each arrival burying the last. A ticked root item and a
+  finished group travel alike; nested tasks stay put, because a group moves as
+  one block. `sink()` gets there by repeating the same level-scoped `reorder()`
+  step, not by computing an index.
+- **A batch of tidies is applied bottom-most row first.** A row stops above
+  whatever finished rows are already below it, so sending the upper one first
+  strands it on top of a sibling that has not travelled yet. Ordering by
+  position is what makes two ticks in one breath land where the same two ticks
+  spread over a minute would.
+- **Closing the day reopens every fold.** The folds were earned by ticks that
+  `clearTicks()` has just wiped; leaving them shut opens tomorrow on a list
+  hiding most of itself.
+- **The `autoCollapseDone` pref now governs the whole tidy**, folding included,
+  which is why the switch reads "Tidy finished items". The stored key keeps its
+  older name on purpose: renaming it reads as unset, and anyone who had turned
+  it off would silently get it back.
 - **All external data goes through `normalize()`** — stored JSON and pasted imports alike.
   It repairs rather than trusts: clamps `target` to 1–99, clamps `count` to `target`, drops
   empty text, regenerates duplicate ids. Never parse straight into state.

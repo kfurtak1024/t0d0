@@ -13,12 +13,7 @@ file, and losing it should cost nothing.
 
 <br>
 
-[![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE)
-
-[![Bundle](https://img.shields.io/badge/bundle-under_25_kB_gzipped-158A62)](./.github/actions/verify/action.yml)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json)
-[![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
+[![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE) [![Bundle](https://img.shields.io/badge/bundle-under_25_kB_gzipped-158A62)](./.github/actions/verify/action.yml) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json) [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
 
 ### [**→ t0d0.krfu.dev**](https://t0d0.krfu.dev)
 
@@ -43,10 +38,10 @@ that rather than merely promising it.
 - **Groups, one level deep.** Enough to separate _Morning_ from _Work_, not enough to become an outliner.
 - **Counted items.** `make calls [3]` takes three ticks, and partial progress counts.
 - **A rewarding tick.** Springy rings that sweep indigo → green as the day fills in, a wiping strike-through, and confetti when everything is done.
-- **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one.
+- **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one. Tomorrow opens on the whole list, every fold reopened.
 - **Reorderable, three ways.** Drag by the grip and the row goes where you point, in or out of a group. `Alt`+arrows and the `⋯` menu move it among its own siblings and stop there — changing level is its own command, so a move never re-nests anything behind your back. One undo puts a whole drag back.
 - **Untickable.** Tap a finished item again and it comes back. A counted item counts up instead, and resets from its menu.
-- **Groups that fold when they're done.** On by default; Settings → Behaviour turns it off.
+- **Finished work gets out of the way.** Tick something off and it drops below what's left, settling on top of whatever finished before it rather than burying it. A group waits for its last item, then folds shut as it goes. On by default; Settings → Behaviour turns it off.
 - **Offline and installable.** A real PWA; open it with the network off.
 - **Light, dark, or whatever your device says.** Settings → Theme, remembered per browser.
 - **Backups.** Save a `.json` copy, drop one back in. Loading previews what the file holds before replacing anything, and erasing takes two deliberate presses.
@@ -71,7 +66,7 @@ that rather than merely promising it.
 | <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                 |
 | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, a move, an import, or a cleared day                    |
 | `⋯` on a row                                     | move it up or down; take it in or out of a group; reset a count       |
-| `⋯` in the header                                | theme, folding, save a copy, load one back, erase everything          |
+| `⋯` in the header                                | theme, tidying, save a copy, load one back, erase everything          |
 
 ## Quick start
 
@@ -106,7 +101,7 @@ src/
 ├─ transitions.ts                               every state change as State → State
 ├─ storage.ts store.ts                          persistence and one level of undo
 ├─ theme.ts prefs.ts                            appearance and behaviour, own storage keys
-├─ render/    list.ts flip.ts ring.ts task.ts   keyed DOM patching, and FLIP
+├─ render/    list flip ring task group         keyed DOM patching, and FLIP
 ├─ ui/        drawer sheet menu drag toast edit focus confetti dom
 └─ styles/    tokens.css base.css app.css
 ```
@@ -144,6 +139,12 @@ Dragging is Pointer Events, which is one code path for mouse, finger and pen.
 Pushing to `main` runs the full gate, builds, and publishes to GitHub Pages via Actions.
 Nothing is committed back to the repo; `public/CNAME` carries the custom domain into every
 build. Pages **Source** must be set to _GitHub Actions_ — there is no directory to point at.
+
+Publishing is not the same as being served, so a last job checks the live site: it polls
+until `t0d0.krfu.dev` hands back the hashed asset _this_ build produced — proving it is not
+a cached page — then that the CSP meta survived into the HTML and that the service worker,
+the manifest and the favicon all answer 200. It cannot roll anything back. It tells you,
+which beats finding out from the app not opening tomorrow morning.
 
 ## License
 

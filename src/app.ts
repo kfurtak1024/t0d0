@@ -57,7 +57,9 @@ export class App {
   #shownPct = 0;
   #tweenRaf = 0;
   #storageWarned = false;
-  #collapseTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Rows waiting out the tick that finished them, before they get out of the way. */
+  #tidyIds = new Set<string>();
+  #tidyTimer: ReturnType<typeof setTimeout> | undefined;
   /** Set by the moves, so only a rearrangement animates as one. */
   #animateNext = false;
   /** The list as it stood before the current drag, for undo and for Escape. */
@@ -83,9 +85,10 @@ export class App {
         this.#beginEdit(element, id, isGroup);
       },
       toggleCollapse: (id) => {
-        // Folding by hand outranks folding on your behalf: a pending
-        // auto-collapse must not re-shut a group you just opened.
-        clearTimeout(this.#collapseTimer);
+        // Folding by hand outranks folding on your behalf: a pending tidy must
+        // not re-shut a group you just opened. Only this group's, though —
+        // whatever else is queued was nothing to do with the chevron you hit.
+        this.#tidyIds.delete(id);
         this.#store.apply(T.toggleCollapse(this.#state, id));
       },
       openMenu: (anchor, id) => {
@@ -248,32 +251,78 @@ export class App {
         this.#rows.get(id)?.element ?? this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
       if (row && !this.#motion.matches) popRing(row);
       this.#vibrate(12);
-      this.#autoCollapse(id);
+      this.#tidy(id);
     }
   }
 
   /**
-   * Fold a finished group shut, if the preference is on.
+   * Send what a tick just finished down out of the way, if the preference is on.
    *
-   * Only on the transition into finished, and on a delay: the tick landing is
-   * the reward, so the group waits for it to play out before folding over it.
-   * Re-checked when the timer fires, because by then the list may have moved on.
+   * A tick inside a group tidies the group, and only once the whole group is
+   * done — one item finishing is not the group finishing. A tick on a root item
+   * tidies that row itself. Either way the row lands below the work that is
+   * left, and a group folds shut on its way.
    */
-  #autoCollapse(taskId: string): void {
+  #tidy(taskId: string): void {
     if (!this.#prefs.autoCollapseDone) return;
     const owner = T.ownerOf(this.#state, taskId);
-    if (!owner || owner.items.length === 0 || !owner.items.every(isDone)) return;
+    if (owner && !owner.items.every(isDone)) return;
+    this.#queueTidy(owner?.id ?? taskId);
+  }
 
-    const groupId = owner.id;
-    const fold = (): void => {
-      const group = T.findGroup(this.#state, groupId);
-      if (!group || group.items.length === 0 || !group.items.every(isDone)) return;
-      this.#store.apply(T.collapse(this.#state, groupId));
-    };
+  /**
+   * Queue a row to be tidied, once the tick has finished landing.
+   *
+   * The delay is the point: the tick landing is the reward, so nothing moves
+   * over it until it has played out. Queued rather than scheduled one at a time
+   * because ticking two things in quick succession used to have the second
+   * cancel the first, and the first row then sat there un-tidied. They all wait
+   * out the newest tick and travel together, as one animation.
+   */
+  #queueTidy(id: string): void {
+    this.#tidyIds.add(id);
+    if (this.#motion.matches) {
+      this.#runTidy();
+      return;
+    }
+    clearTimeout(this.#tidyTimer);
+    this.#tidyTimer = setTimeout(() => {
+      this.#runTidy();
+    }, COLLAPSE_MS);
+  }
 
-    clearTimeout(this.#collapseTimer);
-    if (this.#motion.matches) fold();
-    else this.#collapseTimer = setTimeout(fold, COLLAPSE_MS);
+  /**
+   * Apply every queued tidy as one state change, so the rows travel together
+   * under FLIP rather than vanishing here and reappearing there.
+   *
+   * Bottom-most first, which is what makes a batch behave like the same ticks
+   * spread out in time. A row stops above the finished ones already resting
+   * below it — so sending the upper one first would have it stop dead on top of
+   * a sibling that has not travelled yet, and stay stranded up in the work.
+   *
+   * Each row is re-checked on the way past: the list may have moved on since
+   * the tick — the row unticked, deleted, or dragged somewhere else — and a
+   * queued intention is not a licence to move something that is no longer done.
+   */
+  #runTidy(): void {
+    const ids = [...this.#tidyIds];
+    this.#tidyIds.clear();
+
+    let next = this.#state;
+    const order = ids
+      .map((id) => ({ id, at: next.list.findIndex((node) => node.id === id) }))
+      .filter((row) => row.at >= 0)
+      .sort((a, b) => b.at - a.at);
+
+    for (const { id } of order) {
+      const row = T.findRow(next, id);
+      if (!row || !T.isFinished(row)) continue;
+      next = T.sink(row.kind === "group" ? T.collapse(next, id) : next, id);
+    }
+
+    if (next === this.#state) return;
+    this.#animateNext = true;
+    this.#store.apply(next);
   }
 
   #remove(id: string): void {
@@ -441,7 +490,9 @@ export class App {
     }
     // The row this menu was opened against is about to stop existing.
     this.#menu.close(false);
-    clearTimeout(this.#collapseTimer);
+    // The rows a queued tidy was aimed at are about to stop existing too.
+    clearTimeout(this.#tidyTimer);
+    this.#tidyIds.clear();
     this.#destId = null;
     this.#rows.clear();
     // Armed before the notify, so an all-done import does not celebrate itself.
