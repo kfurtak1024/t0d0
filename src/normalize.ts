@@ -52,7 +52,14 @@ export function normalize(input: unknown): State | null {
     const target = Number.isFinite(rawTarget) ? Math.min(LIMITS.target, Math.max(1, rawTarget)) : 1;
     const rawCount = Math.trunc(Number(value["count"]));
     const count = Number.isFinite(rawCount) ? Math.min(target, Math.max(0, rawCount)) : 0;
-    return { kind: "task", id: takeId(value["id"]), text: label, target, count };
+    return {
+      kind: "task",
+      id: takeId(value["id"]),
+      text: label,
+      target,
+      count,
+      important: value["important"] === true,
+    };
   };
 
   const list: State["list"] = [];
@@ -68,6 +75,7 @@ export function normalize(input: unknown): State | null {
         id: takeId(node["id"]),
         title,
         collapsed: node["collapsed"] === true,
+        important: node["important"] === true,
         items: rawItems.map(toTask).filter((task): task is Task => task !== null),
       };
       list.push(group);

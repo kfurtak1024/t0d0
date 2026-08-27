@@ -23,6 +23,12 @@
   --ring-l: 56%;
   --ring-c: 0.15;
 
+  /* The importance mark. Warm and off the progress sweep's arc, so a flagged row
+     never reads as "nearly done" or as a warning. It only ever paints a 3px bar
+     and a bolder word, both non-text, so 3:1 against --card is the bar it has to
+     clear — not 4.5:1. */
+  --flag: oklch(62% 0.16 62);
+
   /* Text sitting on a filled accent, and the destructive red. Both flip with
      the theme: the accent lightens in dark mode, so white stops being legible
      on it, and the red has to lighten to stay readable on a dark surface. */
@@ -81,6 +87,7 @@
     --field: #1d222b;
     --ring-l: 74%;
     --ring-c: 0.14;
+    --flag: oklch(78% 0.15 68);
     --on-accent: #10141a;
     --danger: oklch(74% 0.15 25);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
@@ -101,6 +108,7 @@
   --field: #1d222b;
   --ring-l: 74%;
   --ring-c: 0.14;
+  --flag: oklch(78% 0.15 68);
   --on-accent: #10141a;
   --danger: oklch(74% 0.15 25);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);

@@ -503,12 +503,10 @@ export class App {
   #beginEdit(element: HTMLElement, id: string, isGroup: boolean): void {
     if (this.#editingId !== null) return;
 
-    const initial = isGroup
-      ? (T.findGroup(this.#state, id)?.title ?? "")
-      : (() => {
-          const task = T.findTask(this.#state, id);
-          return task ? raw(task) : "";
-        })();
+    // Both kinds go through `raw`, so what the editor opens on is exactly what
+    // the composer would have accepted — bracket, bang and all.
+    const node = isGroup ? T.findGroup(this.#state, id) : T.findTask(this.#state, id);
+    const initial = node ? raw(node) : "";
 
     this.#editingId = id;
     beginEdit(

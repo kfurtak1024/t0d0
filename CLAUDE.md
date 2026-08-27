@@ -31,8 +31,22 @@ These are decisions, not defaults. Changing one is a conversation, not a refacto
 ## Domain model
 
 ```ts
-type Task = { kind: "task"; id: string; text: string; target: number; count: number };
-type Group = { kind: "group"; id: string; title: string; collapsed: boolean; items: Task[] };
+type Task = {
+  kind: "task";
+  id: string;
+  text: string;
+  target: number;
+  count: number;
+  important: boolean;
+};
+type Group = {
+  kind: "group";
+  id: string;
+  title: string;
+  collapsed: boolean;
+  important: boolean;
+  items: Task[];
+};
 
 type State = { v: 1; openedAt: number | null; list: (Task | Group)[] };
 ```
@@ -71,6 +85,19 @@ Invariants worth defending in review:
   which is why the switch reads "Tidy finished items". The stored key keeps its
   older name on purpose: renaming it reads as unset, and anyone who had turned
   it off would silently get it back.
+- **`important` is a mark and nothing else.** It changes how a row reads — an accent
+  bar and a heavier word — and never where it sits. No sorting, no exemption from
+  `sink()`, no weight in the progress ring. A second notion of "where this belongs"
+  is exactly what `reorder()` exists to prevent, and floating flagged rows to the top
+  would be one. It also stands down visually once the row is finished: the green
+  frame is the state worth reading on the pile, and two accents on one edge went
+  muddy. The stored flag is untouched, so unticking brings the bar back.
+- **The mark reaches a screen reader through the row's own handle** — the tick's
+  `aria-label` for a task, the chevron's for a group, both as a trailing
+  ", important". A bar and a font weight are a visual channel only.
+- **Adding a field is not a schema bump.** `important` defaults to `false` in
+  `normalize()`, so a list written before it existed loads unmarked. Moving
+  `SCHEMA_VERSION` would have discarded every stored list — see the migration seam.
 - **All external data goes through `normalize()`** — stored JSON and pasted imports alike.
   It repairs rather than trusts: clamps `target` to 1–99, clamps `count` to `target`, drops
   empty text, regenerates duplicate ids. Never parse straight into state.
@@ -99,10 +126,16 @@ Invariants worth defending in review:
 
 ## Input syntax
 
-The composer parses two things, and both must round-trip through inline editing:
+The composer parses three things, and all of them must round-trip through inline editing:
 
 - `# Morning` creates a group.
 - `make calls [3]` creates a task with `target: 3`. Editing shows `make calls [3]` again.
+- A trailing `!` marks either kind important. It may sit at the end of the line or at
+  the end of the name — `make calls [3]!` and `make calls! [3]` both work, because both
+  are what people type. **At most one `!` is ever consumed**, from wherever it came:
+  that ceiling is what makes `raw()` a true inverse, so `ship it!!` is an important
+  `ship it!` and round-trips as one. `raw()` covers groups too, which is why inline
+  editing seeds itself from it rather than from `title`.
 
 ## Commands
 
@@ -132,7 +165,7 @@ src/normalize.ts  the single gate for data arriving from outside
 src/storage.ts    load/save against one localStorage key
 src/store.ts      the live state, persistence, and one level of undo
 src/transitions.ts  every state change as State -> State
-src/parse.ts      "# Title" and "[n]" parsing, and the raw() round-trip
+src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, day-summary sheet, drawer, row menu, drag, confetti, dom

@@ -1,6 +1,6 @@
-import { parse } from "./parse";
+import { parse, parseTitle } from "./parse";
 import { allTasks, isDone } from "./progress";
-import { LIMITS, SCHEMA_VERSION } from "./types";
+import { SCHEMA_VERSION } from "./types";
 import type { Group, Node, State, Task } from "./types";
 
 /**
@@ -75,15 +75,16 @@ export function bump(state: State, id: string, delta: number, now: number): Stat
   return next;
 }
 
-/** Re-parse edited text so `[n]` stays editable after creation. */
+/** Re-parse edited text so `[n]` and the `!` mark stay editable after creation. */
 export function retitle(state: State, id: string, value: string, isGroup: boolean): State {
   const next = clone(state);
 
   if (isGroup) {
     const group = findGroup(next, id);
-    const title = value.trim().replace(/^#\s*/, "").slice(0, LIMITS.text);
-    if (!group || !title) return state;
-    group.title = title;
+    const head = parseTitle(value);
+    if (!group || !head) return state;
+    group.title = head.title;
+    group.important = head.important;
     return next;
   }
 
@@ -92,6 +93,7 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   if (!task || parsed?.kind !== "task") return state;
   task.text = parsed.text;
   task.target = parsed.target;
+  task.important = parsed.important;
   task.count = Math.min(task.count, task.target);
   return next;
 }

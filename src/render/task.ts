@@ -112,6 +112,7 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
   const update = (next: Task): void => {
     current = next;
     row.classList.toggle("done", isDone(next));
+    row.classList.toggle("important", next.important);
 
     // The arc count is baked into the ring, so a changed target needs a new one.
     if (ring.target !== next.target) {
@@ -142,7 +143,9 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
         tick.removeAttribute(attr);
       }
     }
-    tick.setAttribute("aria-label", next.text);
+    // The accent bar is a visual channel and nothing else, so the one control
+    // that carries the row's name says it out loud too.
+    tick.setAttribute("aria-label", next.important ? `${next.text}, important` : next.text);
     dots.setAttribute("aria-label", `More for ${next.text}`);
     kill.setAttribute("aria-label", `Delete ${next.text}`);
   };

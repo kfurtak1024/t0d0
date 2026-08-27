@@ -114,19 +114,32 @@
   transform: translateX(14px) scale(0.96);
 }
 
+/*
+  The two optional layers of a card's shadow, as named slots: --edge is the
+  finished outline, --bar the importance mark. Kept apart so a row can be both
+  without either rule having to restate the other's value.
+
+  Reset on every row rather than defined on :root, because they must not be
+  inherited — a finished group would otherwise hand its green outline down to
+  every task sitting inside it.
+*/
+.task,
+.group {
+  --edge: 0 0 0 0 transparent;
+  --bar: 0 0 0 0 transparent;
+}
+
 /* ---------------------------------------------------------------- groups */
 
 .group {
   background: var(--card);
   border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card), var(--edge), var(--bar);
   padding: 0.55rem 0.55rem 0.3rem;
 }
 
 .group.clear {
-  box-shadow:
-    var(--shadow-card),
-    0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / 50%);
+  --edge: 0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / 50%);
 }
 
 .ghead {
@@ -221,7 +234,7 @@
 
 .list > .task {
   background: var(--card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card), var(--edge), var(--bar);
   padding: 0.7rem 0.75rem;
   border-radius: var(--r-card);
 }
@@ -288,7 +301,7 @@
   position: relative;
   z-index: 30;
   transform: translateY(var(--drag-y, 0));
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--shadow-lift), var(--bar);
   cursor: grabbing;
   /* The pointer owns this row's transform; a transition would trail the finger,
      and pointer-events would make the row hit-test itself instead of the list
@@ -545,9 +558,62 @@ body.dragging-row {
 
 /* A finished card gets a green outline, whether it is a group or a task. */
 .list > .task.done {
-  box-shadow:
-    var(--shadow-card),
-    0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / 50%);
+  --edge: 0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / 50%);
+}
+
+/* ------------------------------------------------------------- important */
+
+/*
+  A bar at the leading edge and a heavier word. Two channels on purpose: weight
+  is not colour, so the mark survives a monochrome screen, and the tick's
+  accessible name carries it for anyone reading neither.
+
+  A card carries it as an inset shadow: that follows the rounded corners for
+  free, and costs no pseudo-element on a row whose ::after is already spoken
+  for by the hit areas.
+*/
+.list > .task.important,
+.group.important {
+  --bar: inset 3px 0 0 0 var(--flag);
+}
+
+/*
+  A nested row has no card, and the same inset shadow there curves with the
+  much tighter --r-row until it reads as a bracket rather than a bar. So it is
+  drawn instead: straight, and held off the ends so it cannot round at all.
+*/
+.items > .task.important::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--flag);
+}
+
+.task.important > .label {
+  font-weight: 650;
+}
+
+.group.important > .ghead > .gtitle {
+  font-weight: 800;
+}
+
+/*
+  Finished outranks important, so the mark stands down rather than fading.
+  A ticked row is on its way to the foot of the list and the green frame is the
+  state worth reading there; two accents fighting over the same edge just went
+  muddy. The stored flag is untouched — untick it and the bar comes back.
+*/
+.list > .task.important.done,
+.group.important.clear {
+  --bar: 0 0 0 0 transparent;
+}
+
+.items > .task.important.done::before {
+  display: none;
 }
 
 /* --------------------------------------------------------------- the end */

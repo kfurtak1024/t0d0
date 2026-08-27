@@ -9,7 +9,7 @@ import type { State } from "../src/types";
 const state = (text: string, count = 0): State => ({
   v: 1,
   openedAt: null,
-  list: [{ kind: "task", id: "a", text, target: 1, count }],
+  list: [{ kind: "task", id: "a", text, target: 1, count, important: false }],
 });
 
 beforeEach(() => {

@@ -8,7 +8,7 @@ import type { State } from "../src/types";
 const state = (text = "shopping"): State => ({
   v: 1,
   openedAt: null,
-  list: [{ kind: "task", id: "a", text, target: 1, count: 0 }],
+  list: [{ kind: "task", id: "a", text, target: 1, count: 0, important: false }],
 });
 
 const breakStorage = (): void => {

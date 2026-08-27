@@ -8,6 +8,7 @@ const task = (text: string, count = 0, target = 1): Task => ({
   text,
   target,
   count,
+  important: false,
 });
 
 const group = (title: string, items: Task[], collapsed = false): Group => ({
@@ -15,6 +16,7 @@ const group = (title: string, items: Task[], collapsed = false): Group => ({
   id: title,
   title,
   collapsed,
+  important: false,
   items,
 });
 
