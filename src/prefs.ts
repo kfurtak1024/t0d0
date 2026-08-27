@@ -1,5 +1,14 @@
 const KEY = "t0d0/prefs";
 
+/**
+ * The bars the settings screen offers, as whole percentages.
+ *
+ * The single source: the `<select>` builds its options from this and the loader
+ * validates against it, so the control can never offer a value the loader would
+ * reject, nor a stored value the control cannot show.
+ */
+export const SUCCESS_STEPS = [50, 60, 70, 80, 90, 100] as const;
+
 export interface Prefs {
   /**
    * Send finished rows down below the work that is left — folding a group shut
@@ -8,11 +17,20 @@ export interface Prefs {
    * who had switched it off, which is a poor trade for a tidier identifier.
    */
   autoCollapseDone: boolean;
+  /**
+   * How much of the unimportant work makes the day a success, as a percentage.
+   * The important work is not negotiable — this is the bar for everything else.
+   */
+  successAt: number;
 }
 
 export const DEFAULTS: Prefs = {
   autoCollapseDone: true,
+  successAt: 70,
 };
+
+const isStep = (value: unknown): value is number =>
+  typeof value === "number" && (SUCCESS_STEPS as readonly number[]).includes(value);
 
 /**
  * How this browser behaves, kept out of the list for the same reason the theme
@@ -34,6 +52,10 @@ export function loadPrefs(): Prefs {
         typeof stored["autoCollapseDone"] === "boolean"
           ? stored["autoCollapseDone"]
           : DEFAULTS.autoCollapseDone,
+      // Validated against the offered steps rather than merely clamped: a
+      // hand-edited 73 would leave the picker showing nothing, which is exactly
+      // the shape the settings screen cannot describe.
+      successAt: isStep(stored["successAt"]) ? stored["successAt"] : DEFAULTS.successAt,
     };
   } catch {
     return { ...DEFAULTS };

@@ -363,8 +363,11 @@ body.dragging-row {
   fill: none;
 }
 
+/* The day's ring tints its own track, so the rainbow is visible before the
+   first tick; every other ring leaves the fallback alone. */
 .ring .trk {
-  stroke: var(--track);
+  stroke: var(--track-tint, var(--track));
+  transition: stroke 0.3s var(--ease);
 }
 
 .ring .seg {
@@ -663,9 +666,15 @@ body.dragging-row {
   border-color: oklch(var(--ring-l) var(--ring-c) var(--end-hue) / 40%);
 }
 
+/*
+  Ripe now means the day is a success, not that the list is empty — so the
+  button wears whatever the day earned rather than a fixed green: blue at the
+  bar, violet once nothing is left. --end-tint is the ring's own colour, warm
+  band lifted and all, set alongside --end-hue so the two cannot disagree.
+*/
 .endday.ripe {
   color: var(--on-accent);
-  background: oklch(var(--ring-l) var(--ring-c) 150);
+  background: var(--end-tint, oklch(var(--ring-l) var(--ring-c) 150));
   border-color: transparent;
   box-shadow: var(--shadow-lift);
 }
@@ -987,6 +996,53 @@ body.dragging-row {
   font-size: 0.9rem;
   color: var(--muted);
   margin-bottom: 0.5rem;
+}
+
+/* The day's verdict, above the list of what got cleared. Absent rather than
+   consoling when the day did not earn one. */
+/*
+  The success-bar picker. Same shape as the composer's "Adding to" select, but
+  on --field rather than --card: a drawer row is already a card, and a card on a
+  card disappears into it.
+*/
+.pick {
+  flex: none;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--field);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 1.6rem 0.4rem 0.8rem;
+  cursor: pointer;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentcolor 50%),
+    linear-gradient(135deg, currentcolor 50%, transparent 50%);
+  background-position:
+    right 0.8rem center,
+    right 0.6rem center;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+}
+
+.pick:hover {
+  border-color: var(--track);
+}
+
+.sheet .verdict {
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 0.7rem;
+}
+
+.sheet .verdict[hidden] {
+  display: none;
 }
 
 .sheet .cleared {

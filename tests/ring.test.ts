@@ -5,7 +5,7 @@
  * dasharray still renders, just wrongly, and no other test would notice.
  */
 import { describe, expect, it } from "vitest";
-import { hueAt, makeRing, paintRing } from "../src/render/ring";
+import { dayStroke, hueAt, makeRing, paintRing } from "../src/render/ring";
 
 const SIZE = 26;
 const WIDTH = 3;
@@ -136,6 +136,50 @@ describe("paintRing", () => {
       0,
       6,
     );
+  });
+});
+
+describe("paintRing colour override", () => {
+  it("uses the given colour instead of the row sweep", () => {
+    // The day's ring wears the rainbow while every row keeps the indigo→green
+    // sweep that matches its finished frame.
+    const ring = makeRing(40, 4, 1);
+    paintRing(ring, 0.5, 1, "rebeccapurple");
+    expect((ring.segments[0] as SVGElement).style.stroke).toBe("rebeccapurple");
+    expect(ring.check.style.stroke).toBe("rebeccapurple");
+  });
+
+  it("still shows nothing at zero, whatever the colour", () => {
+    const ring = makeRing(40, 4, 1);
+    paintRing(ring, 0, 1, "rebeccapurple");
+    expect((ring.segments[0] as SVGElement).style.stroke).toBe("transparent");
+  });
+});
+
+describe("dayStroke", () => {
+  it("carries the hue and reads its lightness from the theme's tokens", () => {
+    const stroke = dayStroke(260);
+    expect(stroke).toContain("260.0");
+    expect(stroke).toContain("var(--ring-l)");
+    expect(stroke).toContain("var(--ring-c)");
+  });
+
+  it("fades to an alpha for the track, which is how red shows before any arc", () => {
+    expect(dayStroke(25)).not.toContain("/");
+    expect(dayStroke(25, 0.2)).toContain("/ 20%");
+  });
+
+  it("lifts the warm band and leaves the cool end alone", () => {
+    // Yellow held at the ring's fixed lightness renders olive, so the band
+    // around it is lifted; blue and violet need none of it.
+    const lift = (hue: number): number =>
+      Number(/var\(--ring-lift\) \* ([\d.]+)/.exec(dayStroke(hue))?.[1] ?? "0");
+
+    expect(lift(95)).toBeCloseTo(1, 2);
+    expect(lift(60)).toBeGreaterThan(0.5);
+    expect(lift(150)).toBeLessThan(0.5);
+    expect(lift(260)).toBeLessThan(0.01);
+    expect(lift(320)).toBeLessThan(0.01);
   });
 });
 

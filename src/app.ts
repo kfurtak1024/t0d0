@@ -1,8 +1,8 @@
-import { allTasks, isComplete, isDone, overallProgress } from "./progress";
+import { allTasks, dayHue, isDone, overallProgress, scoreDay, type DayScore } from "./progress";
 import { createGroup } from "./render/group";
 import { flip } from "./render/flip";
 import { KeyedList } from "./render/list";
-import { hueAt, makeRing, paintRing } from "./render/ring";
+import { dayStroke, makeRing, paintRing } from "./render/ring";
 import { createTask, popRing, tickOf } from "./render/task";
 import type { RowActions } from "./render/context";
 import { loadPrefs, savePrefs, type Prefs } from "./prefs";
@@ -24,6 +24,29 @@ const STALE_MS = 16 * 60 * 60 * 1000;
 const EXIT_MS = 200;
 /** Long enough for the tick to finish landing before the group folds over it. */
 const COLLAPSE_MS = 520;
+
+/**
+ * The day's three moments, in the order they can be reached.
+ *
+ * Each is celebrated once, on the transition into it, and re-arms if the list
+ * falls back below it — the same rule the single completion check always used,
+ * now applied three times over.
+ */
+const MILESTONES = ["cleared", "succeeded", "complete"] as const;
+type Milestone = (typeof MILESTONES)[number];
+
+/** What each moment looks like: the hue the ring turns, and how loud it is. */
+const FANFARE: Record<Milestone, { hue: number; count: number }> = {
+  cleared: { hue: 150, count: 55 },
+  succeeded: { hue: 260, count: 95 },
+  complete: { hue: 320, count: 150 },
+};
+
+const HAPTICS: Record<Milestone, number[]> = {
+  cleared: [14, 30, 14],
+  succeeded: [18, 40, 24],
+  complete: [20, 40, 20, 40, 34],
+};
 
 /** Query a required element of the page, failing loudly rather than rendering nothing. */
 const el = (selector: string): HTMLElement => need(document, selector);
@@ -53,7 +76,7 @@ export class App {
   #prefs: Prefs = loadPrefs();
   #destId: string | null = null;
   #editingId: string | null = null;
-  #armed = true;
+  #armed: Record<Milestone, boolean> = { cleared: true, succeeded: true, complete: true };
   #shownPct = 0;
   #tweenRaf = 0;
   #storageWarned = false;
@@ -148,6 +171,14 @@ export class App {
       onPrefs: (next) => {
         this.#prefs = next;
         savePrefs(next);
+        /*
+         * Moving the bar re-scores the day, so the ring and the closer have to
+         * repaint. Arming rather than checking on purpose: a milestone reached
+         * by lowering your own bar was not earned, and confetti for moving the
+         * goalposts is hollow. It re-arms the moment the list falls back below.
+         */
+        this.#arm(this.#state);
+        this.#render();
       },
       onReplace: (next) => {
         this.#replace(next, true);
@@ -215,7 +246,7 @@ export class App {
       this.#render();
       // Every state change, not just a tick: deleting the last undone item
       // finishes the day just as much as ticking it does.
-      this.#checkComplete();
+      this.#checkMilestones();
     });
   }
 
@@ -223,16 +254,34 @@ export class App {
     return this.#store.state;
   }
 
+  /** The success bar as a fraction, which is what the scoring speaks in. */
+  get #bar(): number {
+    return this.#prefs.successAt / 100;
+  }
+
+  /** Which of the day's moments the list has reached, right now. */
+  #reached(score: DayScore): Record<Milestone, boolean> {
+    return {
+      // Only a moment when there was something marked to clear: with nothing
+      // important on the list the gate is vacuous, and celebrating it would
+      // fire on the very first tick of an ordinary day.
+      cleared: score.hasImportant && score.cleared && score.total > 0,
+      succeeded: score.succeeded,
+      complete: score.complete,
+    };
+  }
+
   /* ------------------------------------------------------------------ boot */
 
   start(): void {
     this.#render();
-    // Never celebrate on load: arm only once the list drops below complete.
-    this.#armed = !isComplete(allTasks(this.#state.list));
+    // Never celebrate on load: every moment already reached starts spent, and
+    // arms itself only if the list later falls back below it.
+    this.#arm(this.#state);
 
     const { openedAt } = this.#state;
     if (openedAt !== null && Date.now() - openedAt > STALE_MS) {
-      this.#sheet.show(this.#state, Date.now());
+      this.#sheet.show(this.#state, Date.now(), this.#bar);
     }
   }
 
@@ -496,7 +545,7 @@ export class App {
     this.#destId = null;
     this.#rows.clear();
     // Armed before the notify, so an all-done import does not celebrate itself.
-    this.#armed = !isComplete(allTasks(next.list));
+    this.#arm(next);
     this.#store.replace(next, { undoable });
   }
 
@@ -526,17 +575,38 @@ export class App {
 
   /* --------------------------------------------------------------- rewards */
 
-  #checkComplete(): void {
-    const complete = isComplete(allTasks(this.#state.list));
-    if (complete && this.#armed) {
-      this.#armed = false;
-      if (!this.#motion.matches) {
-        const box = this.#totalRing.getBoundingClientRect();
-        this.#confetti.burst({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
-      }
-      this.#vibrate([18, 40, 24]);
+  /** Spend every moment the list has already reached, without celebrating it. */
+  #arm(state: State): void {
+    const reached = this.#reached(scoreDay(state, this.#bar));
+    for (const milestone of MILESTONES) this.#armed[milestone] = !reached[milestone];
+  }
+
+  /**
+   * Celebrate whatever the last change just crossed.
+   *
+   * Highest first, and only one burst: a single tick can cross two lines at
+   * once — the last important item landing on a list already past the bar — and
+   * two showers on the same frame read as one messy shower rather than as two
+   * rewards. The lower moments are still spent, so they do not fire late.
+   */
+  #checkMilestones(): void {
+    const reached = this.#reached(scoreDay(this.#state, this.#bar));
+    const hit = [...MILESTONES]
+      .reverse()
+      .find((milestone) => reached[milestone] && this.#armed[milestone]);
+
+    for (const milestone of MILESTONES) this.#armed[milestone] = !reached[milestone];
+    if (!hit) return;
+
+    const { hue, count } = FANFARE[hit];
+    if (!this.#motion.matches) {
+      const box = this.#totalRing.getBoundingClientRect();
+      this.#confetti.burst(
+        { x: box.left + box.width / 2, y: box.top + box.height / 2 },
+        { hue, count },
+      );
     }
-    if (!complete) this.#armed = true;
+    this.#vibrate(HAPTICS[hit]);
   }
 
   #vibrate(pattern: number | number[]): void {
@@ -574,14 +644,24 @@ export class App {
 
     const tasks = allTasks(this.#state.list);
     const progress = overallProgress(this.#state);
+    /*
+     * The arc still measures the whole list, because that is what "3 of 7"
+     * means. The colour is the day's verdict, which is a different question:
+     * a list can be most of the way done and still have an important item
+     * outstanding, and the ring should say so rather than average it away.
+     */
+    const score = scoreDay(this.#state, this.#bar);
+    const hue = dayHue(score, this.#bar);
 
     this.#empty.hidden = this.#state.list.length > 0;
     this.#closer.hidden = tasks.length === 0;
-    this.#closer.style.setProperty("--end-hue", hueAt(progress).toFixed(1));
+    this.#closer.style.setProperty("--end-hue", hue.toFixed(1));
+    this.#closer.style.setProperty("--end-tint", dayStroke(hue));
     this.#closer.classList.toggle("lit", progress > 0);
-    this.#closer.classList.toggle("ripe", tasks.length > 0 && progress === 1);
+    this.#closer.classList.toggle("ripe", score.succeeded);
 
-    paintRing(this.#totalRing, tasks.length ? progress : 0, 1);
+    paintRing(this.#totalRing, tasks.length ? progress : 0, 1, dayStroke(hue));
+    this.#totalRing.style.setProperty("--track-tint", dayStroke(hue, 0.2));
     this.#totalRing.style.opacity = tasks.length ? "1" : "0.3";
     const frac = `${String(tasks.filter(isDone).length)} of ${String(tasks.length)}`;
     // Writing the same text still fires the live region, so only write changes.
@@ -646,7 +726,7 @@ export class App {
     });
 
     this.#closer.addEventListener("click", () => {
-      this.#sheet.show(this.#state, Date.now());
+      this.#sheet.show(this.#state, Date.now(), this.#bar);
     });
     (el("#databtn") as HTMLButtonElement).addEventListener("click", () => {
       this.#drawer.show();

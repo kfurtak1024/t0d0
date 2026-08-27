@@ -16,12 +16,16 @@ test.beforeEach(async ({ page }) => {
   await clearStorage(page);
 });
 
-test("the settings sheet holds theme, behaviour, two backup rows, and reset", async ({ page }) => {
+test("the settings sheet holds theme, two behaviour rows, two backup rows, and reset", async ({
+  page,
+}) => {
   await addItem(page, "shopping");
   await openDrawer(page);
 
   await expect(page.locator(".drawer-head h2")).toHaveText("Settings");
-  await expect(page.locator(".row")).toHaveCount(5);
+  await expect(page.locator(".row")).toHaveCount(6);
+  await expect(page.locator('[data-pref="autoCollapseDone"]')).toHaveCount(1);
+  await expect(page.locator('[data-pref-choice="successAt"]')).toHaveCount(1);
   await expect(page.locator('[data-act="save"] .row-label')).toHaveText("Save a copy");
   await expect(page.locator('[data-act="restore"] .row-label')).toHaveText("Load from a file");
   await expect(page.locator('[data-act="erase"] .row-label')).toHaveText("Erase everything");

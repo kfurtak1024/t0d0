@@ -26,18 +26,128 @@ export function isComplete(tasks: Task[]): boolean {
   return tasks.length > 0 && tasks.every(isDone);
 }
 
+/**
+ * Split the list into the work that carries the day and the work that fills it.
+ *
+ * A task is important if it is marked, or if it sits in a group that is —
+ * finishing an important group means finishing its items, so they are the same
+ * obligation. An empty important group contributes no tasks and so cannot block
+ * the gate, which is the same rule that keeps empty groups out of the ring.
+ */
+export function partition(list: Node[]): { important: Task[]; rest: Task[] } {
+  const important: Task[] = [];
+  const rest: Task[] = [];
+  for (const node of list) {
+    if (node.kind === "group") {
+      for (const task of node.items)
+        (node.important || task.important ? important : rest).push(task);
+    } else {
+      (node.important ? important : rest).push(node);
+    }
+  }
+  return { important, rest };
+}
+
+export interface DayScore {
+  /** Progress over the work that carries the day. 1 when none is marked. */
+  important: number;
+  /** Progress over everything else. 1 when there is none. */
+  rest: number;
+  /** Whether anything is marked at all — the gate is vacuous without it. */
+  hasImportant: boolean;
+  /** Every marked thing finished. Vacuously true when nothing is marked. */
+  cleared: boolean;
+  /** The day is a success: the important work done, the rest past the bar. */
+  succeeded: boolean;
+  /** Nothing left anywhere. */
+  complete: boolean;
+  total: number;
+}
+
+/**
+ * How the day is going, as one verdict.
+ *
+ * Two gates rather than one number: the important work has to be finished, and
+ * then enough of the rest — `bar` as a fraction. That is why an almost-perfect
+ * day with one important thing outstanding is not a success, and why a day with
+ * nothing marked can still be one.
+ *
+ * An empty list is never a success, for the same reason 0/0 is not 100%.
+ */
+export function scoreDay(state: State, bar: number): DayScore {
+  const { important, rest } = partition(state.list);
+  const total = important.length + rest.length;
+  // Vacuously complete when the set is empty, so a day with nothing marked is
+  // gated on the rest alone rather than being stuck at zero forever.
+  const importantProgress = important.length > 0 ? progress(important) : 1;
+  const restProgress = rest.length > 0 ? progress(rest) : 1;
+  const cleared = importantProgress >= 1;
+
+  return {
+    important: importantProgress,
+    rest: restProgress,
+    hasImportant: important.length > 0,
+    cleared,
+    succeeded: total > 0 && cleared && restProgress >= bar,
+    complete: total > 0 && importantProgress >= 1 && restProgress >= 1,
+    total,
+  };
+}
+
+/*
+ * The day's colour, as a rainbow with its landmarks pinned to the two gates:
+ * red at nothing done, green the moment the important work lands, blue the
+ * moment the rest clears the bar, violet at everything.
+ */
+const RED = 25;
+const GREEN = 150;
+const BLUE = 260;
+const VIOLET = 320;
+
+const mix = (from: number, to: number, k: number): number =>
+  from + (to - from) * Math.min(1, Math.max(0, k));
+
+/**
+ * Where the day sits on that rainbow.
+ *
+ * Green is a landmark only when there was important work to earn it with. With
+ * nothing marked the sweep runs straight from red into blue and green is merely
+ * a colour it passes through — otherwise a list with nothing important would
+ * open on green, which reads as "you are safe" before a single tick.
+ */
+export function dayHue(score: DayScore, bar: number): number {
+  if (score.total === 0) return RED;
+  if (score.complete) return VIOLET;
+  if (score.hasImportant && !score.cleared) return mix(RED, GREEN, score.important);
+
+  const from = score.hasImportant ? GREEN : RED;
+  /*
+   * Neither divisor can be zero, and neither needs guarding:
+   *
+   * `rest < bar` cannot hold for a bar of 0, since progress is never negative.
+   * And reaching the last line with a bar of 1 would need `rest >= 1` on a
+   * non-empty list whose important work is already done — which is `complete`,
+   * and returned violet several lines ago.
+   */
+  if (score.rest < bar) return mix(from, BLUE, score.rest / bar);
+  return mix(BLUE, VIOLET, (score.rest - bar) / (1 - bar));
+}
+
 export interface DaySummary {
   done: number;
   total: number;
   clearedGroups: string[];
   elapsedMs: number | null;
+  /** The verdict the card reports before it clears anything. */
+  score: DayScore;
 }
 
-export function summarise(state: State, now: number): DaySummary {
+export function summarise(state: State, now: number, bar: number): DaySummary {
   const tasks = allTasks(state.list);
   return {
     done: tasks.filter(isDone).length,
     total: tasks.length,
+    score: scoreDay(state, bar),
     clearedGroups: state.list
       .filter((node) => node.kind === "group" && node.items.length > 0 && node.items.every(isDone))
       .map((node) => (node as { title: string }).title),

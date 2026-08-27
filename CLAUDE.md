@@ -59,6 +59,32 @@ Invariants worth defending in review:
   root beside groups; there is no implicit "Inbox".
 - **Progress is `mean(count / target)`** over tasks, so one `[20]` item cannot swamp the
   ring. Empty groups are excluded from totals and render no ring.
+- **The arc measures the list; the colour judges the day.** They answer different
+  questions and must not be conflated: `3 of 7` is what the arc and `#pct` report, while
+  the hue reports `scoreDay()` — a list can be most of the way done and still have an
+  important item outstanding, and the ring has to say so rather than average it away.
+- **The day succeeds on two gates, not one number.** Every important thing finished,
+  _and_ the rest past `prefs.successAt`. A task is important if it is marked or sits in
+  an important group — finishing such a group means finishing its items, so they are the
+  same obligation. An empty important group contributes no tasks and cannot block, the
+  same rule that keeps empty groups out of the ring. An empty list is never a success.
+- **The rainbow's landmarks are the gates**: red at nothing, green the moment the
+  important work lands, blue the moment the rest clears the bar, violet at everything.
+  Green is a landmark **only when something is marked** — with nothing important the
+  sweep runs straight from red to blue, because a list with nothing marked would
+  otherwise open on green and read as "you are safe" before a single tick.
+- **Only the day ring wears the rainbow.** Row rings keep `hueAt`'s indigo→green sweep,
+  which ends on the same hue as the finished frame — a row whose ring and outline
+  disagreed would be a bug. `paintRing`'s `colour` argument is the seam.
+- **The warm band of the rainbow is lifted by `--ring-lift`.** Yellow is inherently a
+  light colour; held at `--ring-l` an OKLCH yellow renders olive and red→green reads as
+  mud. This was checked by rendering the sweep, not by eye-balling the numbers.
+- **All three moments are celebrated**, each once, on the transition into it, re-arming
+  when the list falls back below. One tick can cross two gates at once — the last
+  important item landing on a list already past the bar — and only the highest fires:
+  two showers on one frame read as one messy shower. Moving the bar in Settings re-scores
+  and repaints but deliberately does **not** celebrate; a milestone reached by moving
+  your own goalposts was not earned.
 - **The theme and the preferences live in their own storage keys**, never in the
   list. They are properties of this browser, so putting them in `State` would
   export them in a backup and import someone else's choices.
@@ -166,7 +192,7 @@ src/storage.ts    load/save against one localStorage key
 src/store.ts      the live state, persistence, and one level of undo
 src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
-src/progress.ts   the mean(count/target) formula
+src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, day-summary sheet, drawer, row menu, drag, confetti, dom
 src/styles/       tokens.css first, then base.css, then app.css
@@ -202,7 +228,9 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
 ## Testing expectations
 
 - `parse`, `progress`, and `normalize` are pure and should stay at full coverage. Most
-  real bugs live there.
+  real bugs live there. `scoreDay` and `dayHue` are part of that: the gates and every
+  landmark of the rainbow are unit-tested, so the browser tests only have to check that
+  the preference reaches the scoring and the ring wears the result.
 - State transitions (add, delete, move in/out of a group, clear ticks, undo) are tested as
   pure functions over `State`, without a DOM.
 - The keyed patch has DOM tests asserting node identity survives an update.
