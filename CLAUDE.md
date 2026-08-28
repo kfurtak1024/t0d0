@@ -166,15 +166,22 @@ Invariants worth defending in review:
 - **Clearing a group has to reach its items**, and that is not a nicety. Left marked,
   they would re-read the group as important on the next change and the group could never
   be told "no" — the trap a standing "all marked implies marked" rule sets.
-- **`settle()` is asymmetric, deliberately.** One item saying it is _not_ important always
-  takes the group's mark off. One item saying it _is_ only puts the mark on when the group
-  holds more than one: with a single item, "all of them are marked" and "this one is
+- **`settleGroup()` is asymmetric, deliberately.** Only an explicit unmark may take a
+  group's mark off: a group's mark is a statement you made, and adding an ordinary item to
+  it or deleting a row out of it should not take that back. Completing the set is
+  different, so an add or a delete may _promote_ — removing the last item that
+  contradicted "everything here matters" finishes the sentence. Promoting also needs more
+  than one item, because with a single item "all of them are marked" and "this one is
   marked" are the same sentence, and promoting there would make every ordinary item added
   afterwards important by inheritance.
-- **It runs when a mark changes, not on a move or a delete.** A group's mark is a
-  statement you made; it should not evaporate because an ordinary item was added to it,
-  nor appear because the last plain one was deleted. So an ordinary item added to a marked
-  group is important by inheritance — which is what marking the group said.
+- **It is scoped to the one group whose items changed.** Sweeping the list let a change in
+  one group take the mark off another that had been marked as a whole and still held
+  ordinary rows — which is what it did until a test went looking for it.
+- **The mark is therefore path-dependent, and that is the accepted cost.** Adding
+  `a! b! plain` leaves the group marked; `plain a! b!` does not, because the first order
+  promotes before the plain row arrives and no add demotes. Unmarking the group is always
+  the way out. The alternative — demoting on every add — makes `# Work!` evaporate the
+  moment you put anything ordinary in it.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
   ", important". A bar and a font weight are a visual channel only.
