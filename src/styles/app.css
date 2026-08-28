@@ -126,7 +126,15 @@
 
 /* ---------------------------------------------------------------- groups */
 
+/*
+  Positioned so the header's grip measures from the card rather than from
+  `.ghead`, which sits inside the card's padding — that put a group's handle
+  8.8px closer to its card than a row's, which reads as a different distance
+  because it is one. Nothing else in the header needs a containing block: the
+  controls all carry their own.
+*/
 .group {
+  position: relative;
   background: var(--card);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card), var(--edge);
@@ -138,7 +146,6 @@
 }
 
 .ghead {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -532,8 +539,22 @@ body.dragging-row {
     margin-right: 0;
   }
 
+  /*
+    A nested row's grip is outboard of the row, which inside a group means
+    *inboard* of the card — the one strip of the card that is already spoken
+    for, by the group's own left edge and its importance mark. So the rail moves
+    right far enough to open a gutter the grip sits in, clear of the mark on one
+    side and the rail on the other.
+
+    Only on these devices: where the grip stays in the flow it takes real space
+    in the row and needs no gutter, so a phone keeps the tighter indent.
+  */
+  .items {
+    margin-left: 1.85rem;
+  }
+
   .items > .task > .grip {
-    left: -1.3rem;
+    left: -1.6rem;
   }
 
   .task:hover .kill,

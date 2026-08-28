@@ -267,6 +267,19 @@ above / inside / below, which is what stops a step undoing itself on the next fr
 you widen one region, narrow the other by the same amount, and re-check by measurement —
 this went wrong twice, in both directions, and neither was visible by eye.
 
+**A grip measures from the card it belongs to**, which is why `.group` is positioned and
+`.ghead` is not. The header sits inside the card's padding, so a grip anchored to it came
+out 8.8px closer to its card than a row's did — a difference small enough to look like
+nothing and read like a mistake. Nothing else in the header needs a containing block; the
+controls all carry their own.
+
+**A nested row's grip lives in a gutter, not the margin.** Outboard of the row means
+inboard of the card, where the group's own left edge and its importance strip already
+are — so on pointer devices `.items` is indented far enough to open a lane between the
+strip and the rail, and the grip sits in it. Only there: where the grip stays in the flow
+it takes real space in the row, and a phone keeps the tighter indent. Both numbers were
+set by measuring the three clearances, not by eye.
+
 Hit areas are `::after` overlays, so **where two overlap, the later one in the DOM wins**.
 That is why the grip's is asymmetric — a symmetric 44px box put the tick's overlay on top
 of the grip's own dots. Changing a row's controls means re-checking this with
