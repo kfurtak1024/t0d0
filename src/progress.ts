@@ -19,8 +19,6 @@ export function progress(tasks: Task[]): number {
   return total / tasks.length;
 }
 
-export const overallProgress = (state: State): number => progress(allTasks(state.list));
-
 /** True only for a non-empty list with everything finished — 0/0 is not 100%. */
 export function isComplete(tasks: Task[]): boolean {
   return tasks.length > 0 && tasks.every(isDone);
@@ -100,15 +98,21 @@ export function scoreDay(state: State, bar: number): DayScore {
   };
 }
 
-/*
+/**
  * The day's colour, as a rainbow with its landmarks pinned to the two gates:
  * red at nothing done, green the moment the important work lands, blue the
  * moment the rest clears the bar, violet at everything.
+ *
+ * Exported because the celebrations wear them too: a burst fires at the moment
+ * the ring turns, so the two have to be the same colour by construction rather
+ * than by the same three numbers being typed out twice.
  */
-const RED = 25;
-const GREEN = 150;
-const BLUE = 260;
-const VIOLET = 320;
+export const HUE = {
+  red: 25,
+  green: 150,
+  blue: 260,
+  violet: 320,
+} as const;
 
 const mix = (from: number, to: number, k: number): number =>
   from + (to - from) * Math.min(1, Math.max(0, k));
@@ -122,11 +126,11 @@ const mix = (from: number, to: number, k: number): number =>
  * open on green, which reads as "you are safe" before a single tick.
  */
 export function dayHue(score: DayScore, bar: number): number {
-  if (score.total === 0) return RED;
-  if (score.complete) return VIOLET;
-  if (score.hasImportant && !score.cleared) return mix(RED, GREEN, score.important);
+  if (score.total === 0) return HUE.red;
+  if (score.complete) return HUE.violet;
+  if (score.hasImportant && !score.cleared) return mix(HUE.red, HUE.green, score.important);
 
-  const from = score.hasImportant ? GREEN : RED;
+  const from = score.hasImportant ? HUE.green : HUE.red;
   /*
    * Neither divisor can be zero, and neither needs guarding:
    *
@@ -135,8 +139,8 @@ export function dayHue(score: DayScore, bar: number): number {
    * non-empty list whose important work is already done — which is `complete`,
    * and returned violet several lines ago.
    */
-  if (score.rest < bar) return mix(from, BLUE, score.rest / bar);
-  return mix(BLUE, VIOLET, (score.rest - bar) / (1 - bar));
+  if (score.rest < bar) return mix(from, HUE.blue, score.rest / bar);
+  return mix(HUE.blue, HUE.violet, (score.rest - bar) / (1 - bar));
 }
 
 export interface DaySummary {

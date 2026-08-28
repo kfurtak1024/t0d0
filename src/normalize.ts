@@ -1,5 +1,6 @@
 import { LIMITS, SCHEMA_VERSION } from "./types";
 import type { Group, State, Task } from "./types";
+import { settle } from "./marks";
 import { uid } from "./parse";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -87,9 +88,17 @@ export function normalize(input: unknown): State | null {
   }
 
   const openedAt = input["openedAt"];
-  return {
+  const state: State = {
     v: SCHEMA_VERSION,
     openedAt: typeof openedAt === "number" && Number.isFinite(openedAt) ? openedAt : null,
     list,
   };
+  /*
+   * A group's mark is derived from its items, so a backup that disagrees with
+   * itself is repaired here rather than left to be corrected by the first
+   * unrelated edit — which would have taken the mark off a group nobody had
+   * touched.
+   */
+  settle(state);
+  return state;
 }

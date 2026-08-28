@@ -73,6 +73,17 @@ Invariants worth defending in review:
   Green is a landmark **only when something is marked** — with nothing important the
   sweep runs straight from red to blue, because a list with nothing marked would
   otherwise open on green and read as "you are safe" before a single tick.
+- **The day's verdict is in words as well as in hue.** The closer's label follows
+  `scoreDay()` — "That's the day" / "The important work is done" / "That's a good day" /
+  "Everything done" — because hue is not a channel everyone has. Measured with a
+  dichromacy simulation: red and green come out at ΔE 4 for a deuteranope, and they are
+  the rainbow's two most meaningful landmarks, so the ring alone was a WCAG 1.4.1 failure.
+- **A lightness ramp along the rainbow was tried as a second channel and rejected.**
+  Measured, it broke white-on-`.ripe` contrast in light mode (4.71 → 3.99, against a 4.5
+  floor), still left red/green confusable (ΔE 4 → 9, against a ~12 threshold), and made
+  blue/violet _worse_ under protanopia (ΔE 8 → 2). Light mode's lightness headroom is
+  bounded by contrast on a white card, so hue cannot be rescued there. Do not re-try it
+  without re-running those three numbers.
 - **Only the day ring wears the rainbow.** Row rings keep `hueAt`'s indigo→green sweep,
   which ends on the same hue as the finished frame — a row whose ring and outline
   disagreed would be a bug. `paintRing`'s `colour` argument is the seam.
@@ -80,7 +91,8 @@ Invariants worth defending in review:
   light colour; held at `--ring-l` an OKLCH yellow renders olive and red→green reads as
   mud. This was checked by rendering the sweep, not by eye-balling the numbers.
 - **All three moments are celebrated**, each once, on the transition into it, re-arming
-  when the list falls back below. One tick can cross two gates at once — the last
+  when the list falls back below. The arming lives in `src/milestones.ts` as a pure
+  machine over `DayScore`; `app.ts` only owns what a celebration looks like. One tick can cross two gates at once — the last
   important item landing on a list already past the bar — and only the highest fires:
   two showers on one frame read as one messy shower. Moving the bar in Settings re-scores
   and repaints but deliberately does **not** celebrate; a milestone reached by moving
@@ -93,6 +105,12 @@ Invariants worth defending in review:
   until it has played out. Folding a group by hand cancels that group's pending
   tidy, and only that one. The fold and the drop are **one state change**, so
   the card travels under FLIP instead of vanishing here and reappearing there.
+- **A new group lands above the first finished row**, not at the end of the list. It is
+  work, so it goes with the work — appending it buried a group you had just made under
+  the ticks, and the first thing you did with it was drag it back up. With nothing
+  finished there is nothing to go in front of, so it appends, which is where it always
+  landed. Root tasks still append: the composer aims at a new group, so an item you add
+  next goes inside it rather than needing a place of its own.
 - **A finished row sinks to the foot of the unfinished list**, stopping above
   the run of finished rows already resting there — the pile keeps the order it
   was earned rather than each arrival burying the last. A ticked root item and a
@@ -111,7 +129,7 @@ Invariants worth defending in review:
   is a correction with no reward to protect, and a row that took half a second to come
   back would feel stuck. Both are gated on `autoCollapseDone` — someone who turned off
   automatic tidying does not want automatic reordering in either direction.
-- **A batch of tidies is applied bottom-most row first.** A row stops above
+- **A batch of tidies is applied bottom-most row first**, in `tidyAll()`. A row stops above
   whatever finished rows are already below it, so sending the upper one first
   strands it on top of a sibling that has not travelled yet. Ordering by
   position is what makes two ticks in one breath land where the same two ticks
@@ -136,13 +154,20 @@ Invariants worth defending in review:
   sits beside the green frame cleanly.) `tests/e2e/important.spec.ts` asserts the two
   are tellable apart rather than asserting a colour, so the treatment can change without
   the guarantee moving.
-- **A group and an item wear the mark differently, on purpose.** A group is a
-  container, so it wears it as its own left edge: a `linear-gradient` in the card's
-  background stopping at exactly `--r-card`, so the card's `border-radius` clips it and
-  the strip's flat inner side lands precisely where the curve ends. It _is_ the rounded
-  corner rather than a bar sitting inside it, and it follows `--r-card` if that changes.
-  An item is a row, so it takes a slim `::before` pill — a strip that wide would read as
-  a colour block on a 56px card and swamp a nested row.
+- **A card wears the mark as its own left edge; a nested row wears a pill.** The card
+  version is a `linear-gradient` in the background stopping at exactly `--r-card`, so the
+  card's `border-radius` clips it and the strip's flat inner side lands precisely where
+  the curve ends. It _is_ the rounded corner rather than a bar sitting inside it, and it
+  follows `--r-card` if that changes. Groups and top-level items share it, because they
+  are the same kind of thing to the eye — two cards side by side in one list. A nested
+  row has no card, and a strip that wide would swamp something half a card tall, so it
+  takes a slim `::before` pill instead.
+- **A root card's leading padding has to clear `--r-card`**, which is why it is 1.25rem
+  where the others are 0.75rem. At the narrower value the tick and the in-flow grip sat
+  six pixels inside the strip and were drawn over the colour — invisible on a pointer
+  device, where the grip is out in the margin, and obvious on a phone. It is
+  unconditional rather than only on a marked row, so nothing shifts when the mark goes
+  on or comes off.
 - **Do not draw the group's strip any other way.** Both alternatives were tried and both
   fought the corner: an inset `box-shadow` curves _both_ sides and reads as a fragment
   of the frame, and a pseudo-element cannot match an 18px corner at all, because a
@@ -150,6 +175,34 @@ Invariants worth defending in review:
   intercept a tap — which is why the item's pill needs `pointer-events: none`, sitting
   as it does exactly where the grip's hit area reaches. Only the green finished outline
   is still a shadow slot (`--edge`).
+- **A group's mark and its items' marks are one statement made two ways.** Setting the
+  group sets every item; clearing it clears every item; changing an item's own mark
+  re-reads the group from what is left. So an item inside an important group never wears
+  its own pill — the group's edge already says it, and repeating it on every row says it
+  several times over.
+- **Clearing a group has to reach its items**, and that is not a nicety. Left marked,
+  they would re-read the group as important on the next change and the group could never
+  be told "no" — the trap a standing "all marked implies marked" rule sets.
+- **A group's mark is derived from its items, in both directions.** `settle()` in
+  `src/marks.ts` runs on every change to a mark or to membership, and on everything
+  arriving through `normalize()`: a group is important exactly when everything in
+  it is. Deriving one way only was tried and was wrong twice over — it made the mark
+  depend on the order rows arrived in (`a! b! plain` left a group marked where
+  `plain a! b!` did not), and it let a plain row dropped into a marked group become
+  important without anyone saying so.
+- **Deriving both ways is also what makes the mark removable.** Clearing a group clears
+  its items, so nothing is left to put the mark straight back — the trap a one-directional
+  "all marked implies marked" rule sets.
+- **The derivation is enforced by a property test, not by tidy call sites.** It runs from
+  eight places across six transitions and there is no chokepoint to funnel them through,
+  so the way it goes wrong is a seventh transition arriving without one.
+  `tests/transitions.test.ts` folds arbitrary runs of transitions and asserts the
+  invariant after every step — removing any one of the eight calls fails it. The rule is
+  written out again in that test rather than imported: asking the implementation whether
+  it agrees with itself would pass for the wrong reason.
+- **An empty group keeps the mark it was given.** `# Work!` is a promise about a group you
+  have not filled yet and there is nothing in it to read; the first row you put in decides
+  it from then on, which is why that `!` does not survive an ordinary first item.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
   ", important". A bar and a font weight are a visual channel only.
@@ -232,11 +285,13 @@ src/theme.ts      theme preference, in its own storage key
 src/prefs.ts      behaviour preferences, in their own storage key
 src/types.ts      Task, Group, State, and the limits
 src/normalize.ts  the single gate for data arriving from outside
+src/marks.ts      a group's mark, derived from its items
 src/storage.ts    load/save against one localStorage key
 src/store.ts      the live state, persistence, and one level of undo
 src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
+src/milestones.ts which of the day's moments a change just crossed
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, day-summary sheet, drawer, row menu, drag, inline edit,
                   focus trap, confetti, dom

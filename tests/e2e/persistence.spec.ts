@@ -56,6 +56,44 @@ test("counts stored above their target are repaired on load", async ({ page }) =
   );
 });
 
+/*
+ * Another tab writing while a row is being edited. The edit's node is about to
+ * be replaced, and the blur that follows used to commit a rename against the
+ * list from before the replace — which spent the undo slot, so one Ctrl-Z
+ * silently put the old list back over what the other tab had written.
+ */
+test("an edit in flight is called off, not committed, when another tab writes", async ({
+  page,
+}) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now(),
+    list: [{ kind: "task", id: "a", text: "shopping", target: 1, count: 0, important: false }],
+  });
+
+  await page.locator(".task .label").click();
+  await expect(page.locator(".task .label")).toHaveAttribute("contenteditable", "plaintext-only");
+
+  await page.evaluate(() => {
+    const next = JSON.stringify({
+      v: 1,
+      openedAt: Date.now(),
+      list: [{ kind: "task", id: "b", text: "from another tab", target: 1, count: 0 }],
+    });
+    localStorage.setItem("t0d0/v1", next);
+    dispatchEvent(new StorageEvent("storage", { key: "t0d0/v1", newValue: next }));
+  });
+  await expect(page.locator(".task .label")).toHaveText("from another tab");
+
+  // Nothing was staged to undo, so the other tab's list stands.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.locator(".task .label")).toHaveText("from another tab");
+
+  // And editing still works afterwards.
+  await page.locator(".task .label").click();
+  await expect(page.locator(".task .label")).toHaveAttribute("contenteditable", "plaintext-only");
+});
+
 test("a day left open overnight offers its summary instead of counting on", async ({ page }) => {
   await seedStorage(page, {
     v: 1,

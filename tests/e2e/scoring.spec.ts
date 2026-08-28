@@ -124,6 +124,34 @@ test("a day with nothing marked runs red to blue, not green first", async ({ pag
   expect(hue).toBeLessThan(200);
 });
 
+/*
+ * The ring reports the day in hue, and hue is not a channel everyone has: red
+ * and green are one colour to a deuteranope, and those are the two landmarks
+ * that matter most. The closer says the same thing in words, on screen, without
+ * having to open the card to read it.
+ */
+test("the closer says how the day is going, not only the ring", async ({ page }) => {
+  await addItem(page, "call the bank!");
+  for (const text of ["a", "b", "c", "d"]) await addItem(page, text);
+
+  const closer = page.locator("#closeday");
+  await expect(closer).toHaveText(/That's the day/);
+
+  await tick(page, "call the bank, important").click();
+  await expect(closer).toHaveText(/The important work is done/);
+
+  // Three of four ordinary items is 75%, past the 70% bar.
+  for (const text of ["a", "b", "c"]) await tick(page, text).click();
+  await expect(closer).toHaveText(/That's a good day/);
+
+  await tick(page, "d").click();
+  await expect(closer).toHaveText(/Everything done/);
+
+  // And back down again when the day is no longer that.
+  await tick(page, "d").click();
+  await expect(closer).toHaveText(/That's a good day/);
+});
+
 test("the day card reports the verdict before it clears anything", async ({ page }) => {
   await addItem(page, "call the bank!");
   await addItem(page, "a");
@@ -207,6 +235,40 @@ test("each milestone is celebrated once, and a doubled crossing only once", asyn
   await tick(page, "d").click();
   await tick(page, "d").click();
   await expect.poll(milestones).toBe(4);
+});
+
+/*
+ * `navigator.vibrate` cancels whatever is already playing, so on a tick that
+ * both finishes an item and crosses a milestone the order matters: the small
+ * tick buzz has to go first, or it silences the celebration a moment later.
+ * Counting calls cannot see this — only the last one actually plays.
+ */
+test("a milestone's own pattern is the haptic that survives the tick", async ({ page }) => {
+  await page.addInitScript(() => {
+    const log: (number | number[])[] = [];
+    (window as unknown as { buzzes: (number | number[])[] }).buzzes = log;
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: (pattern: number | number[]) => {
+        log.push(pattern);
+        return true;
+      },
+    });
+  });
+  await clearStorage(page);
+  await addItem(page, "call the bank!");
+
+  // One item, so this tick clears the important work, passes the bar and
+  // finishes the day all at once.
+  await tick(page, "call the bank, important").click();
+
+  const buzzes = await page.evaluate(
+    () => (window as unknown as { buzzes: (number | number[])[] }).buzzes,
+  );
+  // The tick's own buzz came first and the celebration came last, so the
+  // celebration is what the device actually plays.
+  expect(buzzes.at(0)).toBe(12);
+  expect(Array.isArray(buzzes.at(-1))).toBe(true);
 });
 
 /*

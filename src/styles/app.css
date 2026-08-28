@@ -237,7 +237,13 @@
 .list > .task {
   background: var(--card);
   box-shadow: var(--shadow-card), var(--edge);
-  padding: 0.7rem 0.75rem;
+  /*
+   * The leading padding clears --r-card, because that is how wide the
+   * importance strip runs: at the old 0.75rem the tick and the in-flow grip sat
+   * six pixels inside it, drawn over the colour. Unconditional rather than only
+   * on a marked row, so nothing shifts when the mark goes on or comes off.
+   */
+  padding: 0.7rem 0.75rem 0.7rem 1.25rem;
   border-radius: var(--r-card);
 }
 
@@ -599,39 +605,52 @@ body.dragging-row {
   the way a pseudo-element sitting over the grip's hit area could.
 */
 /*
-  A group wears the mark as its own left edge, so the strip is exactly as wide
-  as the corner radius: its flat inner side lands precisely where the card's
-  curve ends, which makes the strip *be* the rounded corner rather than sit
-  inside it. Change --r-card and this follows.
+  A card wears the mark as its own left edge, so the strip is exactly as wide as
+  the corner radius: its flat inner side lands precisely where the card's curve
+  ends, which makes the strip *be* the rounded corner rather than sit inside it.
+  Change --r-card and this follows.
+
+  Groups and top-level items alike, because they are the same kind of thing to
+  the eye — two cards side by side in one list — and marking them differently
+  read as two different marks rather than one.
 */
+.list > .task.important,
 .group.important {
   background: linear-gradient(to right, var(--flag) 0 var(--r-card), var(--card) var(--r-card));
 }
 
 /*
-  An item is a row, not a container, so it takes a slim pill instead — the same
-  mark at the scale of the thing being marked. A strip that wide on a 56px card
-  would read as a colour block, and on a nested row it would swamp it.
+  A nested row has no card of its own, so it takes a slim pill instead — the
+  same mark at the scale of the thing being marked. A strip that wide would
+  swamp a row half the height of a card.
 
   `pointer-events: none` because it is decoration sitting exactly where the
   grip's hit area reaches: the row's leading edge.
 */
-.task.important::before {
+/*
+  An item inside an important group is important by inheritance, so it does not
+  also wear its own pill: the group's edge already says it, and repeating it on
+  every row says it several times over. The stored flag is untouched — unmark
+  the group and each item's own mark comes back.
+*/
+.group.important .items > .task.important::before {
+  display: none;
+}
+
+.items > .task.important::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 0.5rem;
-  bottom: 0.5rem;
-  width: 3px;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  /* A third of the edge a card wears, so the two marks are the same idea at two
+     scales and this follows if --r-card ever moves. At 3px it read as a
+     hairline next to the 1.5px rail; past 8px it stops being a capsule and
+     starts crowding the tick. */
+  width: calc(var(--r-card) / 3);
   border-radius: 999px;
   background: var(--flag);
   pointer-events: none;
-}
-
-/* A nested row is half the height of a card, so it keeps a tighter inset. */
-.items > .task.important::before {
-  top: 0.3rem;
-  bottom: 0.3rem;
 }
 
 .task.important > .label {

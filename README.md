@@ -37,7 +37,7 @@ that rather than merely promising it.
 - **One persistent list.** It's still there tomorrow. You edit it; nothing expires on its own.
 - **Groups, one level deep.** Enough to separate _Morning_ from _Work_, not enough to become an outliner.
 - **Counted items.** `make calls [3]` takes three ticks, and partial progress counts.
-- **Important items.** A trailing `!` — `call the bank!`, `# Work!` — gives a row an accent bar and a heavier word, and the `⋯` menu marks one without typing. A mark and nothing more: it never reorders anything, and it stays on once the row is finished, so you can still see what you got done.
+- **Important items.** A trailing `!` — `call the bank!`, `# Work!` — gives a row an accent edge and a heavier word, and the `⋯` menu marks one without typing. Marking a group marks everything in it, unmarking it clears them again, and marking every item in a group marks the group. A mark and nothing more: it never reorders anything, and it stays on once the row is finished, so you can still see what you got done.
 - **A day is scored on two gates.** Everything marked `!` has to be done, _and_ enough of the rest — 70% by default, and Settings → Behaviour moves the bar. So an almost-perfect day with one important thing still open is not a success, while a day with nothing marked is judged on the rest alone.
 - **The day's ring runs a rainbow.** Red at nothing done, **green** the moment the important work lands, **blue** the moment the rest clears the bar, **violet** at everything. All three are celebrated. The arc still measures the whole list — the colour is the verdict on it.
 - **A rewarding tick.** Springy rings that sweep indigo → green as each row fills in, a wiping strike-through, and confetti at every milestone.
@@ -51,14 +51,14 @@ that rather than merely promising it.
 
 ## Using it
 
-| Type this         | To get                                        |
-| ----------------- | --------------------------------------------- |
-| `shopping`        | a task                                        |
-| `make calls [3]`  | a task that takes three ticks                 |
-| `# Morning`       | a group, with the composer aimed at it        |
-| `call the bank!`  | an important task — `# Work!` marks a group   |
-| `make calls! [3]` | both; `make calls [3]!` reads the same        |
-| `ship it!!`       | an important `ship it!` — one `!` is the mark |
+| Type this         | To get                                                |
+| ----------------- | ----------------------------------------------------- |
+| `shopping`        | a task                                                |
+| `make calls [3]`  | a task that takes three ticks                         |
+| `# Morning`       | a group above the finished pile, composer aimed at it |
+| `call the bank!`  | an important task — `# Work!` marks a group           |
+| `make calls! [3]` | both; `make calls [3]!` reads the same                |
+| `ship it!!`       | an important `ship it!` — one `!` is the mark         |
 
 | Do this                                          | To                                                                                 |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------- |

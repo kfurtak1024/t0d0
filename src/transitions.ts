@@ -1,3 +1,4 @@
+import { settle } from "./marks";
 import { parse, parseTitle } from "./parse";
 import { allTasks, isDone } from "./progress";
 import { SCHEMA_VERSION } from "./types";
@@ -52,7 +53,18 @@ export function add(state: State, input: string, destId: string | null, now: num
   open(next, now);
 
   if (node.kind === "group") {
-    next.list.push(node);
+    /*
+     * A new group is work, so it lands with the work: above the first finished
+     * row rather than under the pile of things already done. Adding one at the
+     * end of a tidied list otherwise buried it, and the first thing you had to
+     * do with a group you had just made was drag it back up past the ticks.
+     *
+     * With nothing finished there is nothing to go in front of, so it appends —
+     * which is where it has always landed.
+     */
+    const pile = next.list.findIndex(isFinished);
+    if (pile < 0) next.list.push(node);
+    else next.list.splice(pile, 0, node);
     return { state: next, destId: node.id, added: node };
   }
 
@@ -60,6 +72,7 @@ export function add(state: State, input: string, destId: string | null, now: num
   if (target) {
     target.items.push(node);
     target.collapsed = false;
+    settle(next);
   } else {
     next.list.push(node);
   }
@@ -84,7 +97,10 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
     const head = parseTitle(value);
     if (!group || !head) return state;
     group.title = head.title;
+    // Editing the title is another way of marking the group, so it carries the
+    // same weight as the menu's: a group's mark is a statement about its items.
     group.important = head.important;
+    for (const task of group.items) task.important = head.important;
     return next;
   }
 
@@ -95,6 +111,7 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   task.target = parsed.target;
   task.important = parsed.important;
   task.count = Math.min(task.count, task.target);
+  settle(next);
   return next;
 }
 
@@ -108,9 +125,24 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
  */
 export function toggleImportant(state: State, id: string): State {
   const next = clone(state);
-  const node: Task | Group | undefined = findTask(next, id) ?? findGroup(next, id);
-  if (!node) return state;
-  node.important = !node.important;
+
+  /*
+   * A group's mark is a statement about everything in it, so setting it sets
+   * them and clearing it clears them. Clearing especially: leaving the items
+   * marked would have `settle` put the group's mark straight back, and the
+   * group could never be told "no".
+   */
+  const group = findGroup(next, id);
+  if (group) {
+    group.important = !group.important;
+    for (const task of group.items) task.important = group.important;
+    return next;
+  }
+
+  const task = findTask(next, id);
+  if (!task) return state;
+  task.important = !task.important;
+  settle(next);
   return next;
 }
 
@@ -120,6 +152,7 @@ export function remove(state: State, id: string): State {
   const owner = ownerOf(next, id);
   if (owner) {
     owner.items = owner.items.filter((task) => task.id !== id);
+    settle(next);
   } else {
     next.list = next.list.filter((node) => node.id !== id);
   }
@@ -223,6 +256,7 @@ export function reorder(
     owner.items.splice(index, 1);
     const at = next.list.findIndex((node) => node.id === owner.id);
     next.list.splice(dir === "up" ? at : at + 1, 0, task);
+    settle(next);
     return next;
   }
 
@@ -239,6 +273,7 @@ export function reorder(
     else neighbour.items.unshift(node);
     // Entering a folded group would look like the item vanishing.
     neighbour.collapsed = false;
+    settle(next);
     return next;
   }
 
@@ -319,6 +354,46 @@ export function rise(state: State, id: string): State {
   }
 }
 
+/**
+ * Which row a finished tick should tidy: the task itself, or the group holding
+ * it — and a group only once the whole of it is done, because one item
+ * finishing is not the group finishing. Null when there is nothing to send down
+ * yet.
+ */
+export function rowToTidy(state: State, taskId: string): string | null {
+  const owner = ownerOf(state, taskId);
+  if (!owner) return taskId;
+  return owner.items.every(isDone) ? owner.id : null;
+}
+
+/**
+ * Apply a batch of queued tidies as one change, so the rows travel together.
+ *
+ * **Bottom-most row first.** A row stops above the finished ones already
+ * resting below it, so sending the upper one first strands it on top of a
+ * sibling that has not travelled yet — it stays up in the work, and the pile
+ * ends up in an order nobody earned. Ordering by position is what makes two
+ * ticks in one breath land where the same two ticks spread over a minute would.
+ *
+ * Each row is re-checked on the way past: the list may have moved on since the
+ * tick — the row unticked, deleted, or dragged somewhere else — and a queued
+ * intention is not a licence to move something that is no longer done.
+ */
+export function tidyAll(state: State, ids: Iterable<string>): State {
+  const order = [...ids]
+    .map((id) => ({ id, at: state.list.findIndex((node) => node.id === id) }))
+    .filter((row) => row.at >= 0)
+    .sort((a, b) => b.at - a.at);
+
+  let next = state;
+  for (const { id } of order) {
+    const row = findRow(next, id);
+    if (!row || !isFinished(row)) continue;
+    next = sink(row.kind === "group" ? collapse(next, id) : next, id);
+  }
+  return next;
+}
+
 export type MoveDirection = "in" | "out";
 
 /** The nearest group above a root task — the one it would move into. */
@@ -358,6 +433,7 @@ export function move(state: State, id: string, dir: MoveDirection): State {
     next.list.splice(index, 1);
     group.items.push(task);
     group.collapsed = false;
+    settle(next);
     return next;
   }
 
@@ -367,6 +443,7 @@ export function move(state: State, id: string, dir: MoveDirection): State {
   owner.items = owner.items.filter((item) => item.id !== id);
   const at = next.list.findIndex((node) => node.id === owner.id);
   next.list.splice(at + 1, 0, task);
+  settle(next);
   return next;
 }
 
