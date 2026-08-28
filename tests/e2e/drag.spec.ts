@@ -340,6 +340,63 @@ test("the grip is what you hit when you press the grip", async ({ page }) => {
   expect(hits).toEqual(["G: grip grip grip", "nested: grip grip grip", "root: grip grip grip"]);
 });
 
+/*
+ * A second finger is not the drag's business. The end handlers used to take any
+ * pointerup at all, so a stray thumb resting on the list and lifting — the way
+ * a phone is actually held — ended the gesture the first finger was still
+ * holding, dropping the row wherever it had got to.
+ */
+test("a stray second finger does not end the drag", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  await settle(page);
+  const released = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll<HTMLElement>(".list > .task")];
+    const row = rows[1];
+    const grip = row?.querySelector<HTMLElement>(".grip");
+    const first = rows[0];
+    if (!grip || !row || !first) return false;
+
+    const box = grip.getBoundingClientRect();
+    const send = (type: string, y: number, pointerId: number): void => {
+      grip.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId,
+          pointerType: "touch",
+          isPrimary: pointerId === 1,
+          clientX: box.x + box.width / 2,
+          clientY: y,
+          button: 0,
+        }),
+      );
+    };
+
+    const from = box.y + box.height / 2;
+    const target = first.getBoundingClientRect();
+    const at = (i: number): number => from + ((target.top - from) * i) / 12;
+
+    send("pointerdown", from, 1);
+    // Two steps in — far enough to be a drag, nowhere near a swap yet.
+    send("pointermove", at(1), 1);
+    send("pointermove", at(2), 1);
+
+    // The second finger arrives and leaves while the first still holds the row.
+    send("pointerdown", at(2), 2);
+    send("pointerup", at(2), 2);
+
+    for (let i = 3; i <= 12; i++) send("pointermove", at(i), 1);
+    send("pointerup", target.top, 1);
+    return document.querySelectorAll(".dragging").length === 0;
+  });
+  expect(released).toBe(true);
+
+  // The gesture ran to completion, so the row landed where it was taken.
+  expect(await shape(page)).toEqual(["beta", "alpha"]);
+});
+
 test("a touch pointer drags too", async ({ page }) => {
   await addItem(page, "alpha");
   await addItem(page, "beta");

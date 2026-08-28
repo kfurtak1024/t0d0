@@ -89,7 +89,13 @@ export function scoreDay(state: State, bar: number): DayScore {
     hasImportant: important.length > 0,
     cleared,
     succeeded: total > 0 && cleared && restProgress >= bar,
-    complete: total > 0 && importantProgress >= 1 && restProgress >= 1,
+    /*
+     * Asked directly rather than inferred from the two progress figures. It
+     * keeps one definition of "done with the day" instead of two that could
+     * drift, and `every(isDone)` cannot round the way a mean approaching 1
+     * could.
+     */
+    complete: isComplete([...important, ...rest]),
     total,
   };
 }

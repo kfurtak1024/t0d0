@@ -55,15 +55,31 @@ describe("parse", () => {
 });
 
 describe("isGroupInput", () => {
-  it("agrees with what parse actually does with the line", () => {
+  it.each([
+    ["# Morning", true],
+    ["#Errands", true],
+    ["   # leading space", true],
+    // Still group input even though `parse` rejects it for having no title:
+    // the composer has to say "Top level" from the first keystroke.
+    ["#", true],
+    ["shopping", false],
+    ["make calls [3]", false],
+    ["ship it!", false],
+    ["a # b", false],
+    ["[3]", false],
+    ["", false],
+    ["   ", false],
+  ])("reads %j as %s", (line, expected) => {
+    expect(isGroupInput(line)).toBe(expected);
+  });
+
+  it("agrees with the branch parse actually takes", () => {
     // The composer previews this answer while you type, so a disagreement would
     // show "Top level" for something that lands in a group, or the reverse.
-    for (const line of ["# Morning", "#Errands", "  # spaced", "#", "shopping", "[3]", ""]) {
-      expect(isGroupInput(line)).toBe(parse(line)?.kind === "group" || line.trim().startsWith("#"));
+    // Only lines parse accepts, so the comparison is a real one.
+    for (const line of ["# Morning", "#Errands", "shopping", "make calls [3]", "ship it!"]) {
+      expect(isGroupInput(line)).toBe(parse(line)?.kind === "group");
     }
-    expect(isGroupInput("# Morning")).toBe(true);
-    expect(isGroupInput("shopping")).toBe(false);
-    expect(isGroupInput("  ")).toBe(false);
   });
 });
 

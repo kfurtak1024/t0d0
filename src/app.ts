@@ -243,10 +243,14 @@ export class App {
 
     this.#wire();
     this.#store.subscribe(() => {
-      this.#render();
+      // Scored once and handed to both: the ring and the milestones are asking
+      // the same question of the same list, and partitioning it twice per
+      // change is work that only ever grows.
+      const score = scoreDay(this.#state, this.#bar);
+      this.#render(score);
       // Every state change, not just a tick: deleting the last undone item
       // finishes the day just as much as ticking it does.
-      this.#checkMilestones();
+      this.#checkMilestones(score);
     });
   }
 
@@ -637,8 +641,8 @@ export class App {
    * two showers on the same frame read as one messy shower rather than as two
    * rewards. The lower moments are still spent, so they do not fire late.
    */
-  #checkMilestones(): void {
-    const reached = this.#reached(scoreDay(this.#state, this.#bar));
+  #checkMilestones(score = scoreDay(this.#state, this.#bar)): void {
+    const reached = this.#reached(score);
     const hit = [...MILESTONES]
       .reverse()
       .find((milestone) => reached[milestone] && this.#armed[milestone]);
@@ -670,7 +674,7 @@ export class App {
 
   /* ---------------------------------------------------------------- render */
 
-  #render(): void {
+  #render(score = scoreDay(this.#state, this.#bar)): void {
     if (this.#destId !== null && !T.findGroup(this.#state, this.#destId)) this.#destId = null;
 
     // Only reorders pay for the FLIP measurement — reading every row's box on
@@ -698,7 +702,6 @@ export class App {
      * a list can be most of the way done and still have an important item
      * outstanding, and the ring should say so rather than average it away.
      */
-    const score = scoreDay(this.#state, this.#bar);
     const hue = dayHue(score, this.#bar);
 
     this.#empty.hidden = this.#state.list.length > 0;

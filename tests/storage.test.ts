@@ -49,6 +49,22 @@ describe("save", () => {
     expect(back?.list).toHaveLength(1);
     expect((back?.list[0] as { text: string }).text).toBe("only in memory");
   });
+
+  it("stops falling back to memory once storage comes back", () => {
+    breakStorage();
+    save(state("written while blocked"));
+    vi.restoreAllMocks();
+
+    save(state("written for real"));
+
+    // Reading breaks again. The fallback must not resurrect the older copy —
+    // it is not the newest state any more, and quietly serving it would undo
+    // whatever happened while storage was working.
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    expect(load()).toBeNull();
+  });
 });
 
 describe("load", () => {

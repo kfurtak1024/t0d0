@@ -238,7 +238,8 @@ src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/render/       keyed DOM patching — list, task, group, ring, flip
-src/ui/           toast, day-summary sheet, drawer, row menu, drag, confetti, dom
+src/ui/           toast, day-summary sheet, drawer, row menu, drag, inline edit,
+                  focus trap, confetti, dom
 src/styles/       tokens.css first, then base.css, then app.css
 ```
 
@@ -254,6 +255,12 @@ puts the item in, dragging out over the same header takes it out, and a short ca
 empty group is barely taller than its header) still has a band left to drop into. The
 sliver at the bottom is the matching exit downwards, which the last item of the last group
 has no other route to.
+
+**Every pointer handler checks the pointer id**, both ends included, not just
+`pointermove`. A phone is held with more than one finger: without the check, a stray
+thumb touching the list and lifting ended the drag the first finger was still holding,
+and a second press mid-gesture took the drag over. Neither is reachable with a mouse, so
+neither shows up unless someone goes looking.
 
 **Entering and leaving must read the same lines.** The pointer is always in exactly one of
 above / inside / below, which is what stops a step undoing itself on the next frame. If

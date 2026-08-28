@@ -68,11 +68,17 @@ export class Dragger {
     list.addEventListener("pointermove", (event) => {
       this.#onMove(event);
     });
-    list.addEventListener("pointerup", () => {
-      this.#finish(true);
+    /*
+     * Both ends check the pointer, the same way `#onMove` does. Without it a
+     * second finger touching down and lifting anywhere on the list ends the
+     * drag the first one is still holding — invisible on a mouse, and the
+     * normal way of holding a phone.
+     */
+    list.addEventListener("pointerup", (event) => {
+      if (this.#isDragPointer(event)) this.#finish(true);
     });
-    list.addEventListener("pointercancel", () => {
-      this.#finish(false);
+    list.addEventListener("pointercancel", (event) => {
+      if (this.#isDragPointer(event)) this.#finish(false);
     });
     addEventListener("keydown", (event) => {
       if (event.key === "Escape" && this.#id !== null) {
@@ -82,6 +88,11 @@ export class Dragger {
     });
   }
 
+  /** Whether this event belongs to the gesture in progress. */
+  #isDragPointer(event: PointerEvent): boolean {
+    return this.#id !== null && event.pointerId === this.#pointer;
+  }
+
   #row(): HTMLElement | null {
     if (this.#id === null) return null;
     return this.#list.querySelector<HTMLElement>(`[data-id="${this.#id}"]`);
@@ -89,6 +100,9 @@ export class Dragger {
 
   #onDown(event: PointerEvent): void {
     if (event.button !== 0) return;
+    // A second finger during a drag is not a second drag; taking it would leave
+    // the first row glued to a pointer nothing is tracking any more.
+    if (this.#id !== null) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
     const grip = target.closest(".grip");

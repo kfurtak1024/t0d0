@@ -30,9 +30,9 @@
   --ring-lift: 10%;
 
   /* The importance mark. Warm and off the progress sweep's arc, so a flagged row
-     never reads as "nearly done" or as a warning. It only ever paints a 3px bar
-     and a bolder word, both non-text, so 3:1 against --card is the bar it has to
-     clear — not 4.5:1. */
+     never reads as "nearly done" or as a warning. It paints a group's left edge,
+     a slim pill on a row, and a bolder word — all non-text, so 3:1 against
+     --card is the bar it has to clear, not 4.5:1. */
   --flag: oklch(62% 0.16 62);
 
   /* Text sitting on a filled accent, and the destructive red. Both flip with

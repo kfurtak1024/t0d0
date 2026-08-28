@@ -48,7 +48,14 @@ export class Store {
     this.#emit();
   }
 
-  /** Replace wholesale (import, another tab) without keeping the old state. */
+  /**
+   * Replace wholesale (import, another tab) without keeping the old state.
+   *
+   * No identity guard, unlike {@link apply}, and deliberately so: that one is
+   * there because a transition can decline and hand back the state it was
+   * given. Nothing reaches here except a state parsed or built fresh, so the
+   * same check would be a line that can never run.
+   */
   replace(next: State, { undoable = false }: { undoable?: boolean } = {}): void {
     if (undoable) this.#undo = this.#state;
     this.#state = next;
