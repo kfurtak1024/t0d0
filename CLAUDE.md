@@ -73,6 +73,17 @@ Invariants worth defending in review:
   Green is a landmark **only when something is marked** — with nothing important the
   sweep runs straight from red to blue, because a list with nothing marked would
   otherwise open on green and read as "you are safe" before a single tick.
+- **The day's verdict is in words as well as in hue.** The closer's label follows
+  `scoreDay()` — "That's the day" / "The important work is done" / "That's a good day" /
+  "Everything done" — because hue is not a channel everyone has. Measured with a
+  dichromacy simulation: red and green come out at ΔE 4 for a deuteranope, and they are
+  the rainbow's two most meaningful landmarks, so the ring alone was a WCAG 1.4.1 failure.
+- **A lightness ramp along the rainbow was tried as a second channel and rejected.**
+  Measured, it broke white-on-`.ripe` contrast in light mode (4.71 → 3.99, against a 4.5
+  floor), still left red/green confusable (ΔE 4 → 9, against a ~12 threshold), and made
+  blue/violet _worse_ under protanopia (ΔE 8 → 2). Light mode's lightness headroom is
+  bounded by contrast on a white card, so hue cannot be rescued there. Do not re-try it
+  without re-running those three numbers.
 - **Only the day ring wears the rainbow.** Row rings keep `hueAt`'s indigo→green sweep,
   which ends on the same hue as the finished frame — a row whose ring and outline
   disagreed would be a bug. `paintRing`'s `colour` argument is the seam.

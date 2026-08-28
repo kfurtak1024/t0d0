@@ -14,6 +14,8 @@
   --nest: #f4f7fc;
   --ink: #191d26;
   --muted: #4b5466;
+  /* 4.58:1 on --bg — AA with 0.08 to spare. Darkening --bg or lightening this
+     breaks it, so re-measure rather than nudge. */
   --faint: #646c7b;
   --line: #e3e8f1;
   --track: #dfe5ef;

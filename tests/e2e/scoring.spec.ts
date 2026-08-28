@@ -124,6 +124,34 @@ test("a day with nothing marked runs red to blue, not green first", async ({ pag
   expect(hue).toBeLessThan(200);
 });
 
+/*
+ * The ring reports the day in hue, and hue is not a channel everyone has: red
+ * and green are one colour to a deuteranope, and those are the two landmarks
+ * that matter most. The closer says the same thing in words, on screen, without
+ * having to open the card to read it.
+ */
+test("the closer says how the day is going, not only the ring", async ({ page }) => {
+  await addItem(page, "call the bank!");
+  for (const text of ["a", "b", "c", "d"]) await addItem(page, text);
+
+  const closer = page.locator("#closeday");
+  await expect(closer).toHaveText(/That's the day/);
+
+  await tick(page, "call the bank, important").click();
+  await expect(closer).toHaveText(/The important work is done/);
+
+  // Three of four ordinary items is 75%, past the 70% bar.
+  for (const text of ["a", "b", "c"]) await tick(page, text).click();
+  await expect(closer).toHaveText(/That's a good day/);
+
+  await tick(page, "d").click();
+  await expect(closer).toHaveText(/Everything done/);
+
+  // And back down again when the day is no longer that.
+  await tick(page, "d").click();
+  await expect(closer).toHaveText(/That's a good day/);
+});
+
 test("the day card reports the verdict before it clears anything", async ({ page }) => {
   await addItem(page, "call the bank!");
   await addItem(page, "a");

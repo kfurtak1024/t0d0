@@ -52,6 +52,24 @@ interface Frame {
   done: number;
 }
 
+/**
+ * What the closer says about the day so far.
+ *
+ * The ring reports the same thing in hue, and hue is not a channel everyone
+ * has — red and green are one colour to a deuteranope, and those are the two
+ * landmarks that matter most. This is the verdict in words, on screen, without
+ * having to open the card to read it.
+ *
+ * Ordered by what outranks what, so a finished day is not also told the
+ * important things are done.
+ */
+function endLabel(score: DayScore): string {
+  if (score.complete) return "Everything done";
+  if (score.succeeded) return "That's a good day";
+  if (score.hasImportant && score.cleared) return "The important work is done";
+  return "That's the day";
+}
+
 /** Query a required element of the page, failing loudly rather than rendering nothing. */
 const el = (selector: string): HTMLElement => need(document, selector);
 
@@ -62,6 +80,7 @@ export class App {
   #list = el("#list");
   #empty = el("#empty");
   #closer = el("#closeday") as HTMLButtonElement;
+  #endLabel = el("#endlabel");
   #pct = el("#pct");
   #frac = el("#frac");
   #dest = el("#dest") as HTMLSelectElement;
@@ -728,6 +747,10 @@ export class App {
     this.#closer.style.setProperty("--end-tint", dayStroke(hue));
     this.#closer.classList.toggle("lit", frame.done > 0);
     this.#closer.classList.toggle("ripe", score.succeeded);
+    const label = endLabel(score);
+    // The button carries a live region's worth of meaning; only write changes,
+    // so a screen reader is not told the same thing on every tick.
+    if (this.#endLabel.textContent !== label) this.#endLabel.textContent = label;
 
     paintRing(this.#totalRing, tasks.length ? frame.done : 0, 1, dayStroke(hue));
     this.#totalRing.style.setProperty("--track-tint", dayStroke(hue, 0.2));
