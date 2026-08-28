@@ -51,14 +51,14 @@ that rather than merely promising it.
 
 ## Using it
 
-| Type this         | To get                                        |
-| ----------------- | --------------------------------------------- |
-| `shopping`        | a task                                        |
-| `make calls [3]`  | a task that takes three ticks                 |
-| `# Morning`       | a group, with the composer aimed at it        |
-| `call the bank!`  | an important task — `# Work!` marks a group   |
-| `make calls! [3]` | both; `make calls [3]!` reads the same        |
-| `ship it!!`       | an important `ship it!` — one `!` is the mark |
+| Type this         | To get                                                |
+| ----------------- | ----------------------------------------------------- |
+| `shopping`        | a task                                                |
+| `make calls [3]`  | a task that takes three ticks                         |
+| `# Morning`       | a group above the finished pile, composer aimed at it |
+| `call the bank!`  | an important task — `# Work!` marks a group           |
+| `make calls! [3]` | both; `make calls [3]!` reads the same                |
+| `ship it!!`       | an important `ship it!` — one `!` is the mark         |
 
 | Do this                                          | To                                                                                 |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
