@@ -92,65 +92,7 @@ export class App {
   constructor(store: Store) {
     this.#store = store;
 
-    const actions: RowActions = {
-      bump: (id, delta) => {
-        this.#bump(id, delta);
-      },
-      remove: (id) => {
-        this.#remove(id);
-      },
-      beginEdit: (element, id, isGroup) => {
-        this.#beginEdit(element, id, isGroup);
-      },
-      toggleCollapse: (id) => {
-        // Folding by hand outranks folding on your behalf: a pending tidy must
-        // not re-shut a group you just opened. Only this group's, though —
-        // whatever else is queued was nothing to do with the chevron you hit.
-        this.#tidyIds.delete(id);
-        this.#store.apply(T.toggleCollapse(this.#state, id));
-      },
-      openMenu: (anchor, id) => {
-        this.#menu.open(
-          anchor,
-          () => this.#menuItems(id),
-          () =>
-            this.#list.querySelector<HTMLElement>(
-              `[data-id="${id}"] > .dots, [data-id="${id}"] > .ghead > .dots`,
-            ),
-        );
-      },
-      aim: (id) => {
-        this.#destId = this.#destId === id ? null : id;
-        this.#render();
-        this.#input.focus();
-      },
-      isAimed: (id) => this.#destId === id,
-      isEditing: (id) => this.#editingId === id,
-    };
-
-    // A root row is a task or a group; narrow on update so neither renderer is
-    // ever handed the other's shape.
-    this.#rows = new KeyedList<Node>(this.#list, (node) => {
-      if (node.kind === "group") {
-        const entry = createGroup(node, actions);
-        return {
-          key: entry.key,
-          element: entry.element,
-          update: (next) => {
-            if (next.kind === "group") entry.update(next);
-          },
-        };
-      }
-      const entry = createTask(node, actions, false);
-      return {
-        key: entry.key,
-        element: entry.element,
-        update: (next) => {
-          if (next.kind === "task") entry.update(next);
-        },
-      };
-    });
-
+    this.#rows = this.#makeRows(this.#rowActions());
     el("#totalring").append(this.#totalRing);
 
     this.#toast = new Toast(el("#toast"), () => {
@@ -187,11 +129,87 @@ export class App {
     });
     this.#confetti = new Confetti(el("#confetti") as HTMLCanvasElement);
 
-    /*
-     * A drag is the same one-step reorder the keyboard uses, applied as the
-     * pointer crosses rows — so the steps are not individually undoable. The
-     * whole gesture is: one Ctrl-Z puts the list back where the drag found it.
-     */
+    this.#wireDrag();
+    this.#wireStore();
+    this.#wire();
+  }
+
+  /* ----------------------------------------------------------------- wiring */
+
+  /** What a rendered row is allowed to ask of the app. */
+  #rowActions(): RowActions {
+    return {
+      bump: (id, delta) => {
+        this.#bump(id, delta);
+      },
+      remove: (id) => {
+        this.#remove(id);
+      },
+      beginEdit: (element, id, isGroup) => {
+        this.#beginEdit(element, id, isGroup);
+      },
+      toggleCollapse: (id) => {
+        // Folding by hand outranks folding on your behalf: a pending tidy must
+        // not re-shut a group you just opened. Only this group's, though —
+        // whatever else is queued was nothing to do with the chevron you hit.
+        this.#tidyIds.delete(id);
+        this.#store.apply(T.toggleCollapse(this.#state, id));
+      },
+      openMenu: (anchor, id) => {
+        this.#menu.open(
+          anchor,
+          () => this.#menuItems(id),
+          () =>
+            this.#list.querySelector<HTMLElement>(
+              `[data-id="${id}"] > .dots, [data-id="${id}"] > .ghead > .dots`,
+            ),
+        );
+      },
+      aim: (id) => {
+        this.#destId = this.#destId === id ? null : id;
+        this.#render();
+        this.#input.focus();
+      },
+      isAimed: (id) => this.#destId === id,
+      isEditing: (id) => this.#editingId === id,
+    };
+  }
+
+  /**
+   * The keyed patch over the root list.
+   *
+   * A root row is a task or a group; narrow on update so neither renderer is
+   * ever handed the other's shape.
+   */
+  #makeRows(actions: RowActions): KeyedList<Node> {
+    return new KeyedList<Node>(this.#list, (node) => {
+      if (node.kind === "group") {
+        const entry = createGroup(node, actions);
+        return {
+          key: entry.key,
+          element: entry.element,
+          update: (next) => {
+            if (next.kind === "group") entry.update(next);
+          },
+        };
+      }
+      const entry = createTask(node, actions, false);
+      return {
+        key: entry.key,
+        element: entry.element,
+        update: (next) => {
+          if (next.kind === "task") entry.update(next);
+        },
+      };
+    });
+  }
+
+  /**
+   * A drag is the same one-step reorder the keyboard uses, applied as the
+   * pointer crosses rows — so the steps are not individually undoable. The
+   * whole gesture is: one Ctrl-Z puts the list back where the drag found it.
+   */
+  #wireDrag(): void {
     new Dragger(this.#list, {
       step: (id, dir, scope) => {
         if (!T.canReorder(this.#state, id, dir, scope)) return false;
@@ -224,7 +242,9 @@ export class App {
         this.#beforeDrag = null;
       },
     });
+  }
 
+  #wireStore(): void {
     // Warn once per outage, and again if storage comes back and fails afresh.
     this.#store.onPersist((ok) => {
       if (ok) {
@@ -236,7 +256,6 @@ export class App {
       this.#toast.show("Can't save — this list will be lost on reload");
     });
 
-    this.#wire();
     this.#store.subscribe(() => {
       // Scored once and handed to both: the ring and the milestones are asking
       // the same question of the same list, and partitioning it twice per
