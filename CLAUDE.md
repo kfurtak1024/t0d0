@@ -158,19 +158,23 @@ Invariants worth defending in review:
   intercept a tap — which is why the item's pill needs `pointer-events: none`, sitting
   as it does exactly where the grip's hit area reaches. Only the green finished outline
   is still a shadow slot (`--edge`).
-- **A group's mark speaks for everything in it.** An item inside an important group is
-  important by inheritance — `partition()` has always scored it that way — so it does not
-  also wear its own pill. Display only: the stored flag is untouched, and unmarking the
-  group brings each item's own mark back.
-- **A group whose every item is marked is promoted to important**, because those marks
-  were all saying the same thing. Three constraints on that, and each one is load-bearing:
-  it fires **on the marking**, not as a rule the state must always satisfy — re-derived,
-  the items would put the group's mark straight back and it could never be taken off; it
-  needs **more than one item**, because with a single item "all of them are marked" and
-  "this one is marked" are the same sentence; and **nothing demotes**, so a group marked
-  by hand stays marked. The cost of the first is that deleting a group's last unmarked
-  item does not promote it. The cost of the third is that an ordinary item added to a
-  promoted group becomes important by inheritance.
+- **A group's mark and its items' marks are one statement made two ways.** Setting the
+  group sets every item; clearing it clears every item; changing an item's own mark
+  re-reads the group from what is left. So an item inside an important group never wears
+  its own pill — the group's edge already says it, and repeating it on every row says it
+  several times over.
+- **Clearing a group has to reach its items**, and that is not a nicety. Left marked,
+  they would re-read the group as important on the next change and the group could never
+  be told "no" — the trap a standing "all marked implies marked" rule sets.
+- **`settle()` is asymmetric, deliberately.** One item saying it is _not_ important always
+  takes the group's mark off. One item saying it _is_ only puts the mark on when the group
+  holds more than one: with a single item, "all of them are marked" and "this one is
+  marked" are the same sentence, and promoting there would make every ordinary item added
+  afterwards important by inheritance.
+- **It runs when a mark changes, not on a move or a delete.** A group's mark is a
+  statement you made; it should not evaporate because an ordinary item was added to it,
+  nor appear because the last plain one was deleted. So an ordinary item added to a marked
+  group is important by inheritance — which is what marking the group said.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
   ", important". A bar and a font weight are a visual channel only.

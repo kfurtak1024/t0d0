@@ -38,27 +38,37 @@ const open = (state: State, now: number): void => {
 };
 
 /**
- * A group whose every item is marked is itself important — each of those marks
- * was saying the same thing, and the group can say it once.
+ * Re-read every group's mark from its items: important exactly when all of them
+ * are.
  *
- * Fires on the marking rather than standing as a rule the state must always
- * satisfy. Re-derived, it would make a group's own mark impossible to take off:
- * unmarking the group would leave the items marked, and they would put it
- * straight back. The price is that emptying a group down to its marked items
- * does not promote it — only marking one does.
+ * Run when an item's mark changes, which is the only thing that can make the
+ * two disagree. Not on a move or a delete: a group's mark is a statement you
+ * made, and it should not evaporate because an ordinary item was added to it or
+ * survive because the last plain one was deleted.
+ *
+ * This is what makes a group's mark removable. Taking it off clears the items
+ * too, so there is nothing left to put it straight back — the trap that a
+ * standing "all marked implies marked" rule would set.
+ *
+ * An empty group keeps whatever it was given: `# Work!` is a promise about a
+ * group you have not filled yet, and there is nothing in it to read.
  *
  * Mutates, because every caller is already working on a clone.
  */
-function promoteOwner(state: State, taskId: string): void {
-  const owner = ownerOf(state, taskId);
-  /*
-   * More than one item, not merely some. With a single item "all of them are
-   * marked" and "this one is marked" are the same sentence, and promoting says
-   * nothing the item had not already said — while quietly making every ordinary
-   * item added afterwards important by inheritance.
-   */
-  if (!owner || owner.important || owner.items.length < 2) return;
-  if (owner.items.every((task) => task.important)) owner.important = true;
+function settle(state: State): void {
+  for (const node of state.list) {
+    if (node.kind !== "group" || node.items.length === 0) continue;
+    const all = node.items.every((task) => task.important);
+    /*
+     * Asymmetric, and deliberately. One item saying it is not important is
+     * always enough to take the group's mark off. One item saying it *is* is
+     * not enough to put it on: with a single item, "all of them are marked" and
+     * "this one is marked" are the same sentence, and promoting would make
+     * every ordinary item added afterwards important by inheritance.
+     */
+    if (!all) node.important = false;
+    else if (node.items.length > 1) node.important = true;
+  }
 }
 
 export interface AddResult {
@@ -84,7 +94,9 @@ export function add(state: State, input: string, destId: string | null, now: num
   if (target) {
     target.items.push(node);
     target.collapsed = false;
-    if (node.important) promoteOwner(next, node.id);
+    // Only upwards: a marked item can complete the set, but an ordinary one
+    // arriving does not take the group's own mark away.
+    if (node.important) settle(next);
   } else {
     next.list.push(node);
   }
@@ -109,7 +121,10 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
     const head = parseTitle(value);
     if (!group || !head) return state;
     group.title = head.title;
+    // Editing the title is another way of marking the group, so it carries the
+    // same weight as the menu's: a group's mark is a statement about its items.
     group.important = head.important;
+    for (const task of group.items) task.important = head.important;
     return next;
   }
 
@@ -120,7 +135,7 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   task.target = parsed.target;
   task.important = parsed.important;
   task.count = Math.min(task.count, task.target);
-  if (task.important) promoteOwner(next, id);
+  settle(next);
   return next;
 }
 
@@ -134,10 +149,24 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
  */
 export function toggleImportant(state: State, id: string): State {
   const next = clone(state);
-  const node: Task | Group | undefined = findTask(next, id) ?? findGroup(next, id);
-  if (!node) return state;
-  node.important = !node.important;
-  if (node.kind === "task" && node.important) promoteOwner(next, id);
+
+  /*
+   * A group's mark is a statement about everything in it, so setting it sets
+   * them and clearing it clears them. Clearing especially: leaving the items
+   * marked would have `settle` put the group's mark straight back, and the
+   * group could never be told "no".
+   */
+  const group = findGroup(next, id);
+  if (group) {
+    group.important = !group.important;
+    for (const task of group.items) task.important = group.important;
+    return next;
+  }
+
+  const task = findTask(next, id);
+  if (!task) return state;
+  task.important = !task.important;
+  settle(next);
   return next;
 }
 

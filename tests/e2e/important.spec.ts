@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { addItem, clearStorage, seedStorage } from "./helpers";
 
 /**
@@ -6,6 +6,19 @@ import { addItem, clearStorage, seedStorage } from "./helpers";
  * browser can check is that the mark reaches the row, survives being edited and
  * reloaded, and never leaks into the text you see.
  */
+
+/**
+ * Whether a row is actually drawing its own pill.
+ *
+ * Both halves matter: a row that is not marked at all has no `::before` rule,
+ * so `content` comes back "none" while `display` still reports "block" —
+ * reading the display alone would call that shown.
+ */
+const wearsPill = (row: Locator): Promise<boolean> =>
+  row.evaluate((el) => {
+    const before = getComputedStyle(el, "::before");
+    return before.content !== "none" && before.display !== "none";
+  });
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -122,16 +135,21 @@ test("the row menu marks and unmarks an item", async ({ page }) => {
 test("the row menu marks a group, and a nested item", async ({ page }) => {
   await addItem(page, "# Morning");
   await addItem(page, "a");
-
-  const group = page.locator(".group");
-  await group.locator(".ghead .dots").click();
-  await page.getByRole("menuitem", { name: "Mark important" }).click();
-  await expect(group).toHaveClass(/important/);
+  await addItem(page, "b");
 
   const nested = page.locator(".items > .task", { hasText: "a" });
   await nested.locator(".dots").click();
-  await page.getByRole("menuitem", { name: "Mark important" }).click();
+  await page.getByRole("menuitem", { name: "Mark important", exact: true }).click();
   await expect(nested).toHaveClass(/important/);
+  // One of two, so the group is not yet making the same statement.
+  await expect(page.locator(".group")).not.toHaveClass(/important/);
+
+  const group = page.locator(".group");
+  await group.locator(".ghead .dots").click();
+  await page.getByRole("menuitem", { name: "Mark important", exact: true }).click();
+  await expect(group).toHaveClass(/important/);
+  // Marking the group marked what was left in it.
+  await expect(page.locator(".items > .task", { hasText: "b" })).toHaveClass(/important/);
 });
 
 test("marking from the menu is undoable", async ({ page }) => {
@@ -156,7 +174,7 @@ test("an item inside an important group does not wear its own mark", async ({ pa
   await addItem(page, "plain one");
 
   const marked = page.locator(".items > .task", { hasText: "marked one" });
-  const shown = () => marked.evaluate((el) => getComputedStyle(el, "::before").display !== "none");
+  const shown = () => wearsPill(marked);
 
   // The group is not important yet, so the item says so itself.
   await expect(page.locator(".group")).not.toHaveClass(/important/);
@@ -167,10 +185,32 @@ test("an item inside an important group does not wear its own mark", async ({ pa
   await expect(page.locator(".group")).toHaveClass(/important/);
   expect(await shown()).toBe(false);
 
-  // Unmark the group and the item's own mark comes back: it was only hidden.
+  // Marking the group marked everything in it, so the plain one is now marked
+  // too — and unmarking the group takes all of it back off.
   await page.locator(".group .ghead .dots").click();
   await page.getByRole("menuitem", { name: "Unmark important" }).click();
-  expect(await shown()).toBe(true);
+  await expect(page.locator(".group")).not.toHaveClass(/important/);
+  expect(await shown()).toBe(false);
+});
+
+/*
+ * A group and its items are one statement made two ways, so the two stay in
+ * step whichever end you change.
+ */
+test("unmarking one item takes the mark off the group", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "one!");
+  await addItem(page, "two!");
+
+  const group = page.locator(".group");
+  await expect(group).toHaveClass(/important/);
+
+  await page.locator(".items > .task", { hasText: "one" }).locator(".dots").click();
+  await page.getByRole("menuitem", { name: "Unmark important" }).click();
+
+  await expect(group).not.toHaveClass(/important/);
+  // The one still marked shows its own mark again, now the group is not saying it.
+  expect(await wearsPill(page.locator(".items > .task", { hasText: "two" }))).toBe(true);
 });
 
 /*
@@ -190,10 +230,12 @@ test("marking the last item promotes the group, which can still be unmarked", as
   await page.getByRole("menuitem", { name: "Mark important" }).click();
   await expect(group).toHaveClass(/important/);
 
-  // And it stays off when told to come off.
+  // And it stays off when told to come off: unmarking clears the items, so
+  // there is nothing left to put the group's mark straight back.
   await group.locator(".ghead .dots").click();
   await page.getByRole("menuitem", { name: "Unmark important" }).click();
   await expect(group).not.toHaveClass(/important/);
+  await expect(page.locator(".items > .task.important")).toHaveCount(0);
 });
 
 /*
