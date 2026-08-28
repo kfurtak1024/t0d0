@@ -210,6 +210,40 @@ test("each milestone is celebrated once, and a doubled crossing only once", asyn
 });
 
 /*
+ * `navigator.vibrate` cancels whatever is already playing, so on a tick that
+ * both finishes an item and crosses a milestone the order matters: the small
+ * tick buzz has to go first, or it silences the celebration a moment later.
+ * Counting calls cannot see this — only the last one actually plays.
+ */
+test("a milestone's own pattern is the haptic that survives the tick", async ({ page }) => {
+  await page.addInitScript(() => {
+    const log: (number | number[])[] = [];
+    (window as unknown as { buzzes: (number | number[])[] }).buzzes = log;
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: (pattern: number | number[]) => {
+        log.push(pattern);
+        return true;
+      },
+    });
+  });
+  await clearStorage(page);
+  await addItem(page, "call the bank!");
+
+  // One item, so this tick clears the important work, passes the bar and
+  // finishes the day all at once.
+  await tick(page, "call the bank, important").click();
+
+  const buzzes = await page.evaluate(
+    () => (window as unknown as { buzzes: (number | number[])[] }).buzzes,
+  );
+  // The tick's own buzz came first and the celebration came last, so the
+  // celebration is what the device actually plays.
+  expect(buzzes.at(0)).toBe(12);
+  expect(Array.isArray(buzzes.at(-1))).toBe(true);
+});
+
+/*
  * A tick that crosses both gates at once is one moment, not two: the last
  * important item landing on a list whose rest is already past the bar.
  */

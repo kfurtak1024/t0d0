@@ -8,7 +8,7 @@ export function beginEdit(
   initial: string,
   commit: (value: string) => void,
   cancel: () => void,
-): void {
+): () => void {
   element.textContent = initial;
   // Not "true": the label holds one line of plain text, and a rich paste would
   // otherwise drop styled nodes into the row mid-edit, while a multi-line one
@@ -51,4 +51,14 @@ export function beginEdit(
 
   element.addEventListener("keydown", onKey);
   element.addEventListener("blur", onBlur);
+
+  /*
+   * Call off the edit without committing it. For the case where the row is
+   * about to stop existing — an import, or another tab writing — because the
+   * blur that follows the node's removal would otherwise commit a rename into
+   * a list that is being replaced, and spend the undo slot doing it.
+   */
+  return () => {
+    finish(false);
+  };
 }

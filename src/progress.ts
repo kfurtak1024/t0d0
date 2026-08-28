@@ -19,8 +19,6 @@ export function progress(tasks: Task[]): number {
   return total / tasks.length;
 }
 
-export const overallProgress = (state: State): number => progress(allTasks(state.list));
-
 /** True only for a non-empty list with everything finished — 0/0 is not 100%. */
 export function isComplete(tasks: Task[]): boolean {
   return tasks.length > 0 && tasks.every(isDone);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allTasks, isDone, overallProgress } from "../src/progress";
+import { allTasks, isDone, progress } from "../src/progress";
 import * as T from "../src/transitions";
 import type { Group, State, Task } from "../src/types";
 
@@ -213,7 +213,7 @@ describe("the mark is only a mark", () => {
 
   it("leaves progress alone", () => {
     const state = build(["a!", "b"]);
-    expect(overallProgress(state)).toBe(0);
+    expect(progress(allTasks(state.list))).toBe(0);
   });
 });
 
