@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { allTasks, isDone, progress } from "../src/progress";
 import * as T from "../src/transitions";
@@ -945,5 +946,109 @@ describe("purity", () => {
     T.toggleCollapse(before, groupOf(before, "Morning").id);
 
     expect(JSON.stringify(before)).toBe(snapshot);
+  });
+});
+
+/*
+ * `settle` is called from eight places across six transitions, and the way that
+ * goes wrong is a seventh transition being added without one. Rather than tidy
+ * the call sites — there is no chokepoint to funnel them through — this asserts
+ * the invariant itself after every step of an arbitrary run.
+ *
+ * The rule is written out here rather than imported, on purpose: asking the
+ * implementation whether it agrees with itself would pass for the wrong reason.
+ */
+describe("the group mark holds under any sequence of transitions", () => {
+  const unsettled = (state: State): string[] =>
+    state.list
+      .filter((node): node is Group => node.kind === "group" && node.items.length > 0)
+      .filter((group) => group.important !== group.items.every((task) => task.important))
+      .map((group) => group.title);
+
+  const seed = (): State => {
+    let state = T.add(T.blank(), "# Alpha", null, NOW).state;
+    const alpha = groupOf(state, "Alpha").id;
+    state = T.add(state, "a1", alpha, NOW).state;
+    state = T.add(state, "a2!", alpha, NOW).state;
+    state = T.add(state, "# Beta", null, NOW).state;
+    const beta = groupOf(state, "Beta").id;
+    state = T.add(state, "b1!", beta, NOW).state;
+    state = T.add(state, "b2!", beta, NOW).state;
+    state = T.add(state, "loose", null, NOW).state;
+    return T.add(state, "loose2!", null, NOW).state;
+  };
+
+  type Op =
+    | { do: "mark"; at: number }
+    | { do: "remove"; at: number }
+    | { do: "in"; at: number }
+    | { do: "out"; at: number }
+    | { do: "up"; at: number }
+    | { do: "down"; at: number }
+    | { do: "addPlain"; at: number }
+    | { do: "addMarked"; at: number }
+    | { do: "renamePlain"; at: number }
+    | { do: "renameMarked"; at: number };
+
+  const step = (state: State, op: Op, n: number): State => {
+    const rows = [...state.list.map((node) => node.id), ...allTasks(state.list).map((t) => t.id)];
+    if (rows.length === 0) return state;
+    const id = rows[op.at % rows.length] as string;
+    const isGroup = state.list.some((node) => node.kind === "group" && node.id === id);
+    const groups = state.list.filter((node): node is Group => node.kind === "group");
+    const dest = groups.length ? (groups[op.at % groups.length] as Group).id : null;
+
+    switch (op.do) {
+      case "mark":
+        return T.toggleImportant(state, id);
+      case "remove":
+        return T.remove(state, id);
+      case "in":
+        return T.move(state, id, "in");
+      case "out":
+        return T.move(state, id, "out");
+      case "up":
+        return T.reorder(state, id, "up", "list");
+      case "down":
+        return T.reorder(state, id, "down", "list");
+      case "addPlain":
+        return T.add(state, `p${String(n)}`, dest, NOW).state;
+      case "addMarked":
+        return T.add(state, `m${String(n)}!`, dest, NOW).state;
+      case "renamePlain":
+        return T.retitle(state, id, `r${String(n)}`, isGroup);
+      case "renameMarked":
+        return T.retitle(state, id, `r${String(n)}!`, isGroup);
+    }
+  };
+
+  const anyOp = fc.record({
+    do: fc.constantFrom<Op["do"]>(
+      "mark",
+      "remove",
+      "in",
+      "out",
+      "up",
+      "down",
+      "addPlain",
+      "addMarked",
+      "renamePlain",
+      "renameMarked",
+    ),
+    at: fc.nat({ max: 40 }),
+  }) as fc.Arbitrary<Op>;
+
+  it("never leaves a group disagreeing with its items", () => {
+    fc.assert(
+      fc.property(fc.array(anyOp, { minLength: 1, maxLength: 25 }), (ops) => {
+        let state = seed();
+        expect(unsettled(state)).toEqual([]);
+        ops.forEach((op, n) => {
+          state = step(state, op, n);
+          expect(unsettled(state)).toEqual([]);
+        });
+      }),
+      { numRuns: 300 },
+    );
   });
 });

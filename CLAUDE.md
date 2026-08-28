@@ -166,8 +166,9 @@ Invariants worth defending in review:
 - **Clearing a group has to reach its items**, and that is not a nicety. Left marked,
   they would re-read the group as important on the next change and the group could never
   be told "no" — the trap a standing "all marked implies marked" rule sets.
-- **A group's mark is derived from its items, in both directions.** `settle()` runs on
-  every change to a mark or to membership: a group is important exactly when everything in
+- **A group's mark is derived from its items, in both directions.** `settle()` in
+  `src/marks.ts` runs on every change to a mark or to membership, and on everything
+  arriving through `normalize()`: a group is important exactly when everything in
   it is. Deriving one way only was tried and was wrong twice over — it made the mark
   depend on the order rows arrived in (`a! b! plain` left a group marked where
   `plain a! b!` did not), and it let a plain row dropped into a marked group become
@@ -175,6 +176,13 @@ Invariants worth defending in review:
 - **Deriving both ways is also what makes the mark removable.** Clearing a group clears
   its items, so nothing is left to put the mark straight back — the trap a one-directional
   "all marked implies marked" rule sets.
+- **The derivation is enforced by a property test, not by tidy call sites.** It runs from
+  eight places across six transitions and there is no chokepoint to funnel them through,
+  so the way it goes wrong is a seventh transition arriving without one.
+  `tests/transitions.test.ts` folds arbitrary runs of transitions and asserts the
+  invariant after every step — removing any one of the eight calls fails it. The rule is
+  written out again in that test rather than imported: asking the implementation whether
+  it agrees with itself would pass for the wrong reason.
 - **An empty group keeps the mark it was given.** `# Work!` is a promise about a group you
   have not filled yet and there is nothing in it to read; the first row you put in decides
   it from then on, which is why that `!` does not survive an ordinary first item.
@@ -260,6 +268,7 @@ src/theme.ts      theme preference, in its own storage key
 src/prefs.ts      behaviour preferences, in their own storage key
 src/types.ts      Task, Group, State, and the limits
 src/normalize.ts  the single gate for data arriving from outside
+src/marks.ts      a group's mark, derived from its items
 src/storage.ts    load/save against one localStorage key
 src/store.ts      the live state, persistence, and one level of undo
 src/transitions.ts  every state change as State -> State

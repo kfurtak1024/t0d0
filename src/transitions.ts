@@ -1,3 +1,4 @@
+import { settle } from "./marks";
 import { parse, parseTitle } from "./parse";
 import { allTasks, isDone } from "./progress";
 import { SCHEMA_VERSION } from "./types";
@@ -36,36 +37,6 @@ export const ownerOf = (state: State, id: string): Group | undefined =>
 const open = (state: State, now: number): void => {
   state.openedAt ??= now;
 };
-
-/**
- * Re-read every group's mark from the items it holds: important exactly when
- * all of them are.
- *
- * A group's mark and its items' marks are one statement made two ways, and the
- * items are the ones that carry it. So the group is derived rather than stored
- * in its own right, and any change to membership or to a mark runs this.
- *
- * Total, in both directions, which is what keeps it honest. Deriving in one
- * direction only made the mark depend on the order rows were added: `a! b!
- * plain` left a group marked where `plain a! b!` did not, and a plain row
- * dropped into a marked group became important without anyone saying so.
- *
- * Deriving both ways is also what makes the mark removable. Clearing a group
- * clears its items, so there is nothing left to put the mark straight back —
- * the trap a one-directional rule sets.
- *
- * An empty group keeps whatever it was given: `# Work!` is a promise about a
- * group you have not filled yet, and there is nothing in it to read. The first
- * row you put in decides it from then on.
- *
- * Mutates, because every caller is already working on a clone.
- */
-function settle(state: State): void {
-  for (const node of state.list) {
-    if (node.kind !== "group" || node.items.length === 0) continue;
-    node.important = node.items.every((task) => task.important);
-  }
-}
 
 export interface AddResult {
   state: State;

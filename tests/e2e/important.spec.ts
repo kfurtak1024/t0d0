@@ -293,7 +293,9 @@ test("a finished important row is still tellable from an ordinary one", async ({
         title: "Admin",
         collapsed: false,
         important: true,
-        items: [{ kind: "task", id: "a1", text: "file it", target: 1, count: 1, important: false }],
+        // Marked all the way down, because a group's mark is read from its
+        // items — a group claiming otherwise is repaired on the way in.
+        items: [{ kind: "task", id: "a1", text: "file it", target: 1, count: 1, important: true }],
       },
       {
         kind: "group",

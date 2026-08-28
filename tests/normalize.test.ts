@@ -122,6 +122,41 @@ describe("normalize", () => {
     expect(state?.list.map((node) => node.important)).toEqual([false, true, false, false, true]);
   });
 
+  /*
+   * A group's mark is derived from its items, so a backup that disagrees with
+   * itself is repaired on the way in. Left alone, it would survive until some
+   * unrelated edit ran the derivation and took the mark off a group nobody had
+   * touched.
+   */
+  it("settles a group whose mark disagrees with its items", () => {
+    const state = normalize(
+      wrap([
+        {
+          kind: "group",
+          title: "Claims to be important",
+          important: true,
+          items: [
+            { kind: "task", text: "marked", important: true },
+            { kind: "task", text: "plain" },
+          ],
+        },
+        {
+          kind: "group",
+          title: "Does not, but is",
+          important: false,
+          items: [
+            { kind: "task", text: "a", important: true },
+            { kind: "task", text: "b", important: true },
+          ],
+        },
+        // Nothing to read a mark from, so an empty group keeps the one it has.
+        { kind: "group", title: "Empty", important: true, items: [] },
+      ]),
+    );
+
+    expect(state?.list.map((node) => node.important)).toEqual([false, true, true]);
+  });
+
   it("truncates oversized text instead of rejecting the item", () => {
     const state = normalize(wrap([{ kind: "task", text: "x".repeat(1000) }]));
     expect((state?.list[0] as { text: string }).text).toHaveLength(200);
