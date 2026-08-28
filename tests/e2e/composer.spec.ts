@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { addItem, clearStorage } from "./helpers";
+import { expect, test, type Page } from "@playwright/test";
+import { addItem, clearStorage, shape } from "./helpers";
 
 /**
  * Where the composer says the next item is going.
@@ -7,6 +7,9 @@ import { addItem, clearStorage } from "./helpers";
  * "Adding to" is a promise about the item you are about to add, so it has to be
  * right before you press Enter, not after.
  */
+
+const tick = (page: Page, text: string) =>
+  page.locator(".task", { hasText: text }).locator(".tick");
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -64,6 +67,32 @@ test("typing a # switches the row to Top level, and giving it up restores the ai
   await expect(
     page.locator(".group", { hasText: "Morning" }).locator(".items > .task"),
   ).toHaveCount(1);
+});
+
+/*
+ * A new group is work, so it goes with the work. Landing it at the end of a
+ * tidied list buried it under the ticks, and the first thing you did with it
+ * was drag it back up.
+ *
+ * The finished row has to be one the tidy actually moves, so that awaiting the
+ * new shape proves the tidy has run. Ticking the last row instead leaves the
+ * tidy pending, and it then sinks that row past the new group — reaching the
+ * same arrangement by a route that hides whether the placement works at all.
+ */
+test("a new group lands above what is already finished", async ({ page }) => {
+  for (const text of ["first", "second", "third"]) await addItem(page, text);
+
+  await tick(page, "first").click();
+  await expect.poll(() => shape(page)).toEqual(["second", "third", "first"]);
+
+  await addItem(page, "# Morning");
+  await expect.poll(() => shape(page)).toEqual(["second", "third", "# Morning", "first"]);
+
+  // And the composer is aimed at it, so the next item goes inside.
+  await addItem(page, "eat breakfast");
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["second", "third", "# Morning", "  eat breakfast", "first"]);
 });
 
 test("a group typed while one is aimed still lands at the root", async ({ page }) => {

@@ -94,6 +94,12 @@ Invariants worth defending in review:
   until it has played out. Folding a group by hand cancels that group's pending
   tidy, and only that one. The fold and the drop are **one state change**, so
   the card travels under FLIP instead of vanishing here and reappearing there.
+- **A new group lands above the first finished row**, not at the end of the list. It is
+  work, so it goes with the work — appending it buried a group you had just made under
+  the ticks, and the first thing you did with it was drag it back up. With nothing
+  finished there is nothing to go in front of, so it appends, which is where it always
+  landed. Root tasks still append: the composer aims at a new group, so an item you add
+  next goes inside it rather than needing a place of its own.
 - **A finished row sinks to the foot of the unfinished list**, stopping above
   the run of finished rows already resting there — the pile keeps the order it
   was earned rather than each arrival burying the last. A ticked root item and a

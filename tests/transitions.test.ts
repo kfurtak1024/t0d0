@@ -70,6 +70,45 @@ describe("add", () => {
     expect(groupOf(state, "Morning").important).toBe(false);
   });
 
+  /*
+   * A new group is work. Landing it at the very end put it under whatever had
+   * already been ticked off, so the first thing you did with a group you had
+   * just made was drag it back up past the pile.
+   */
+  it("lands a new group above the first finished row", () => {
+    let state = build(["a", "b"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    expect(shape(state)).toEqual(["a", "b"]);
+
+    state = T.add(state, "# Morning", null, NOW).state;
+    expect(shape(state)).toEqual(["# Morning", "a", "b"]);
+  });
+
+  it("counts a cleared group as a finished row to go in front of", () => {
+    let state = build(["# Done", "x"]);
+    state = T.bump(state, taskOf(state, "x").id, 1, NOW);
+    state = T.add(state, "# Fresh", null, NOW).state;
+
+    expect(shape(state)).toEqual(["# Fresh", "# Done", "  x"]);
+  });
+
+  it("appends when nothing is finished, as it always did", () => {
+    let state = build(["a", "b"]);
+    state = T.add(state, "# Morning", null, NOW).state;
+    expect(shape(state)).toEqual(["a", "b", "# Morning"]);
+  });
+
+  it("still aims the composer at the group it just made", () => {
+    let state = build(["a"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    const result = T.add(state, "# Morning", null, NOW);
+
+    expect(result.destId).toBe(groupOf(result.state, "Morning").id);
+    // And the next item lands inside it, not beside it.
+    const next = T.add(result.state, "eat breakfast", result.destId, NOW).state;
+    expect(shape(next)).toEqual(["# Morning", "  eat breakfast", "a"]);
+  });
+
   it("appends a root task when nothing is aimed", () => {
     const state = build(["shopping"]);
     expect(state.list).toHaveLength(1);

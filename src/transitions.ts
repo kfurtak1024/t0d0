@@ -53,7 +53,18 @@ export function add(state: State, input: string, destId: string | null, now: num
   open(next, now);
 
   if (node.kind === "group") {
-    next.list.push(node);
+    /*
+     * A new group is work, so it lands with the work: above the first finished
+     * row rather than under the pile of things already done. Adding one at the
+     * end of a tidied list otherwise buried it, and the first thing you had to
+     * do with a group you had just made was drag it back up past the ticks.
+     *
+     * With nothing finished there is nothing to go in front of, so it appends —
+     * which is where it has always landed.
+     */
+    const pile = next.list.findIndex(isFinished);
+    if (pile < 0) next.list.push(node);
+    else next.list.splice(pile, 0, node);
     return { state: next, destId: node.id, added: node };
   }
 
