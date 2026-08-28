@@ -166,22 +166,18 @@ Invariants worth defending in review:
 - **Clearing a group has to reach its items**, and that is not a nicety. Left marked,
   they would re-read the group as important on the next change and the group could never
   be told "no" — the trap a standing "all marked implies marked" rule sets.
-- **`settleGroup()` is asymmetric, deliberately.** Only an explicit unmark may take a
-  group's mark off: a group's mark is a statement you made, and adding an ordinary item to
-  it or deleting a row out of it should not take that back. Completing the set is
-  different, so an add or a delete may _promote_ — removing the last item that
-  contradicted "everything here matters" finishes the sentence. Promoting also needs more
-  than one item, because with a single item "all of them are marked" and "this one is
-  marked" are the same sentence, and promoting there would make every ordinary item added
-  afterwards important by inheritance.
-- **It is scoped to the one group whose items changed.** Sweeping the list let a change in
-  one group take the mark off another that had been marked as a whole and still held
-  ordinary rows — which is what it did until a test went looking for it.
-- **The mark is therefore path-dependent, and that is the accepted cost.** Adding
-  `a! b! plain` leaves the group marked; `plain a! b!` does not, because the first order
-  promotes before the plain row arrives and no add demotes. Unmarking the group is always
-  the way out. The alternative — demoting on every add — makes `# Work!` evaporate the
-  moment you put anything ordinary in it.
+- **A group's mark is derived from its items, in both directions.** `settle()` runs on
+  every change to a mark or to membership: a group is important exactly when everything in
+  it is. Deriving one way only was tried and was wrong twice over — it made the mark
+  depend on the order rows arrived in (`a! b! plain` left a group marked where
+  `plain a! b!` did not), and it let a plain row dropped into a marked group become
+  important without anyone saying so.
+- **Deriving both ways is also what makes the mark removable.** Clearing a group clears
+  its items, so nothing is left to put the mark straight back — the trap a one-directional
+  "all marked implies marked" rule sets.
+- **An empty group keeps the mark it was given.** `# Work!` is a promise about a group you
+  have not filled yet and there is nothing in it to read; the first row you put in decides
+  it from then on, which is why that `!` does not survive an ordinary first item.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
   ", important". A bar and a font weight are a visual channel only.

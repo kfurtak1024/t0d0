@@ -63,9 +63,10 @@ const taskOf = (state: State, text: string): Task =>
 describe("add", () => {
   it("carries the importance mark through to the stored row", () => {
     const state = build(["# Morning!", "call the bank!", "water plants"]);
-    expect(groupOf(state, "Morning").important).toBe(true);
     expect(taskOf(state, "call the bank").important).toBe(true);
     expect(taskOf(state, "water plants").important).toBe(false);
+    // The group reads itself from its items, and one of them is not marked.
+    expect(groupOf(state, "Morning").important).toBe(false);
   });
 
   it("appends a root task when nothing is aimed", () => {
@@ -467,27 +468,36 @@ describe("a group and its items", () => {
     expect(groupOf(state, "Morning").important).toBe(true);
   });
 
-  /*
-   * A move or a delete is not a statement about importance, so neither takes a
-   * group's mark away — an ordinary item added to a marked group is important
-   * by inheritance, which is what marking the group said in the first place.
-   */
-  it("keeps its mark when an ordinary item is added to it", () => {
-    let state = build(["# Morning!"]);
-    state = T.add(state, "errand", groupOf(state, "Morning").id, NOW).state;
+  it("becomes important as soon as its only item is marked", () => {
+    // One marked item is the whole of the group, so the group says the same.
+    let state = build(["# Morning", "a"]);
+    expect(groupOf(state, "Morning").important).toBe(false);
 
+    state = T.toggleImportant(state, taskOf(state, "a").id);
     expect(groupOf(state, "Morning").important).toBe(true);
-    expect(taskOf(state, "errand").important).toBe(false);
   });
 
   /*
-   * Completing the set is not the same as taking the mark away: deleting the
-   * last item that contradicted "everything here matters" finishes the
-   * sentence, so the group says it once instead of on every remaining row.
+   * Derived both ways, so the mark cannot depend on the order rows arrived in
+   * and a plain row cannot become important without anyone saying so.
    */
+  it("loses its mark when an ordinary item is added to it", () => {
+    let state = build(["# Morning!"]);
+    state = T.add(state, "errand", groupOf(state, "Morning").id, NOW).state;
+
+    expect(groupOf(state, "Morning").important).toBe(false);
+    expect(taskOf(state, "errand").important).toBe(false);
+  });
+
+  it("reads the same whichever order its rows arrived in", () => {
+    const marksFirst = build(["# Morning", "a!", "b!", "plain"]);
+    const plainFirst = build(["# Evening", "plain", "a!", "b!"]);
+
+    expect(groupOf(marksFirst, "Morning").important).toBe(false);
+    expect(groupOf(plainFirst, "Evening").important).toBe(false);
+  });
+
   it("becomes important when the last ordinary item is deleted out of it", () => {
-    // The plain one first: adding it after the marked pair would have found the
-    // group already promoted, and an add never takes a mark back off.
     let state = build(["# Morning", "plain", "a!", "b!"]);
     expect(groupOf(state, "Morning").important).toBe(false);
 
@@ -495,38 +505,18 @@ describe("a group and its items", () => {
     expect(groupOf(state, "Morning").important).toBe(true);
   });
 
-  it("keeps its mark when an ordinary item is deleted out of it", () => {
-    // The group was marked as a whole; deleting one of its rows is not a
-    // statement that it no longer matters.
-    let state = build(["# Morning!"]);
-    state = T.add(state, "one", groupOf(state, "Morning").id, NOW).state;
-    state = T.add(state, "two", groupOf(state, "Morning").id, NOW).state;
-
-    state = T.remove(state, taskOf(state, "one").id);
-    expect(groupOf(state, "Morning").important).toBe(true);
-  });
-
-  /*
-   * Re-reading is scoped to the group whose items changed. Sweeping the list
-   * would let a change here take the mark off a group over there that had been
-   * marked as a whole and still held ordinary rows.
-   */
-  it("leaves other groups alone when one of its items changes", () => {
-    let state = build(["# Work!"]);
-    const work = groupOf(state, "Work").id;
-    state = T.add(state, "chore", work, NOW).state;
-    expect(groupOf(state, "Work").important).toBe(true);
-
-    state = T.add(state, "# Morning", null, NOW).state;
-    const morning = groupOf(state, "Morning").id;
-    state = T.add(state, "x!", morning, NOW).state;
-    state = T.add(state, "y!", morning, NOW).state;
+  it("follows an item moved into it, and again when it leaves", () => {
+    let state = build(["# Morning", "a!"]);
+    state = T.add(state, "loose", null, NOW).state;
     expect(groupOf(state, "Morning").important).toBe(true);
 
-    // Unmarking over in Morning must not reach into Work.
-    state = T.toggleImportant(state, taskOf(state, "x").id);
+    // A plain row moving in makes the group's statement untrue.
+    state = T.move(state, taskOf(state, "loose").id, "in");
     expect(groupOf(state, "Morning").important).toBe(false);
-    expect(groupOf(state, "Work").important).toBe(true);
+
+    // And taking it back out makes it true again.
+    state = T.move(state, taskOf(state, "loose").id, "out");
+    expect(groupOf(state, "Morning").important).toBe(true);
   });
 });
 

@@ -194,6 +194,27 @@ test("an item inside an important group does not wear its own mark", async ({ pa
 });
 
 /*
+ * The reported gap: a plain group given a marked item is a group all of whose
+ * items are marked, and it should say so.
+ */
+test("a group takes the mark when the only item put in it is marked", async ({ page }) => {
+  await addItem(page, "# Morning");
+  const group = page.locator(".group");
+  await expect(group).not.toHaveClass(/important/);
+
+  await addItem(page, "ship it!");
+  await expect(group).toHaveClass(/important/);
+
+  // And gives it back when something plain joins, rather than quietly making
+  // that plain row important by inheritance.
+  await addItem(page, "water plants");
+  await expect(group).not.toHaveClass(/important/);
+  await expect(page.locator(".items > .task", { hasText: "water plants" })).not.toHaveClass(
+    /important/,
+  );
+});
+
+/*
  * A group and its items are one statement made two ways, so the two stay in
  * step whichever end you change.
  */
