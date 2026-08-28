@@ -147,6 +147,56 @@ test("marking from the menu is undoable", async ({ page }) => {
 });
 
 /*
+ * A group's mark speaks for everything in it, so the items stop repeating it.
+ * Their own flags are untouched — this is what is shown, not what is stored.
+ */
+test("an item inside an important group does not wear its own mark", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "marked one!");
+  await addItem(page, "plain one");
+
+  const marked = page.locator(".items > .task", { hasText: "marked one" });
+  const shown = () => marked.evaluate((el) => getComputedStyle(el, "::before").display !== "none");
+
+  // The group is not important yet, so the item says so itself.
+  await expect(page.locator(".group")).not.toHaveClass(/important/);
+  expect(await shown()).toBe(true);
+
+  await page.locator(".group .ghead .dots").click();
+  await page.getByRole("menuitem", { name: "Mark important" }).click();
+  await expect(page.locator(".group")).toHaveClass(/important/);
+  expect(await shown()).toBe(false);
+
+  // Unmark the group and the item's own mark comes back: it was only hidden.
+  await page.locator(".group .ghead .dots").click();
+  await page.getByRole("menuitem", { name: "Unmark important" }).click();
+  expect(await shown()).toBe(true);
+});
+
+/*
+ * Several marks all saying the same thing become one on the group. It happens
+ * on the marking, not as a standing rule — otherwise the items would put the
+ * group's mark straight back and it could never be taken off.
+ */
+test("marking the last item promotes the group, which can still be unmarked", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "one!");
+  await addItem(page, "two");
+
+  const group = page.locator(".group");
+  await expect(group).not.toHaveClass(/important/);
+
+  await page.locator(".items > .task", { hasText: "two" }).locator(".dots").click();
+  await page.getByRole("menuitem", { name: "Mark important" }).click();
+  await expect(group).toHaveClass(/important/);
+
+  // And it stays off when told to come off.
+  await group.locator(".ghead .dots").click();
+  await page.getByRole("menuitem", { name: "Unmark important" }).click();
+  await expect(group).not.toHaveClass(/important/);
+});
+
+/*
  * A finished important row has to stay recognisable as one.
  *
  * The mark was suppressed on finished rows at first, on the grounds that the

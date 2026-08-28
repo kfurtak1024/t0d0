@@ -627,6 +627,16 @@ body.dragging-row {
   `pointer-events: none` because it is decoration sitting exactly where the
   grip's hit area reaches: the row's leading edge.
 */
+/*
+  An item inside an important group is important by inheritance, so it does not
+  also wear its own pill: the group's edge already says it, and repeating it on
+  every row says it several times over. The stored flag is untouched — unmark
+  the group and each item's own mark comes back.
+*/
+.group.important .items > .task.important::before {
+  display: none;
+}
+
 .items > .task.important::before {
   content: "";
   position: absolute;

@@ -37,6 +37,30 @@ const open = (state: State, now: number): void => {
   state.openedAt ??= now;
 };
 
+/**
+ * A group whose every item is marked is itself important — each of those marks
+ * was saying the same thing, and the group can say it once.
+ *
+ * Fires on the marking rather than standing as a rule the state must always
+ * satisfy. Re-derived, it would make a group's own mark impossible to take off:
+ * unmarking the group would leave the items marked, and they would put it
+ * straight back. The price is that emptying a group down to its marked items
+ * does not promote it — only marking one does.
+ *
+ * Mutates, because every caller is already working on a clone.
+ */
+function promoteOwner(state: State, taskId: string): void {
+  const owner = ownerOf(state, taskId);
+  /*
+   * More than one item, not merely some. With a single item "all of them are
+   * marked" and "this one is marked" are the same sentence, and promoting says
+   * nothing the item had not already said — while quietly making every ordinary
+   * item added afterwards important by inheritance.
+   */
+  if (!owner || owner.important || owner.items.length < 2) return;
+  if (owner.items.every((task) => task.important)) owner.important = true;
+}
+
 export interface AddResult {
   state: State;
   /** Where the next item should land — creating a group aims at it. */
@@ -60,6 +84,7 @@ export function add(state: State, input: string, destId: string | null, now: num
   if (target) {
     target.items.push(node);
     target.collapsed = false;
+    if (node.important) promoteOwner(next, node.id);
   } else {
     next.list.push(node);
   }
@@ -95,6 +120,7 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   task.target = parsed.target;
   task.important = parsed.important;
   task.count = Math.min(task.count, task.target);
+  if (task.important) promoteOwner(next, id);
   return next;
 }
 
@@ -111,6 +137,7 @@ export function toggleImportant(state: State, id: string): State {
   const node: Task | Group | undefined = findTask(next, id) ?? findGroup(next, id);
   if (!node) return state;
   node.important = !node.important;
+  if (node.kind === "task" && node.important) promoteOwner(next, id);
   return next;
 }
 

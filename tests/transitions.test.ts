@@ -368,7 +368,9 @@ describe("toggleImportant", () => {
   });
 
   it("reaches a task inside a group", () => {
-    let state = build(["# Morning", "a"]);
+    // Two items, so marking one leaves the group alone — one marked item is not
+    // the whole group being marked.
+    let state = build(["# Morning", "a", "b"]);
     state = T.toggleImportant(state, taskOf(state, "a").id);
     expect(taskOf(state, "a").important).toBe(true);
     expect(groupOf(state, "Morning").important).toBe(false);
@@ -391,6 +393,86 @@ describe("toggleImportant", () => {
   it("leaves the list alone for an id it does not know", () => {
     const state = build(["a"]);
     expect(T.toggleImportant(state, "nope")).toBe(state);
+  });
+});
+
+/*
+ * A group whose every item is marked is itself important — each of those marks
+ * was saying the same thing. It fires on the marking, not as a standing rule,
+ * which is what keeps the group's own mark removable.
+ */
+describe("a group promoted by its items", () => {
+  it("becomes important when the last of its items is marked", () => {
+    let state = build(["# Morning", "a", "b"]);
+    state = T.toggleImportant(state, taskOf(state, "a").id);
+    expect(groupOf(state, "Morning").important).toBe(false);
+
+    state = T.toggleImportant(state, taskOf(state, "b").id);
+    expect(groupOf(state, "Morning").important).toBe(true);
+  });
+
+  it("promotes through the composer's ! as well as the menu's", () => {
+    const typed = build(["# Morning", "a!", "b!"]);
+    expect(groupOf(typed, "Morning").important).toBe(true);
+
+    // And through inline editing, the third route to the same field.
+    let state = build(["# Evening", "y", "x!"]);
+    expect(groupOf(state, "Evening").important).toBe(false);
+    state = T.retitle(state, taskOf(state, "y").id, "y!", false);
+    expect(groupOf(state, "Evening").important).toBe(true);
+  });
+
+  it("does not promote an empty group", () => {
+    // Vacuous truth is not a reason to call a group important.
+    const state = build(["# Morning"]);
+    expect(groupOf(state, "Morning").important).toBe(false);
+  });
+
+  /*
+   * One marked item is not several marks saying the same thing — it is one
+   * mark, already visible on the row. Promoting there would also make every
+   * ordinary item added afterwards important by inheritance, which is a lot to
+   * infer from a single `!`.
+   */
+  it("does not promote a group holding a single marked item", () => {
+    let state = build(["# Morning", "a!"]);
+    expect(groupOf(state, "Morning").important).toBe(false);
+    expect(taskOf(state, "a").important).toBe(true);
+
+    // A second marked item is what makes it a statement about the group.
+    state = T.add(state, "b!", groupOf(state, "Morning").id, NOW).state;
+    expect(groupOf(state, "Morning").important).toBe(true);
+  });
+
+  /*
+   * The reason this fires on the marking rather than standing as a rule. Were
+   * it re-derived, the items would put the mark straight back and the group
+   * could never be told "no".
+   */
+  it("can still be unmarked, and stays unmarked", () => {
+    let state = build(["# Morning", "a!", "b!"]);
+    const groupId = groupOf(state, "Morning").id;
+    expect(groupOf(state, "Morning").important).toBe(true);
+
+    state = T.toggleImportant(state, groupId);
+    expect(groupOf(state, "Morning").important).toBe(false);
+    // The items keep their own marks; the group simply is not one thing.
+    expect(taskOf(state, "a").important).toBe(true);
+    expect(taskOf(state, "b").important).toBe(true);
+  });
+
+  it("does not demote a group whose items are unmarked", () => {
+    // Marking is what promotes; nothing demotes, so an explicit mark sticks.
+    let state = build(["# Morning", "a!", "b!"]);
+    state = T.toggleImportant(state, taskOf(state, "a").id);
+    expect(taskOf(state, "a").important).toBe(false);
+    expect(groupOf(state, "Morning").important).toBe(true);
+  });
+
+  it("leaves a root task's mark to itself", () => {
+    const state = build(["a!", "b"]);
+    expect(state.list.every((node) => node.kind === "task")).toBe(true);
+    expect(taskOf(state, "a").important).toBe(true);
   });
 });
 

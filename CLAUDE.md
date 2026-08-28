@@ -158,6 +158,19 @@ Invariants worth defending in review:
   intercept a tap — which is why the item's pill needs `pointer-events: none`, sitting
   as it does exactly where the grip's hit area reaches. Only the green finished outline
   is still a shadow slot (`--edge`).
+- **A group's mark speaks for everything in it.** An item inside an important group is
+  important by inheritance — `partition()` has always scored it that way — so it does not
+  also wear its own pill. Display only: the stored flag is untouched, and unmarking the
+  group brings each item's own mark back.
+- **A group whose every item is marked is promoted to important**, because those marks
+  were all saying the same thing. Three constraints on that, and each one is load-bearing:
+  it fires **on the marking**, not as a rule the state must always satisfy — re-derived,
+  the items would put the group's mark straight back and it could never be taken off; it
+  needs **more than one item**, because with a single item "all of them are marked" and
+  "this one is marked" are the same sentence; and **nothing demotes**, so a group marked
+  by hand stays marked. The cost of the first is that deleting a group's last unmarked
+  item does not promote it. The cost of the third is that an ordinary item added to a
+  promoted group becomes important by inheritance.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
   ", important". A bar and a font weight are a visual channel only.
