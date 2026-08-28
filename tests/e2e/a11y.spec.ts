@@ -157,6 +157,8 @@ test("the row menu is a menu, and axe agrees", async ({ page }) => {
     - menu:
       - menuitem "Move up Alt+↑"
       - menuitem "Move down Alt+↓"
+      - menuitem "Reset to 0"
+      - menuitem "Mark important"
       - menuitem "Into “Later” Tab"
   `);
 

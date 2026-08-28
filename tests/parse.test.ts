@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parse, raw } from "../src/parse";
+import { isGroupInput, parse, raw } from "../src/parse";
 import type { Group, Task } from "../src/types";
 
 const task = (input: string): Task => {
@@ -51,6 +51,19 @@ describe("parse", () => {
 
   it("gives every node a distinct id", () => {
     expect(parse("a")?.id).not.toBe(parse("a")?.id);
+  });
+});
+
+describe("isGroupInput", () => {
+  it("agrees with what parse actually does with the line", () => {
+    // The composer previews this answer while you type, so a disagreement would
+    // show "Top level" for something that lands in a group, or the reverse.
+    for (const line of ["# Morning", "#Errands", "  # spaced", "#", "shopping", "[3]", ""]) {
+      expect(isGroupInput(line)).toBe(parse(line)?.kind === "group" || line.trim().startsWith("#"));
+    }
+    expect(isGroupInput("# Morning")).toBe(true);
+    expect(isGroupInput("shopping")).toBe(false);
+    expect(isGroupInput("  ")).toBe(false);
   });
 });
 

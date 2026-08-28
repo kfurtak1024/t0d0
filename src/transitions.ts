@@ -98,6 +98,22 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   return next;
 }
 
+/**
+ * Flip a row's importance mark.
+ *
+ * The composer's way in is a trailing `!` and inline editing's is the same, but
+ * neither is reachable with a thumb on a row you are already looking at — so
+ * the `⋯` menu gets a third way to the same field. Works on a nested task as
+ * well as a root row, which is why it looks in both places.
+ */
+export function toggleImportant(state: State, id: string): State {
+  const next = clone(state);
+  const node: Task | Group | undefined = findTask(next, id) ?? findGroup(next, id);
+  if (!node) return state;
+  node.important = !node.important;
+  return next;
+}
+
 /** Deleting a group takes its items with it; undo is the safety net. */
 export function remove(state: State, id: string): State {
   const next = clone(state);

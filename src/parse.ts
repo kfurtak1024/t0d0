@@ -40,6 +40,15 @@ export function parseTitle(input: string): { title: string; important: boolean }
 }
 
 /**
+ * Whether a line will make a group rather than a task.
+ *
+ * Shared with the composer, which previews the answer while you type: a group
+ * always lands at the root, so "Adding to" has to stop naming a group the
+ * moment the `#` appears. Two copies of this test would drift.
+ */
+export const isGroupInput = (input: string): boolean => input.trim().startsWith("#");
+
+/**
  * Turn one line of composer input into a node.
  *
  * `# Morning` becomes a group; anything else becomes a task, with a trailing
@@ -51,7 +60,7 @@ export function parse(input: string): Node | null {
   const line = input.trim();
   if (!line) return null;
 
-  if (line.startsWith("#")) {
+  if (isGroupInput(line)) {
     const head = parseTitle(line);
     if (!head) return null;
     const group: Group = {

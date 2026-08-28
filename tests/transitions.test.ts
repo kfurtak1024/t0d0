@@ -217,6 +217,43 @@ describe("the mark is only a mark", () => {
   });
 });
 
+describe("toggleImportant", () => {
+  it("marks and unmarks a root task", () => {
+    let state = build(["shopping"]);
+    const id = taskOf(state, "shopping").id;
+    state = T.toggleImportant(state, id);
+    expect(taskOf(state, "shopping").important).toBe(true);
+    state = T.toggleImportant(state, id);
+    expect(taskOf(state, "shopping").important).toBe(false);
+  });
+
+  it("reaches a task inside a group", () => {
+    let state = build(["# Morning", "a"]);
+    state = T.toggleImportant(state, taskOf(state, "a").id);
+    expect(taskOf(state, "a").important).toBe(true);
+    expect(groupOf(state, "Morning").important).toBe(false);
+  });
+
+  it("marks a group", () => {
+    let state = build(["# Morning"]);
+    state = T.toggleImportant(state, groupOf(state, "Morning").id);
+    expect(groupOf(state, "Morning").important).toBe(true);
+  });
+
+  it("agrees with what the composer's ! would have made", () => {
+    // Three routes to one field — the menu must not become a fourth meaning.
+    const plain = build(["shopping"]);
+    const toggled = T.toggleImportant(plain, taskOf(plain, "shopping").id);
+    expect(taskOf(toggled, "shopping").important).toBe(true);
+    expect(taskOf(build(["shopping!"]), "shopping").important).toBe(true);
+  });
+
+  it("leaves the list alone for an id it does not know", () => {
+    const state = build(["a"]);
+    expect(T.toggleImportant(state, "nope")).toBe(state);
+  });
+});
+
 describe("remove", () => {
   it("removes a root task", () => {
     let state = build(["a", "b"]);

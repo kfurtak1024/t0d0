@@ -9,7 +9,7 @@ import { loadPrefs, savePrefs, type Prefs } from "./prefs";
 import { onExternalChange } from "./storage";
 import type { Store } from "./store";
 import * as T from "./transitions";
-import { raw } from "./parse";
+import { isGroupInput, raw } from "./parse";
 import type { Group, Node, State } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
@@ -466,6 +466,19 @@ export class App {
       });
     }
 
+    // The mark's other two routes — a trailing `!` in the composer, and the same
+    // when editing the text — both mean typing. This is the one that works with
+    // a thumb on a row already in front of you.
+    const row = task ?? T.findGroup(this.#state, id);
+    if (row) {
+      items.push({
+        label: row.important ? "Unmark important" : "Mark important",
+        onSelect: () => {
+          this.#store.apply(T.toggleImportant(this.#state, id), { undoable: true });
+        },
+      });
+    }
+
     // Nesting is reachable by stepping, but only one row at a time; on a phone
     // that is a lot of taps to cross a long group, so it gets its own entry.
     const owner = T.ownerOf(this.#state, id);
@@ -679,7 +692,16 @@ export class App {
       for (const group of groups) this.#dest.append(new Option(group.title, group.id));
       this.#dest.dataset["sig"] = signature;
     }
-    this.#dest.value = this.#destId ?? "";
+    /*
+     * A group always lands at the root, whatever is aimed — so while the
+     * composer is holding one, the row has to say "Top level" rather than name
+     * a group the item will not go into.
+     *
+     * Display only: the aim itself is untouched and comes back the moment the
+     * `#` does not, so deleting one character does not cost you the group you
+     * had picked.
+     */
+    this.#dest.value = isGroupInput(this.#input.value) ? "" : (this.#destId ?? "");
   }
 
   #tweenPct(target: number): void {
@@ -707,7 +729,16 @@ export class App {
   #wire(): void {
     (el("#composer") as HTMLFormElement).addEventListener("submit", (event) => {
       event.preventDefault();
-      const result = T.add(this.#state, this.#input.value, this.#destId, Date.now());
+      /*
+       * Emptied before the state is applied, not after. The destination row
+       * reads the composer to decide whether a group is on its way, and the
+       * apply below renders — so leaving the text in place until afterwards had
+       * the row report "Top level" for the group it had just aimed at.
+       */
+      const typed = this.#input.value;
+      this.#input.value = "";
+
+      const result = T.add(this.#state, typed, this.#destId, Date.now());
       if (result.added) {
         this.#destId = result.destId;
         this.#store.apply(result.state);
@@ -715,8 +746,13 @@ export class App {
         // screen behind it, so adding without this types into the void.
         this.#reveal(result.added.id);
       }
-      this.#input.value = "";
       this.#input.focus();
+    });
+
+    // Only the destination row: a full render measures every row for FLIP, which
+    // is a lot of work to do on each keystroke for one <select>'s value.
+    this.#input.addEventListener("input", () => {
+      this.#renderDest();
     });
 
     this.#dest.addEventListener("change", () => {

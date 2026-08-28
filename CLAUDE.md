@@ -115,9 +115,15 @@ Invariants worth defending in review:
   bar and a heavier word — and never where it sits. No sorting, no exemption from
   `sink()`, no weight in the progress ring. A second notion of "where this belongs"
   is exactly what `reorder()` exists to prevent, and floating flagged rows to the top
-  would be one. It also stands down visually once the row is finished: the green
-  frame is the state worth reading on the pile, and two accents on one edge went
-  muddy. The stored flag is untouched, so unticking brings the bar back.
+  would be one.
+- **The mark stays on when a row is finished.** It was suppressed there at first, on
+  the grounds that the green frame was the state worth reading on the pile — which made
+  a completed important row indistinguishable from any other completed row, so you could
+  not see what you had actually got done. Recognition beats tidiness. (The muddiness
+  that prompted the suppression came from _dimming_ the bar to 40%; at full strength it
+  sits beside the green frame cleanly.) `tests/e2e/important.spec.ts` asserts the two
+  are tellable apart rather than asserting a colour, so the treatment can change without
+  the guarantee moving.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
   ", important". A bar and a font weight are a visual channel only.
@@ -146,6 +152,18 @@ Invariants worth defending in review:
   its own command — `Tab` / `Shift-Tab`, or the menu's "Into" / "Out of". The `⋯` menu
   prints `Alt+↑` beside "Move up", so **those two must stay the same command**; scoping
   one and not the other makes the hint a lie.
+- **Three routes reach the `important` field, and they must stay one meaning**: a
+  trailing `!` in the composer, the same when editing the text, and the `⋯` menu's
+  "Mark important" / "Unmark important". The menu exists because the other two mean
+  typing, which is no use with a thumb on a row already in front of you. Do not give any
+  of them a second behaviour, and keep the labels naming _important_ rather than "the
+  mark" — nobody outside this file calls the accent bar that.
+- **"Adding to" is a promise about the item you are about to add.** A group always lands
+  at the root, so while the composer holds a `#` the row must read "Top level" — and
+  display-only, because clearing the aim would cost you the group you picked when you
+  delete one character. `isGroupInput()` is shared with `parse` so the preview and the
+  outcome cannot disagree. The composer is also **emptied before the state is applied**,
+  since the render triggered by the apply reads it.
 - **A plain item's tick toggles; a counted one does not.** `role="checkbox"` promises a
   way back, and on a phone there is no Shift and no arrow key. `target > 1` counts up,
   and steps down via the count label or the row menu.
@@ -239,6 +257,18 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
 - `tests/e2e/a11y.spec.ts` is the net under the accessibility work: axe must report zero
   WCAG 2.1 AA violations on the list, both dialogs and the empty state, and an ARIA
   snapshot pins the roles, names and states of the whole list.
+- **The settings sheet is measured, not eyeballed.** Two things went wrong there and
+  neither was visible: it scrolled with a screenful of room around it because the
+  _absolute_ `max-height` cap bound rather than the viewport one, and three of its
+  controls sat under 44px. `tests/e2e/drawer.spec.ts` pins both — the fit via
+  `scrollHeight` against `clientHeight` on a roomy window, the targets via
+  `elementFromPoint`. Adding a row to that sheet means re-running them. The `<select>`
+  earns its 44px with real height: a replaced element does not render an `::after`
+  reliably, so the overlay trick every other control uses does not work on it.
+- **Measure a control only after the sheet has settled.** The drawer arrives on a spring
+  that overshoots, and `getBoundingClientRect` mid-flight returns the animated box —
+  which reads as a 43px control that is really 44. `settle()` in the e2e helpers is the
+  wait, and it cost a confusing failure before it was there.
 - Text tokens must clear 4.5:1 on `--bg`, `--card` and `--nest`. Changing `--muted`,
   `--faint` or `--danger` means re-running the a11y spec, not eyeballing it.
 - `normalize()` also gets property-based tests: over arbitrary JSON it never throws,

@@ -605,19 +605,12 @@ body.dragging-row {
 }
 
 /*
-  Finished outranks important, so the mark stands down rather than fading.
-  A ticked row is on its way to the foot of the list and the green frame is the
-  state worth reading there; two accents fighting over the same edge just went
-  muddy. The stored flag is untouched — untick it and the bar comes back.
+  The mark stays on once a row is finished.
+  It was suppressed here at first, on the grounds that the green finished frame
+  was the state worth reading — but that made a completed important row
+  indistinguishable from any other completed row, so you could no longer tell
+  what you had actually got done. Recognition beats tidiness.
 */
-.list > .task.important.done,
-.group.important.clear {
-  --bar: 0 0 0 0 transparent;
-}
-
-.items > .task.important.done::before {
-  display: none;
-}
 
 /* --------------------------------------------------------------- the end */
 
@@ -1016,6 +1009,12 @@ body.dragging-row {
   border: 1.5px solid var(--line);
   border-radius: 999px;
   padding: 0.4rem 1.6rem 0.4rem 0.8rem;
+  /*
+   * The 44px comes from real height, not an ::after overlay: a <select> is a
+   * replaced element and does not render one reliably. Everything else in the
+   * drawer grows an invisible target instead.
+   */
+  min-height: 2.75rem;
   cursor: pointer;
   appearance: none;
   background-image:
@@ -1101,7 +1100,18 @@ body.dragging-row {
   box-shadow: var(--shadow-lift);
   width: 100%;
   max-width: 26rem;
-  max-height: min(85dvh, 44rem);
+  /*
+   * Two caps, and both have bitten. The viewport one has to clear the content
+   * on an ordinary 900px-tall window; the absolute one exists only to stop the
+   * sheet becoming a column on a very large monitor, so it must sit well clear
+   * of the content or it silently scrolls a sheet with a screenful of room
+   * around it — which it did, by one pixel, at 1080p.
+   *
+   * Re-check by measuring scrollHeight against clientHeight at 1280x900 and
+   * 1920x1080, not by eye. A one-pixel overflow looks like nothing and still
+   * draws a scrollbar.
+   */
+  max-height: min(92dvh, 56rem);
   overflow-y: auto;
   overscroll-behavior: contain;
   animation: rise 0.5s var(--spring);
@@ -1118,7 +1128,7 @@ body.dragging-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.15rem 1.35rem 0.85rem;
+  padding: 0.95rem 1.35rem 0.75rem;
   background: var(--card);
   border-bottom: 1px solid var(--line);
 }
@@ -1134,6 +1144,7 @@ body.dragging-row {
 
 .drawer-close {
   flex: none;
+  position: relative;
   width: 2rem;
   height: 2rem;
   display: grid;
@@ -1144,6 +1155,13 @@ body.dragging-row {
   transition:
     color 0.2s,
     background 0.2s;
+}
+
+/* Reads as a 32px control, answers to a 44px thumb. */
+.drawer-close::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
 }
 
 .drawer-close:hover {
@@ -1158,7 +1176,7 @@ body.dragging-row {
 /* ------------------------------------------------------------- sections */
 
 .sect {
-  margin-top: 1.35rem;
+  margin-top: 0.9rem;
 }
 
 .sect-title {
@@ -1182,7 +1200,8 @@ body.dragging-row {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.8rem 0.95rem;
+  /* Still well past the 44px hit target at this padding — a row is ~60px. */
+  padding: 0.68rem 0.95rem;
   text-align: left;
   transition: background 0.15s;
 }
@@ -1347,8 +1366,8 @@ body.dragging-row {
 /* ---------------------------------------------------------------- about */
 
 .about {
-  margin-top: 1.5rem;
-  padding-top: 0.9rem;
+  margin-top: 1.1rem;
+  padding-top: 0.7rem;
   border-top: 1px solid var(--line);
   text-align: center;
 }
@@ -1407,7 +1426,7 @@ body.dragging-row {
 
   .drawer {
     max-width: none;
-    max-height: 88dvh;
+    max-height: 90dvh;
     border-radius: 20px 20px 0 0;
     animation: slideup 0.42s var(--ease);
   }
@@ -1466,6 +1485,7 @@ body.dragging-row {
 
 .segmented button {
   flex: 1;
+  position: relative;
   padding: 0.45rem 0.5rem;
   border-radius: 999px;
   font-size: 0.82rem;
@@ -1474,6 +1494,14 @@ body.dragging-row {
   transition:
     background 0.2s,
     color 0.2s;
+}
+
+/* Vertically only: these sit shoulder to shoulder, so widening one would put
+   its target over its neighbour's. */
+.segmented button::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
 }
 
 .segmented button:hover {

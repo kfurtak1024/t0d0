@@ -97,8 +97,111 @@ test("a list from before the mark loads unmarked", async ({ page }) => {
 });
 
 /*
- * The mark stands down while a row is finished, but it is not spent: the flag is
- * still stored, so a mis-tap does not quietly cost you it.
+ * The third route to the mark. The other two — the composer's `!` and the same
+ * when editing the text — both mean typing; this is the one that works with a
+ * thumb on a row already in front of you.
+ */
+test("the row menu marks and unmarks an item", async ({ page }) => {
+  await addItem(page, "call the bank");
+  const row = page.locator(".task", { hasText: "call the bank" });
+  await expect(row).not.toHaveClass(/important/);
+
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: "Mark important" }).click();
+  await expect(row).toHaveClass(/important/);
+  // The same field the composer writes, so editing shows the bang back.
+  await row.locator(".label").click();
+  await expect(row.locator(".label")).toHaveText("call the bank!");
+  await row.locator(".label").press("Escape");
+
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: "Unmark important" }).click();
+  await expect(row).not.toHaveClass(/important/);
+});
+
+test("the row menu marks a group, and a nested item", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "a");
+
+  const group = page.locator(".group");
+  await group.locator(".ghead .dots").click();
+  await page.getByRole("menuitem", { name: "Mark important" }).click();
+  await expect(group).toHaveClass(/important/);
+
+  const nested = page.locator(".items > .task", { hasText: "a" });
+  await nested.locator(".dots").click();
+  await page.getByRole("menuitem", { name: "Mark important" }).click();
+  await expect(nested).toHaveClass(/important/);
+});
+
+test("marking from the menu is undoable", async ({ page }) => {
+  await addItem(page, "call the bank");
+  const row = page.locator(".task", { hasText: "call the bank" });
+
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: "Mark important" }).click();
+  await expect(row).toHaveClass(/important/);
+
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.locator(".task", { hasText: "call the bank" })).not.toHaveClass(/important/);
+});
+
+/*
+ * A finished important row has to stay recognisable as one.
+ *
+ * The mark was suppressed on finished rows at first, on the grounds that the
+ * green frame was the state worth reading — which left a completed important
+ * item looking exactly like every other completed item, so you could not tell
+ * what you had actually got done. This asserts the two are distinguishable
+ * rather than asserting a particular colour, so the treatment can change
+ * without the guarantee moving.
+ */
+test("a finished important row is still tellable from an ordinary one", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now(),
+    list: [
+      { kind: "task", id: "k", text: "call the bank", target: 1, count: 1, important: true },
+      { kind: "task", id: "p", text: "water plants", target: 1, count: 1, important: false },
+      {
+        kind: "group",
+        id: "g",
+        title: "Errands",
+        collapsed: false,
+        important: false,
+        items: [
+          { kind: "task", id: "nk", text: "post it", target: 1, count: 1, important: true },
+          { kind: "task", id: "np", text: "sweep up", target: 1, count: 1, important: false },
+        ],
+      },
+    ],
+  });
+
+  const marks = await page.evaluate(() => {
+    const paint = (id: string): string => {
+      const row = document.querySelector(`[data-id="${id}"]`);
+      if (!row) return "missing";
+      const own = getComputedStyle(row);
+      const before = getComputedStyle(row, "::before");
+      return `${own.boxShadow}|${before.display}|${before.backgroundColor}`;
+    };
+    return {
+      rootMarked: paint("k"),
+      rootPlain: paint("p"),
+      inMarked: paint("nk"),
+      inPlain: paint("np"),
+    };
+  });
+
+  // Both are finished, so both wear the green frame; the marked ones must still
+  // carry something the plain ones do not.
+  expect(marks.rootMarked).not.toBe(marks.rootPlain);
+  expect(marks.inMarked).not.toBe(marks.inPlain);
+});
+
+/*
+ * Ticking does not spend the flag either: it is still stored, so a mis-tap does
+ * not quietly cost you it.
  */
 test("ticking a marked item keeps the mark, and unticking brings it back", async ({ page }) => {
   await addItem(page, "call the bank!");
