@@ -80,7 +80,8 @@ Invariants worth defending in review:
   light colour; held at `--ring-l` an OKLCH yellow renders olive and red→green reads as
   mud. This was checked by rendering the sweep, not by eye-balling the numbers.
 - **All three moments are celebrated**, each once, on the transition into it, re-arming
-  when the list falls back below. One tick can cross two gates at once — the last
+  when the list falls back below. The arming lives in `src/milestones.ts` as a pure
+  machine over `DayScore`; `app.ts` only owns what a celebration looks like. One tick can cross two gates at once — the last
   important item landing on a list already past the bar — and only the highest fires:
   two showers on one frame read as one messy shower. Moving the bar in Settings re-scores
   and repaints but deliberately does **not** celebrate; a milestone reached by moving
@@ -111,7 +112,7 @@ Invariants worth defending in review:
   is a correction with no reward to protect, and a row that took half a second to come
   back would feel stuck. Both are gated on `autoCollapseDone` — someone who turned off
   automatic tidying does not want automatic reordering in either direction.
-- **A batch of tidies is applied bottom-most row first.** A row stops above
+- **A batch of tidies is applied bottom-most row first**, in `tidyAll()`. A row stops above
   whatever finished rows are already below it, so sending the upper one first
   strands it on top of a sibling that has not travelled yet. Ordering by
   position is what makes two ticks in one breath land where the same two ticks
@@ -237,6 +238,7 @@ src/store.ts      the live state, persistence, and one level of undo
 src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
+src/milestones.ts which of the day's moments a change just crossed
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, day-summary sheet, drawer, row menu, drag, inline edit,
                   focus trap, confetti, dom

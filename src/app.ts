@@ -1,4 +1,5 @@
-import { allTasks, dayHue, isDone, overallProgress, scoreDay, type DayScore } from "./progress";
+import { allTasks, dayHue, HUE, isDone, overallProgress, scoreDay } from "./progress";
+import { cross, spend, type Arming, type Milestone } from "./milestones";
 import { createGroup } from "./render/group";
 import { flip } from "./render/flip";
 import { KeyedList } from "./render/list";
@@ -26,20 +27,14 @@ const EXIT_MS = 200;
 const COLLAPSE_MS = 520;
 
 /**
- * The day's three moments, in the order they can be reached.
- *
- * Each is celebrated once, on the transition into it, and re-arms if the list
- * falls back below it — the same rule the single completion check always used,
- * now applied three times over.
+ * What each moment looks like: the hue the ring turns as it lands, and how loud
+ * the shower is. The hues come from the rainbow's own landmarks so a burst and
+ * the ring it bursts from cannot drift apart.
  */
-const MILESTONES = ["cleared", "succeeded", "complete"] as const;
-type Milestone = (typeof MILESTONES)[number];
-
-/** What each moment looks like: the hue the ring turns, and how loud it is. */
 const FANFARE: Record<Milestone, { hue: number; count: number }> = {
-  cleared: { hue: 150, count: 55 },
-  succeeded: { hue: 260, count: 95 },
-  complete: { hue: 320, count: 150 },
+  cleared: { hue: HUE.green, count: 55 },
+  succeeded: { hue: HUE.blue, count: 95 },
+  complete: { hue: HUE.violet, count: 150 },
 };
 
 const HAPTICS: Record<Milestone, number[]> = {
@@ -76,7 +71,7 @@ export class App {
   #prefs: Prefs = loadPrefs();
   #destId: string | null = null;
   #editingId: string | null = null;
-  #armed: Record<Milestone, boolean> = { cleared: true, succeeded: true, complete: true };
+  #armed: Arming = { cleared: true, succeeded: true, complete: true };
   #shownPct = 0;
   #tweenRaf = 0;
   #storageWarned = false;
@@ -263,18 +258,6 @@ export class App {
     return this.#prefs.successAt / 100;
   }
 
-  /** Which of the day's moments the list has reached, right now. */
-  #reached(score: DayScore): Record<Milestone, boolean> {
-    return {
-      // Only a moment when there was something marked to clear: with nothing
-      // important on the list the gate is vacuous, and celebrating it would
-      // fire on the very first tick of an ordinary day.
-      cleared: score.hasImportant && score.cleared && score.total > 0,
-      succeeded: score.succeeded,
-      complete: score.complete,
-    };
-  }
-
   /* ------------------------------------------------------------------ boot */
 
   start(): void {
@@ -353,9 +336,8 @@ export class App {
    */
   #tidy(taskId: string): void {
     if (!this.#prefs.autoCollapseDone) return;
-    const owner = T.ownerOf(this.#state, taskId);
-    if (owner && !owner.items.every(isDone)) return;
-    this.#queueTidy(owner?.id ?? taskId);
+    const id = T.rowToTidy(this.#state, taskId);
+    if (id !== null) this.#queueTidy(id);
   }
 
   /**
@@ -380,34 +362,15 @@ export class App {
   }
 
   /**
-   * Apply every queued tidy as one state change, so the rows travel together
-   * under FLIP rather than vanishing here and reappearing there.
-   *
-   * Bottom-most first, which is what makes a batch behave like the same ticks
-   * spread out in time. A row stops above the finished ones already resting
-   * below it — so sending the upper one first would have it stop dead on top of
-   * a sibling that has not travelled yet, and stay stranded up in the work.
-   *
-   * Each row is re-checked on the way past: the list may have moved on since
-   * the tick — the row unticked, deleted, or dragged somewhere else — and a
-   * queued intention is not a licence to move something that is no longer done.
+   * Send the queued rows down as one state change, so they travel together
+   * under FLIP rather than vanishing here and reappearing there. The ordering
+   * rules live with the transition; this only owns the queue and the animation.
    */
   #runTidy(): void {
     const ids = [...this.#tidyIds];
     this.#tidyIds.clear();
 
-    let next = this.#state;
-    const order = ids
-      .map((id) => ({ id, at: next.list.findIndex((node) => node.id === id) }))
-      .filter((row) => row.at >= 0)
-      .sort((a, b) => b.at - a.at);
-
-    for (const { id } of order) {
-      const row = T.findRow(next, id);
-      if (!row || !T.isFinished(row)) continue;
-      next = T.sink(row.kind === "group" ? T.collapse(next, id) : next, id);
-    }
-
+    const next = T.tidyAll(this.#state, ids);
     if (next === this.#state) return;
     this.#animateNext = true;
     this.#store.apply(next);
@@ -629,28 +592,16 @@ export class App {
 
   /** Spend every moment the list has already reached, without celebrating it. */
   #arm(state: State): void {
-    const reached = this.#reached(scoreDay(state, this.#bar));
-    for (const milestone of MILESTONES) this.#armed[milestone] = !reached[milestone];
+    this.#armed = spend(scoreDay(state, this.#bar));
   }
 
-  /**
-   * Celebrate whatever the last change just crossed.
-   *
-   * Highest first, and only one burst: a single tick can cross two lines at
-   * once — the last important item landing on a list already past the bar — and
-   * two showers on the same frame read as one messy shower rather than as two
-   * rewards. The lower moments are still spent, so they do not fire late.
-   */
+  /** Celebrate whatever the last change just crossed, if anything. */
   #checkMilestones(score = scoreDay(this.#state, this.#bar)): void {
-    const reached = this.#reached(score);
-    const hit = [...MILESTONES]
-      .reverse()
-      .find((milestone) => reached[milestone] && this.#armed[milestone]);
+    const { fired, armed } = cross(this.#armed, score);
+    this.#armed = armed;
+    if (!fired) return;
 
-    for (const milestone of MILESTONES) this.#armed[milestone] = !reached[milestone];
-    if (!hit) return;
-
-    const { hue, count } = FANFARE[hit];
+    const { hue, count } = FANFARE[fired];
     if (!this.#motion.matches) {
       const box = this.#totalRing.getBoundingClientRect();
       this.#confetti.burst(
@@ -658,7 +609,7 @@ export class App {
         { hue, count },
       );
     }
-    this.#vibrate(HAPTICS[hit]);
+    this.#vibrate(HAPTICS[fired]);
   }
 
   #vibrate(pattern: number | number[]): void {

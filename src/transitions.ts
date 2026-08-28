@@ -319,6 +319,46 @@ export function rise(state: State, id: string): State {
   }
 }
 
+/**
+ * Which row a finished tick should tidy: the task itself, or the group holding
+ * it — and a group only once the whole of it is done, because one item
+ * finishing is not the group finishing. Null when there is nothing to send down
+ * yet.
+ */
+export function rowToTidy(state: State, taskId: string): string | null {
+  const owner = ownerOf(state, taskId);
+  if (!owner) return taskId;
+  return owner.items.every(isDone) ? owner.id : null;
+}
+
+/**
+ * Apply a batch of queued tidies as one change, so the rows travel together.
+ *
+ * **Bottom-most row first.** A row stops above the finished ones already
+ * resting below it, so sending the upper one first strands it on top of a
+ * sibling that has not travelled yet — it stays up in the work, and the pile
+ * ends up in an order nobody earned. Ordering by position is what makes two
+ * ticks in one breath land where the same two ticks spread over a minute would.
+ *
+ * Each row is re-checked on the way past: the list may have moved on since the
+ * tick — the row unticked, deleted, or dragged somewhere else — and a queued
+ * intention is not a licence to move something that is no longer done.
+ */
+export function tidyAll(state: State, ids: Iterable<string>): State {
+  const order = [...ids]
+    .map((id) => ({ id, at: state.list.findIndex((node) => node.id === id) }))
+    .filter((row) => row.at >= 0)
+    .sort((a, b) => b.at - a.at);
+
+  let next = state;
+  for (const { id } of order) {
+    const row = findRow(next, id);
+    if (!row || !isFinished(row)) continue;
+    next = sink(row.kind === "group" ? collapse(next, id) : next, id);
+  }
+  return next;
+}
+
 export type MoveDirection = "in" | "out";
 
 /** The nearest group above a root task — the one it would move into. */

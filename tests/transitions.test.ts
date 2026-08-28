@@ -282,6 +282,81 @@ describe("rise", () => {
   });
 });
 
+describe("rowToTidy", () => {
+  const done = (state: State, ...items: string[]): State => {
+    let next = state;
+    for (const text of items) next = T.bump(next, taskOf(next, text).id, 1, NOW);
+    return next;
+  };
+
+  it("sends a root task down as itself", () => {
+    const state = done(rows("a", "b"), "a");
+    const id = taskOf(state, "a").id;
+    expect(T.rowToTidy(state, id)).toBe(id);
+  });
+
+  it("sends a nested task down as its group, once the group is done", () => {
+    const state = done(rows("# Morning", "  x", "  y"), "x", "y");
+    expect(T.rowToTidy(state, taskOf(state, "x").id)).toBe(groupOf(state, "Morning").id);
+  });
+
+  it("has nothing to send down while the group is only part done", () => {
+    // One item finishing is not the group finishing.
+    const state = done(rows("# Morning", "  x", "  y"), "x");
+    expect(T.rowToTidy(state, taskOf(state, "x").id)).toBeNull();
+  });
+});
+
+describe("tidyAll", () => {
+  const done = (state: State, ...items: string[]): State => {
+    let next = state;
+    for (const text of items) next = T.bump(next, taskOf(next, text).id, 1, NOW);
+    return next;
+  };
+
+  /*
+   * The rule the whole batch exists for. A row stops above the finished ones
+   * already below it, so the upper of two must not be sent first — it would
+   * stop dead on a sibling that has not travelled yet and stay stranded up in
+   * the work. Ordering top-most first here gives ["a", "b", "d", "c"].
+   */
+  it("sends the bottom-most row first, so a batch lands where it was earned", () => {
+    const state = done(rows("a", "b", "c", "d"), "b", "c");
+    const ids = [taskOf(state, "b").id, taskOf(state, "c").id];
+
+    expect(shape(T.tidyAll(state, ids))).toEqual(["a", "d", "b", "c"]);
+    // Order of the queue must not matter; position is what decides.
+    expect(shape(T.tidyAll(state, [...ids].reverse()))).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("skips a row that is no longer finished", () => {
+    // Ticked, queued, then unticked before the batch ran.
+    let state = done(rows("a", "b", "c"), "b");
+    const id = taskOf(state, "b").id;
+    state = T.bump(state, id, -1, NOW);
+    expect(T.tidyAll(state, [id])).toBe(state);
+  });
+
+  it("skips an id that has left the list", () => {
+    const state = done(rows("a", "b"), "b");
+    expect(T.tidyAll(state, ["gone"])).toBe(state);
+  });
+
+  it("folds a finished group shut on its way down", () => {
+    const state = done(rows("a", "# Morning", "  x", "b"), "x");
+    const id = groupOf(state, "Morning").id;
+
+    const next = T.tidyAll(state, [id]);
+    expect(shape(next)).toEqual(["a", "b", "# Morning", "  x"]);
+    expect(groupOf(next, "Morning").collapsed).toBe(true);
+  });
+
+  it("leaves the list alone when nothing queued can travel", () => {
+    const state = rows("a", "b");
+    expect(T.tidyAll(state, [])).toBe(state);
+  });
+});
+
 describe("toggleImportant", () => {
   it("marks and unmarks a root task", () => {
     let state = build(["shopping"]);
