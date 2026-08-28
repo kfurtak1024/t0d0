@@ -31,11 +31,23 @@
      rainbow. Dark mode starts high enough to need much less of a lift. */
   --ring-lift: 10%;
 
-  /* The importance mark. Warm and off the progress sweep's arc, so a flagged row
-     never reads as "nearly done" or as a warning. It paints a group's left edge,
-     a slim pill on a row, and a bolder word — all non-text, so 3:1 against
-     --card is the bar it has to clear, not 4.5:1. */
-  --flag: oklch(62% 0.16 62);
+  /* The importance mark.
+     Red rather than the amber it started as, and the reason is measured: the day
+     ring sweeps hue 25 to 320, and at hue 60 it landed within dE 1 of that amber
+     — the same colour, at the part of the sweep where important work is still
+     outstanding. So the ring and the marks on the rows it described said two
+     different things in one voice.
+     Red is the ring's own starting hue, but the ring is barely ever painted
+     there: the arc is transparent at nothing-done, so the collision is with
+     hues the ring only passes through at a sliver of progress. Across the hues
+     it actually draws it stays dE 30-plus clear.
+     It sits close to --danger by design rather than accident — both mean "look
+     at this" — and the two never share a screen: --danger is text in the
+     settings sheet, this is an edge on a row.
+     Deeper in dark than a straight lightening would give, because a pale red
+     reads as salmon. It paints a group's left edge, a slim pill on a row, and a
+     bolder word — all non-text, so 3:1 against --card is the bar, not 4.5:1. */
+  --flag: oklch(52% 0.19 20);
 
   /* Text sitting on a filled accent, and the destructive red. Both flip with
      the theme: the accent lightens in dark mode, so white stops being legible
@@ -96,7 +108,7 @@
     --ring-l: 74%;
     --ring-c: 0.14;
     --ring-lift: 6%;
-    --flag: oklch(78% 0.15 68);
+    --flag: oklch(68% 0.18 22);
     --on-accent: #10141a;
     --danger: oklch(74% 0.15 25);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
@@ -118,7 +130,7 @@
   --ring-l: 74%;
   --ring-c: 0.14;
   --ring-lift: 6%;
-  --flag: oklch(78% 0.15 68);
+  --flag: oklch(68% 0.18 22);
   --on-accent: #10141a;
   --danger: oklch(74% 0.15 25);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);

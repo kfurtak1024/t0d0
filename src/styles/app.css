@@ -643,7 +643,11 @@ body.dragging-row {
   left: 0;
   top: 0.3rem;
   bottom: 0.3rem;
-  width: 3px;
+  /* A third of the edge a card wears, so the two marks are the same idea at two
+     scales and this follows if --r-card ever moves. At 3px it read as a
+     hairline next to the 1.5px rail; past 8px it stops being a capsule and
+     starts crowding the tick. */
+  width: calc(var(--r-card) / 3);
   border-radius: 999px;
   background: var(--flag);
   pointer-events: none;
