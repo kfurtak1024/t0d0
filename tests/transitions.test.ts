@@ -479,6 +479,55 @@ describe("a group and its items", () => {
     expect(groupOf(state, "Morning").important).toBe(true);
     expect(taskOf(state, "errand").important).toBe(false);
   });
+
+  /*
+   * Completing the set is not the same as taking the mark away: deleting the
+   * last item that contradicted "everything here matters" finishes the
+   * sentence, so the group says it once instead of on every remaining row.
+   */
+  it("becomes important when the last ordinary item is deleted out of it", () => {
+    // The plain one first: adding it after the marked pair would have found the
+    // group already promoted, and an add never takes a mark back off.
+    let state = build(["# Morning", "plain", "a!", "b!"]);
+    expect(groupOf(state, "Morning").important).toBe(false);
+
+    state = T.remove(state, taskOf(state, "plain").id);
+    expect(groupOf(state, "Morning").important).toBe(true);
+  });
+
+  it("keeps its mark when an ordinary item is deleted out of it", () => {
+    // The group was marked as a whole; deleting one of its rows is not a
+    // statement that it no longer matters.
+    let state = build(["# Morning!"]);
+    state = T.add(state, "one", groupOf(state, "Morning").id, NOW).state;
+    state = T.add(state, "two", groupOf(state, "Morning").id, NOW).state;
+
+    state = T.remove(state, taskOf(state, "one").id);
+    expect(groupOf(state, "Morning").important).toBe(true);
+  });
+
+  /*
+   * Re-reading is scoped to the group whose items changed. Sweeping the list
+   * would let a change here take the mark off a group over there that had been
+   * marked as a whole and still held ordinary rows.
+   */
+  it("leaves other groups alone when one of its items changes", () => {
+    let state = build(["# Work!"]);
+    const work = groupOf(state, "Work").id;
+    state = T.add(state, "chore", work, NOW).state;
+    expect(groupOf(state, "Work").important).toBe(true);
+
+    state = T.add(state, "# Morning", null, NOW).state;
+    const morning = groupOf(state, "Morning").id;
+    state = T.add(state, "x!", morning, NOW).state;
+    state = T.add(state, "y!", morning, NOW).state;
+    expect(groupOf(state, "Morning").important).toBe(true);
+
+    // Unmarking over in Morning must not reach into Work.
+    state = T.toggleImportant(state, taskOf(state, "x").id);
+    expect(groupOf(state, "Morning").important).toBe(false);
+    expect(groupOf(state, "Work").important).toBe(true);
+  });
 });
 
 describe("remove", () => {

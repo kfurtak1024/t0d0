@@ -38,37 +38,32 @@ const open = (state: State, now: number): void => {
 };
 
 /**
- * Re-read every group's mark from its items: important exactly when all of them
- * are.
+ * Re-read one group's mark from the items it now holds.
  *
- * Run when an item's mark changes, which is the only thing that can make the
- * two disagree. Not on a move or a delete: a group's mark is a statement you
- * made, and it should not evaporate because an ordinary item was added to it or
- * survive because the last plain one was deleted.
+ * A group's mark and its items' marks are one statement made two ways, and this
+ * is what keeps them in step. Scoped to the one group whose items changed:
+ * sweeping the list would let a change in one group take the mark off another
+ * that had been marked as a whole and still held ordinary items.
  *
- * This is what makes a group's mark removable. Taking it off clears the items
- * too, so there is nothing left to put it straight back — the trap that a
- * standing "all marked implies marked" rule would set.
+ * `demote` is what separates the two directions, and only an explicit unmark
+ * gets it. A group's mark is a statement you made — adding an ordinary item to
+ * it, or deleting something out of it, should not take that back. Completing
+ * the set is different: removing the last item that contradicted "everything
+ * here matters" can finish the sentence, which is why a delete may promote.
  *
- * An empty group keeps whatever it was given: `# Work!` is a promise about a
- * group you have not filled yet, and there is nothing in it to read.
+ * Promoting also needs more than one item. With a single item, "all of them are
+ * marked" and "this one is marked" are the same sentence, and promoting there
+ * would make every ordinary item added afterwards important by inheritance.
  *
  * Mutates, because every caller is already working on a clone.
  */
-function settle(state: State): void {
-  for (const node of state.list) {
-    if (node.kind !== "group" || node.items.length === 0) continue;
-    const all = node.items.every((task) => task.important);
-    /*
-     * Asymmetric, and deliberately. One item saying it is not important is
-     * always enough to take the group's mark off. One item saying it *is* is
-     * not enough to put it on: with a single item, "all of them are marked" and
-     * "this one is marked" are the same sentence, and promoting would make
-     * every ordinary item added afterwards important by inheritance.
-     */
-    if (!all) node.important = false;
-    else if (node.items.length > 1) node.important = true;
+function settleGroup(group: Group, demote: boolean): void {
+  if (group.items.length === 0) return;
+  if (!group.items.every((task) => task.important)) {
+    if (demote) group.important = false;
+    return;
   }
+  if (group.items.length > 1) group.important = true;
 }
 
 export interface AddResult {
@@ -94,9 +89,7 @@ export function add(state: State, input: string, destId: string | null, now: num
   if (target) {
     target.items.push(node);
     target.collapsed = false;
-    // Only upwards: a marked item can complete the set, but an ordinary one
-    // arriving does not take the group's own mark away.
-    if (node.important) settle(next);
+    settleGroup(target, false);
   } else {
     next.list.push(node);
   }
@@ -135,7 +128,8 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   task.target = parsed.target;
   task.important = parsed.important;
   task.count = Math.min(task.count, task.target);
-  settle(next);
+  const owner = ownerOf(next, id);
+  if (owner) settleGroup(owner, true);
   return next;
 }
 
@@ -166,7 +160,8 @@ export function toggleImportant(state: State, id: string): State {
   const task = findTask(next, id);
   if (!task) return state;
   task.important = !task.important;
-  settle(next);
+  const owner = ownerOf(next, id);
+  if (owner) settleGroup(owner, true);
   return next;
 }
 
@@ -176,6 +171,8 @@ export function remove(state: State, id: string): State {
   const owner = ownerOf(next, id);
   if (owner) {
     owner.items = owner.items.filter((task) => task.id !== id);
+    // Taking away the last item that was not marked completes the set.
+    settleGroup(owner, false);
   } else {
     next.list = next.list.filter((node) => node.id !== id);
   }
