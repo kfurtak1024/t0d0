@@ -17,6 +17,18 @@ const COUNT = 90;
 const GRAVITY = 0.22;
 const FADE = 0.006;
 
+export interface Burst {
+  /** How many bits. The bigger the moment, the bigger the shower. */
+  count?: number;
+  /**
+   * Centre of the colour spread. Each milestone wears the hue the day ring
+   * turns as it lands, so the burst and the ring are visibly the same event.
+   * Left out, the bits take the row rings' own range.
+   */
+  hue?: number;
+  spread?: number;
+}
+
 /** Hand-rolled so the app keeps its zero runtime dependencies. */
 export class Confetti {
   #canvas: HTMLCanvasElement;
@@ -40,8 +52,10 @@ export class Confetti {
     this.#ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  burst(origin: { x: number; y: number }): void {
-    for (let i = 0; i < COUNT; i++) {
+  burst(origin: { x: number; y: number }, options: Burst = {}): void {
+    const count = options.count ?? COUNT;
+    const spread = options.spread ?? 26;
+    for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 3 + Math.random() * 8;
       this.#bits.push({
@@ -53,8 +67,12 @@ export class Confetti {
         vr: (Math.random() - 0.5) * 0.35,
         w: 5 + Math.random() * 5,
         h: 3 + Math.random() * 4,
-        // Same hue range as the rings, so the celebration belongs to the same system.
-        hue: hueAt(Math.random()),
+        // Same hue range as the rings, so the celebration belongs to the same
+        // system — narrowed around the milestone's own colour when it has one.
+        hue:
+          options.hue === undefined
+            ? hueAt(Math.random())
+            : options.hue + (Math.random() - 0.5) * 2 * spread,
         life: 1,
       });
     }

@@ -140,6 +140,38 @@ test("deleting is undoable", async ({ page }) => {
   await expect(page.locator(".task", { hasText: "shopping" })).toBeVisible();
 });
 
+/*
+ * The toast offers the undo and then gets out of the way. Nothing else takes it
+ * down, so if the countdown stops working it would sit over the composer for
+ * the rest of the session.
+ */
+test("the toast takes itself away", async ({ page }) => {
+  await addItem(page, "shopping");
+  const row = page.locator(".task", { hasText: "shopping" });
+
+  await row.hover();
+  await row.locator(".kill").click();
+  await expect(page.locator("#toast")).toBeVisible();
+
+  /*
+   * The toast fades out rather than leaving the layout — it keeps its box so it
+   * can animate — so "gone" is opacity and pointer-events, not visibility.
+   * Waits longer than the countdown, and resolves the moment it goes.
+   */
+  await expect
+    .poll(
+      () =>
+        page
+          .locator("#toast")
+          .evaluate((el) => [getComputedStyle(el).opacity, getComputedStyle(el).pointerEvents]),
+      { timeout: 9000 },
+    )
+    .toEqual(["0", "none"]);
+  // The undo outlives its toast: the offer expired, the state did not.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.locator(".task", { hasText: "shopping" })).toBeVisible();
+});
+
 test("the closer only appears once there is something to close", async ({ page }) => {
   await expect(page.locator("#closeday")).toBeHidden();
   await addItem(page, "shopping");

@@ -23,6 +23,18 @@
   --ring-l: 56%;
   --ring-c: 0.15;
 
+  /* How far the warm band of the day's rainbow is lifted above --ring-l.
+     Yellow is inherently a light colour: held at the ring's fixed lightness an
+     OKLCH yellow comes out olive, and red→green reads as mud rather than as a
+     rainbow. Dark mode starts high enough to need much less of a lift. */
+  --ring-lift: 10%;
+
+  /* The importance mark. Warm and off the progress sweep's arc, so a flagged row
+     never reads as "nearly done" or as a warning. It paints a group's left edge,
+     a slim pill on a row, and a bolder word — all non-text, so 3:1 against
+     --card is the bar it has to clear, not 4.5:1. */
+  --flag: oklch(62% 0.16 62);
+
   /* Text sitting on a filled accent, and the destructive red. Both flip with
      the theme: the accent lightens in dark mode, so white stops being legible
      on it, and the red has to lighten to stay readable on a dark surface. */
@@ -81,6 +93,8 @@
     --field: #1d222b;
     --ring-l: 74%;
     --ring-c: 0.14;
+    --ring-lift: 6%;
+    --flag: oklch(78% 0.15 68);
     --on-accent: #10141a;
     --danger: oklch(74% 0.15 25);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
@@ -101,6 +115,8 @@
   --field: #1d222b;
   --ring-l: 74%;
   --ring-c: 0.14;
+  --ring-lift: 6%;
+  --flag: oklch(78% 0.15 68);
   --on-accent: #10141a;
   --danger: oklch(74% 0.15 25);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);

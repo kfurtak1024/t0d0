@@ -107,6 +107,21 @@ describe("normalize", () => {
     expect(normalize(wrap([], { openedAt: Number.NaN }))?.openedAt).toBeNull();
   });
 
+  it("coerces important to a boolean on both kinds, defaulting to false", () => {
+    // Lists written before the mark existed carry no field at all, and must not
+    // come back flagged — which is also why the schema version does not move.
+    const state = normalize(
+      wrap([
+        { kind: "task", text: "old" },
+        { kind: "task", text: "yes", important: true },
+        { kind: "task", text: "truthy", important: 1 },
+        { kind: "group", title: "G", items: [], important: "yes" },
+        { kind: "group", title: "H", items: [], important: true },
+      ]),
+    );
+    expect(state?.list.map((node) => node.important)).toEqual([false, true, false, false, true]);
+  });
+
   it("truncates oversized text instead of rejecting the item", () => {
     const state = normalize(wrap([{ kind: "task", text: "x".repeat(1000) }]));
     expect((state?.list[0] as { text: string }).text).toHaveLength(200);
@@ -150,6 +165,7 @@ describe("properties over arbitrary input", () => {
       if (count < 0 || count > target) return false;
       const id = task["id"];
       if (typeof id !== "string" || ids.has(id) || !SAFE_ID.test(id)) return false;
+      if (typeof task["important"] !== "boolean") return false;
       ids.add(id);
       return true;
     };
@@ -163,6 +179,7 @@ describe("properties over arbitrary input", () => {
         if (typeof id !== "string" || ids.has(id) || !SAFE_ID.test(id)) return false;
         ids.add(id);
         if (typeof node["collapsed"] !== "boolean") return false;
+        if (typeof node["important"] !== "boolean") return false;
         if (!Array.isArray(node["items"]) || !(node["items"] as unknown[]).every(okTask)) {
           return false;
         }

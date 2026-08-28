@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allTasks, isDone } from "../src/progress";
+import { allTasks, isDone, overallProgress } from "../src/progress";
 import * as T from "../src/transitions";
 import type { Group, State, Task } from "../src/types";
 
@@ -30,11 +30,18 @@ const rows = (...spec: string[]): State => {
   for (const row of spec) {
     if (row.startsWith("# ")) {
       const title = row.slice(2);
-      state.list.push({ kind: "group", id: title, title, collapsed: false, items: [] });
+      state.list.push({
+        kind: "group",
+        id: title,
+        title,
+        collapsed: false,
+        important: false,
+        items: [],
+      });
       continue;
     }
     const text = row.trim();
-    const task: Task = { kind: "task", id: text, text, target: 1, count: 0 };
+    const task: Task = { kind: "task", id: text, text, target: 1, count: 0, important: false };
     const last = state.list[state.list.length - 1];
     if (row.startsWith("  ") && last?.kind === "group") last.items.push(task);
     else state.list.push(task);
@@ -54,6 +61,13 @@ const taskOf = (state: State, text: string): Task =>
   allTasks(state.list).find((t) => t.text === text)!;
 
 describe("add", () => {
+  it("carries the importance mark through to the stored row", () => {
+    const state = build(["# Morning!", "call the bank!", "water plants"]);
+    expect(groupOf(state, "Morning").important).toBe(true);
+    expect(taskOf(state, "call the bank").important).toBe(true);
+    expect(taskOf(state, "water plants").important).toBe(false);
+  });
+
   it("appends a root task when nothing is aimed", () => {
     const state = build(["shopping"]);
     expect(state.list).toHaveLength(1);
@@ -151,6 +165,157 @@ describe("retitle", () => {
     let state = build(["# Morning"]);
     state = T.retitle(state, groupOf(state, "Morning").id, "# Evening", true);
     expect(groupOf(state, "Evening")).toBeDefined();
+  });
+
+  it("sets and clears the mark on a task, the same way the composer does", () => {
+    let state = build(["call the bank"]);
+    const id = taskOf(state, "call the bank").id;
+    state = T.retitle(state, id, "call the bank!", false);
+    expect(taskOf(state, "call the bank").important).toBe(true);
+    state = T.retitle(state, id, "call the bank", false);
+    expect(taskOf(state, "call the bank").important).toBe(false);
+  });
+
+  it("sets and clears the mark on a group", () => {
+    let state = build(["# Morning"]);
+    const id = groupOf(state, "Morning").id;
+    state = T.retitle(state, id, "Morning!", true);
+    expect(groupOf(state, "Morning").important).toBe(true);
+    state = T.retitle(state, id, "Morning", true);
+    expect(groupOf(state, "Morning").important).toBe(false);
+  });
+
+  it("keeps the mark and the quantity independent", () => {
+    let state = build(["make calls [3]"]);
+    const id = taskOf(state, "make calls").id;
+    state = T.retitle(state, id, "make calls! [5]", false);
+    expect(taskOf(state, "make calls")).toMatchObject({ target: 5, important: true });
+  });
+});
+
+describe("the mark is only a mark", () => {
+  it("buys no place in the order", () => {
+    // Position is the ordering, and nothing about `important` may second-guess
+    // it. A marked row lands where it was typed, steps like any other, and
+    // still sinks out of the way once it is finished.
+    let state = build(["a", "b!", "c"]);
+    expect(texts(state)).toEqual(["a", "b", "c"]);
+
+    const id = taskOf(state, "b").id;
+    state = T.reorder(state, id, "up", "level");
+    expect(texts(state)).toEqual(["b", "a", "c"]);
+
+    state = T.bump(state, id, 1, NOW);
+    expect(T.isFinished(taskOf(state, "b"))).toBe(true);
+    state = T.sink(state, id);
+    expect(texts(state)).toEqual(["a", "c", "b"]);
+  });
+
+  it("leaves progress alone", () => {
+    const state = build(["a!", "b"]);
+    expect(overallProgress(state)).toBe(0);
+  });
+});
+
+describe("rise", () => {
+  const done = (state: State, ...items: string[]): State => {
+    let next = state;
+    for (const text of items) next = T.bump(next, taskOf(next, text).id, 1, NOW);
+    return next;
+  };
+
+  it("brings a row back above the finished pile", () => {
+    let state = done(rows("a", "f1", "f2"), "f1", "f2");
+    const id = taskOf(state, "f2").id;
+
+    state = T.bump(state, id, -1, NOW);
+    state = T.rise(state, id);
+    expect(shape(state)).toEqual(["a", "f2", "f1"]);
+  });
+
+  it("climbs past every finished row, not just one", () => {
+    let state = done(rows("a", "f1", "f2", "f3"), "f1", "f2", "f3");
+    const id = taskOf(state, "f3").id;
+
+    state = T.bump(state, id, -1, NOW);
+    state = T.rise(state, id);
+    expect(shape(state)).toEqual(["a", "f3", "f1", "f2"]);
+  });
+
+  it("stops under the last of the work rather than climbing to the top", () => {
+    let state = done(rows("a", "b", "f1", "c"), "f1");
+    const id = taskOf(state, "f1").id;
+    state = T.bump(state, id, -1, NOW);
+    // b is still work, so putting f1 back must not lift it over b.
+    expect(T.rise(state, id)).toBe(state);
+  });
+
+  it("leaves the top row alone", () => {
+    const state = rows("a", "b");
+    expect(T.rise(state, taskOf(state, "a").id)).toBe(state);
+  });
+
+  /*
+   * The rule is "back above the finished pile", not "back where it came from".
+   * A row that sank past *work* keeps its new place: remembering the old one
+   * would be a second idea of where a row belongs, which is exactly what
+   * `reorder` exists to prevent.
+   */
+  it("does not restore a place it lost to unfinished work", () => {
+    let state = done(rows("a", "b", "c", "d"), "b");
+    const id = taskOf(state, "b").id;
+    state = T.sink(state, id);
+    expect(shape(state)).toEqual(["a", "c", "d", "b"]);
+
+    state = T.bump(state, id, -1, NOW);
+    expect(T.rise(state, id)).toBe(state);
+  });
+
+  it("moves a group as one block, the same way sink does", () => {
+    let state = done(rows("a", "f1", "# Morning", "  x"), "f1", "x");
+    const groupId = groupOf(state, "Morning").id;
+    expect(shape(state)).toEqual(["a", "f1", "# Morning", "  x"]);
+
+    state = T.bump(state, taskOf(state, "x").id, -1, NOW);
+    state = T.rise(state, groupId);
+    expect(shape(state)).toEqual(["a", "# Morning", "  x", "f1"]);
+  });
+});
+
+describe("toggleImportant", () => {
+  it("marks and unmarks a root task", () => {
+    let state = build(["shopping"]);
+    const id = taskOf(state, "shopping").id;
+    state = T.toggleImportant(state, id);
+    expect(taskOf(state, "shopping").important).toBe(true);
+    state = T.toggleImportant(state, id);
+    expect(taskOf(state, "shopping").important).toBe(false);
+  });
+
+  it("reaches a task inside a group", () => {
+    let state = build(["# Morning", "a"]);
+    state = T.toggleImportant(state, taskOf(state, "a").id);
+    expect(taskOf(state, "a").important).toBe(true);
+    expect(groupOf(state, "Morning").important).toBe(false);
+  });
+
+  it("marks a group", () => {
+    let state = build(["# Morning"]);
+    state = T.toggleImportant(state, groupOf(state, "Morning").id);
+    expect(groupOf(state, "Morning").important).toBe(true);
+  });
+
+  it("agrees with what the composer's ! would have made", () => {
+    // Three routes to one field — the menu must not become a fourth meaning.
+    const plain = build(["shopping"]);
+    const toggled = T.toggleImportant(plain, taskOf(plain, "shopping").id);
+    expect(taskOf(toggled, "shopping").important).toBe(true);
+    expect(taskOf(build(["shopping!"]), "shopping").important).toBe(true);
+  });
+
+  it("leaves the list alone for an id it does not know", () => {
+    const state = build(["a"]);
+    expect(T.toggleImportant(state, "nope")).toBe(state);
   });
 });
 

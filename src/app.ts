@@ -1,15 +1,15 @@
-import { allTasks, isComplete, isDone, overallProgress } from "./progress";
+import { allTasks, dayHue, isDone, overallProgress, scoreDay, type DayScore } from "./progress";
 import { createGroup } from "./render/group";
 import { flip } from "./render/flip";
 import { KeyedList } from "./render/list";
-import { hueAt, makeRing, paintRing } from "./render/ring";
+import { dayStroke, makeRing, paintRing } from "./render/ring";
 import { createTask, popRing, tickOf } from "./render/task";
 import type { RowActions } from "./render/context";
 import { loadPrefs, savePrefs, type Prefs } from "./prefs";
 import { onExternalChange } from "./storage";
 import type { Store } from "./store";
 import * as T from "./transitions";
-import { raw } from "./parse";
+import { isGroupInput, raw } from "./parse";
 import type { Group, Node, State } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
@@ -24,6 +24,29 @@ const STALE_MS = 16 * 60 * 60 * 1000;
 const EXIT_MS = 200;
 /** Long enough for the tick to finish landing before the group folds over it. */
 const COLLAPSE_MS = 520;
+
+/**
+ * The day's three moments, in the order they can be reached.
+ *
+ * Each is celebrated once, on the transition into it, and re-arms if the list
+ * falls back below it — the same rule the single completion check always used,
+ * now applied three times over.
+ */
+const MILESTONES = ["cleared", "succeeded", "complete"] as const;
+type Milestone = (typeof MILESTONES)[number];
+
+/** What each moment looks like: the hue the ring turns, and how loud it is. */
+const FANFARE: Record<Milestone, { hue: number; count: number }> = {
+  cleared: { hue: 150, count: 55 },
+  succeeded: { hue: 260, count: 95 },
+  complete: { hue: 320, count: 150 },
+};
+
+const HAPTICS: Record<Milestone, number[]> = {
+  cleared: [14, 30, 14],
+  succeeded: [18, 40, 24],
+  complete: [20, 40, 20, 40, 34],
+};
 
 /** Query a required element of the page, failing loudly rather than rendering nothing. */
 const el = (selector: string): HTMLElement => need(document, selector);
@@ -53,7 +76,7 @@ export class App {
   #prefs: Prefs = loadPrefs();
   #destId: string | null = null;
   #editingId: string | null = null;
-  #armed = true;
+  #armed: Record<Milestone, boolean> = { cleared: true, succeeded: true, complete: true };
   #shownPct = 0;
   #tweenRaf = 0;
   #storageWarned = false;
@@ -148,6 +171,14 @@ export class App {
       onPrefs: (next) => {
         this.#prefs = next;
         savePrefs(next);
+        /*
+         * Moving the bar re-scores the day, so the ring and the closer have to
+         * repaint. Arming rather than checking on purpose: a milestone reached
+         * by lowering your own bar was not earned, and confetti for moving the
+         * goalposts is hollow. It re-arms the moment the list falls back below.
+         */
+        this.#arm(this.#state);
+        this.#render();
       },
       onReplace: (next) => {
         this.#replace(next, true);
@@ -212,10 +243,14 @@ export class App {
 
     this.#wire();
     this.#store.subscribe(() => {
-      this.#render();
+      // Scored once and handed to both: the ring and the milestones are asking
+      // the same question of the same list, and partitioning it twice per
+      // change is work that only ever grows.
+      const score = scoreDay(this.#state, this.#bar);
+      this.#render(score);
       // Every state change, not just a tick: deleting the last undone item
       // finishes the day just as much as ticking it does.
-      this.#checkComplete();
+      this.#checkMilestones(score);
     });
   }
 
@@ -223,16 +258,34 @@ export class App {
     return this.#store.state;
   }
 
+  /** The success bar as a fraction, which is what the scoring speaks in. */
+  get #bar(): number {
+    return this.#prefs.successAt / 100;
+  }
+
+  /** Which of the day's moments the list has reached, right now. */
+  #reached(score: DayScore): Record<Milestone, boolean> {
+    return {
+      // Only a moment when there was something marked to clear: with nothing
+      // important on the list the gate is vacuous, and celebrating it would
+      // fire on the very first tick of an ordinary day.
+      cleared: score.hasImportant && score.cleared && score.total > 0,
+      succeeded: score.succeeded,
+      complete: score.complete,
+    };
+  }
+
   /* ------------------------------------------------------------------ boot */
 
   start(): void {
     this.#render();
-    // Never celebrate on load: arm only once the list drops below complete.
-    this.#armed = !isComplete(allTasks(this.#state.list));
+    // Never celebrate on load: every moment already reached starts spent, and
+    // arms itself only if the list later falls back below it.
+    this.#arm(this.#state);
 
     const { openedAt } = this.#state;
     if (openedAt !== null && Date.now() - openedAt > STALE_MS) {
-      this.#sheet.show(this.#state, Date.now());
+      this.#sheet.show(this.#state, Date.now(), this.#bar);
     }
   }
 
@@ -242,6 +295,15 @@ export class App {
     const before = T.findTask(this.#state, id);
     if (!before) return;
     const wasDone = isDone(before);
+    /*
+     * The row this tick belongs to: the task itself, or the group holding it —
+     * the same row `#tidy` would have sent down, so the same one has to come
+     * back up. Read before the change, because whether it *was* finished is
+     * what says there is anything to come back from.
+     */
+    const rowId = T.ownerOf(this.#state, id)?.id ?? id;
+    const rowBefore = T.findRow(this.#state, rowId);
+    const wasFinished = rowBefore !== undefined && T.isFinished(rowBefore);
 
     this.#store.apply(T.bump(this.#state, id, delta, Date.now()));
 
@@ -253,6 +315,32 @@ export class App {
       this.#vibrate(12);
       this.#tidy(id);
     }
+
+    const rowAfter = T.findRow(this.#state, rowId);
+    if (wasFinished && rowAfter && !T.isFinished(rowAfter)) this.#untidy(rowId);
+  }
+
+  /**
+   * Bring back what an untick just put back into play.
+   *
+   * The mirror of {@link #tidy}, and gated on the same preference: someone who
+   * turned off automatic tidying does not want automatic reordering in either
+   * direction.
+   *
+   * Immediate, where tidying waits. The delay there protects the reward — the
+   * tick landing is the point, so nothing moves over it until it has played
+   * out. An untick is a correction, not a reward, and there is nothing to wait
+   * for; a row that took half a second to come back would feel stuck.
+   */
+  #untidy(id: string): void {
+    if (!this.#prefs.autoCollapseDone) return;
+    // Whatever was queued for this row is off: it is not going down any more.
+    this.#tidyIds.delete(id);
+
+    const next = T.rise(this.#state, id);
+    if (next === this.#state) return;
+    this.#animateNext = true;
+    this.#store.apply(next);
   }
 
   /**
@@ -417,6 +505,19 @@ export class App {
       });
     }
 
+    // The mark's other two routes — a trailing `!` in the composer, and the same
+    // when editing the text — both mean typing. This is the one that works with
+    // a thumb on a row already in front of you.
+    const row = task ?? T.findGroup(this.#state, id);
+    if (row) {
+      items.push({
+        label: row.important ? "Unmark important" : "Mark important",
+        onSelect: () => {
+          this.#store.apply(T.toggleImportant(this.#state, id), { undoable: true });
+        },
+      });
+    }
+
     // Nesting is reachable by stepping, but only one row at a time; on a phone
     // that is a lot of taps to cross a long group, so it gets its own entry.
     const owner = T.ownerOf(this.#state, id);
@@ -496,19 +597,17 @@ export class App {
     this.#destId = null;
     this.#rows.clear();
     // Armed before the notify, so an all-done import does not celebrate itself.
-    this.#armed = !isComplete(allTasks(next.list));
+    this.#arm(next);
     this.#store.replace(next, { undoable });
   }
 
   #beginEdit(element: HTMLElement, id: string, isGroup: boolean): void {
     if (this.#editingId !== null) return;
 
-    const initial = isGroup
-      ? (T.findGroup(this.#state, id)?.title ?? "")
-      : (() => {
-          const task = T.findTask(this.#state, id);
-          return task ? raw(task) : "";
-        })();
+    // Both kinds go through `raw`, so what the editor opens on is exactly what
+    // the composer would have accepted — bracket, bang and all.
+    const node = isGroup ? T.findGroup(this.#state, id) : T.findTask(this.#state, id);
+    const initial = node ? raw(node) : "";
 
     this.#editingId = id;
     beginEdit(
@@ -528,17 +627,38 @@ export class App {
 
   /* --------------------------------------------------------------- rewards */
 
-  #checkComplete(): void {
-    const complete = isComplete(allTasks(this.#state.list));
-    if (complete && this.#armed) {
-      this.#armed = false;
-      if (!this.#motion.matches) {
-        const box = this.#totalRing.getBoundingClientRect();
-        this.#confetti.burst({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
-      }
-      this.#vibrate([18, 40, 24]);
+  /** Spend every moment the list has already reached, without celebrating it. */
+  #arm(state: State): void {
+    const reached = this.#reached(scoreDay(state, this.#bar));
+    for (const milestone of MILESTONES) this.#armed[milestone] = !reached[milestone];
+  }
+
+  /**
+   * Celebrate whatever the last change just crossed.
+   *
+   * Highest first, and only one burst: a single tick can cross two lines at
+   * once — the last important item landing on a list already past the bar — and
+   * two showers on the same frame read as one messy shower rather than as two
+   * rewards. The lower moments are still spent, so they do not fire late.
+   */
+  #checkMilestones(score = scoreDay(this.#state, this.#bar)): void {
+    const reached = this.#reached(score);
+    const hit = [...MILESTONES]
+      .reverse()
+      .find((milestone) => reached[milestone] && this.#armed[milestone]);
+
+    for (const milestone of MILESTONES) this.#armed[milestone] = !reached[milestone];
+    if (!hit) return;
+
+    const { hue, count } = FANFARE[hit];
+    if (!this.#motion.matches) {
+      const box = this.#totalRing.getBoundingClientRect();
+      this.#confetti.burst(
+        { x: box.left + box.width / 2, y: box.top + box.height / 2 },
+        { hue, count },
+      );
     }
-    if (!complete) this.#armed = true;
+    this.#vibrate(HAPTICS[hit]);
   }
 
   #vibrate(pattern: number | number[]): void {
@@ -554,7 +674,7 @@ export class App {
 
   /* ---------------------------------------------------------------- render */
 
-  #render(): void {
+  #render(score = scoreDay(this.#state, this.#bar)): void {
     if (this.#destId !== null && !T.findGroup(this.#state, this.#destId)) this.#destId = null;
 
     // Only reorders pay for the FLIP measurement — reading every row's box on
@@ -576,14 +696,23 @@ export class App {
 
     const tasks = allTasks(this.#state.list);
     const progress = overallProgress(this.#state);
+    /*
+     * The arc still measures the whole list, because that is what "3 of 7"
+     * means. The colour is the day's verdict, which is a different question:
+     * a list can be most of the way done and still have an important item
+     * outstanding, and the ring should say so rather than average it away.
+     */
+    const hue = dayHue(score, this.#bar);
 
     this.#empty.hidden = this.#state.list.length > 0;
     this.#closer.hidden = tasks.length === 0;
-    this.#closer.style.setProperty("--end-hue", hueAt(progress).toFixed(1));
+    this.#closer.style.setProperty("--end-hue", hue.toFixed(1));
+    this.#closer.style.setProperty("--end-tint", dayStroke(hue));
     this.#closer.classList.toggle("lit", progress > 0);
-    this.#closer.classList.toggle("ripe", tasks.length > 0 && progress === 1);
+    this.#closer.classList.toggle("ripe", score.succeeded);
 
-    paintRing(this.#totalRing, tasks.length ? progress : 0, 1);
+    paintRing(this.#totalRing, tasks.length ? progress : 0, 1, dayStroke(hue));
+    this.#totalRing.style.setProperty("--track-tint", dayStroke(hue, 0.2));
     this.#totalRing.style.opacity = tasks.length ? "1" : "0.3";
     const frac = `${String(tasks.filter(isDone).length)} of ${String(tasks.length)}`;
     // Writing the same text still fires the live region, so only write changes.
@@ -601,7 +730,16 @@ export class App {
       for (const group of groups) this.#dest.append(new Option(group.title, group.id));
       this.#dest.dataset["sig"] = signature;
     }
-    this.#dest.value = this.#destId ?? "";
+    /*
+     * A group always lands at the root, whatever is aimed — so while the
+     * composer is holding one, the row has to say "Top level" rather than name
+     * a group the item will not go into.
+     *
+     * Display only: the aim itself is untouched and comes back the moment the
+     * `#` does not, so deleting one character does not cost you the group you
+     * had picked.
+     */
+    this.#dest.value = isGroupInput(this.#input.value) ? "" : (this.#destId ?? "");
   }
 
   #tweenPct(target: number): void {
@@ -629,7 +767,16 @@ export class App {
   #wire(): void {
     (el("#composer") as HTMLFormElement).addEventListener("submit", (event) => {
       event.preventDefault();
-      const result = T.add(this.#state, this.#input.value, this.#destId, Date.now());
+      /*
+       * Emptied before the state is applied, not after. The destination row
+       * reads the composer to decide whether a group is on its way, and the
+       * apply below renders — so leaving the text in place until afterwards had
+       * the row report "Top level" for the group it had just aimed at.
+       */
+      const typed = this.#input.value;
+      this.#input.value = "";
+
+      const result = T.add(this.#state, typed, this.#destId, Date.now());
       if (result.added) {
         this.#destId = result.destId;
         this.#store.apply(result.state);
@@ -637,8 +784,13 @@ export class App {
         // screen behind it, so adding without this types into the void.
         this.#reveal(result.added.id);
       }
-      this.#input.value = "";
       this.#input.focus();
+    });
+
+    // Only the destination row: a full render measures every row for FLIP, which
+    // is a lot of work to do on each keystroke for one <select>'s value.
+    this.#input.addEventListener("input", () => {
+      this.#renderDest();
     });
 
     this.#dest.addEventListener("change", () => {
@@ -648,7 +800,7 @@ export class App {
     });
 
     this.#closer.addEventListener("click", () => {
-      this.#sheet.show(this.#state, Date.now());
+      this.#sheet.show(this.#state, Date.now(), this.#bar);
     });
     (el("#databtn") as HTMLButtonElement).addEventListener("click", () => {
       this.#drawer.show();

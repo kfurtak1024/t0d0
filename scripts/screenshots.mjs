@@ -8,9 +8,10 @@
  *
  * The seeded day is chosen to exercise every state the list can be in: a
  * cleared group with its frame and tinted rail, a partially counted item
- * mid-sweep, a finished standalone item, untouched items, the destination
- * picker and the composer hint. Keep it that way — if a screenshot stops
- * showing a state, that state stops being reviewed.
+ * mid-sweep, a finished standalone item, untouched items, an important group
+ * and an important row with their accent bars, the destination picker and the
+ * composer hint. Keep it that way — if a screenshot stops showing a state,
+ * that state stops being reviewed.
  */
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
@@ -41,13 +42,14 @@ const DEMO_DAY = {
       id: "g2",
       title: "Work",
       collapsed: false,
+      important: true,
       items: [
         { kind: "task", id: "t3", text: "make calls", target: 3, count: 1 },
         { kind: "task", id: "t4", text: "review the PR", target: 1, count: 1 },
         { kind: "task", id: "t5", text: "write release notes", target: 1, count: 0 },
       ],
     },
-    { kind: "task", id: "t6", text: "shopping", target: 1, count: 0 },
+    { kind: "task", id: "t6", text: "shopping", target: 1, count: 0, important: true },
     { kind: "task", id: "t7", text: "stretch", target: 1, count: 0 },
   ],
 };

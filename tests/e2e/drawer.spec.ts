@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage } from "./helpers";
+import { addItem, clearStorage, settle } from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
@@ -16,17 +16,101 @@ test.beforeEach(async ({ page }) => {
   await clearStorage(page);
 });
 
-test("the settings sheet holds theme, behaviour, two backup rows, and reset", async ({ page }) => {
+test("the settings sheet holds theme, two behaviour rows, two backup rows, and reset", async ({
+  page,
+}) => {
   await addItem(page, "shopping");
   await openDrawer(page);
 
   await expect(page.locator(".drawer-head h2")).toHaveText("Settings");
-  await expect(page.locator(".row")).toHaveCount(5);
+  await expect(page.locator(".row")).toHaveCount(6);
+  await expect(page.locator('[data-pref="autoCollapseDone"]')).toHaveCount(1);
+  await expect(page.locator('[data-pref-choice="successAt"]')).toHaveCount(1);
   await expect(page.locator('[data-act="save"] .row-label')).toHaveText("Save a copy");
   await expect(page.locator('[data-act="restore"] .row-label')).toHaveText("Load from a file");
   await expect(page.locator('[data-act="erase"] .row-label')).toHaveText("Erase everything");
   await expect(page.locator(".advanced")).toHaveCount(0);
   await expect(page.locator("textarea")).toHaveCount(0);
+});
+
+/*
+ * A scrollbar on a sheet with a screenful of room around it is the complaint
+ * this guards against. It has gone wrong twice — once when the Behaviour
+ * section grew a second row and tipped the content past the viewport cap, and
+ * once at 1080p where the *absolute* cap bound and it scrolled by one pixel.
+ *
+ * Measured, not eyeballed: a one-pixel overflow looks like nothing and still
+ * draws a scrollbar. A genuinely short window is allowed to scroll, which is
+ * why this asks for a roomy one.
+ */
+test("the settings sheet fits a roomy window without scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await addItem(page, "shopping");
+  await openDrawer(page);
+
+  const fit = await page.evaluate(() => {
+    const drawer = document.querySelector(".drawer");
+    if (!drawer) return null;
+    return { content: drawer.scrollHeight, box: drawer.clientHeight };
+  });
+  expect(fit).not.toBeNull();
+  expect(fit?.content).toBeLessThanOrEqual(fit?.box ?? 0);
+});
+
+/*
+ * Every control here has to answer to a 44px thumb. Measured with
+ * elementFromPoint rather than by box, because most of them get there through
+ * an invisible ::after overlay that getBoundingClientRect cannot see — and
+ * because an overlay that reaches too far steals its neighbour's centre, which
+ * looks like nothing and breaks the control beside it.
+ *
+ * The picker is the exception: a <select> is a replaced element and does not
+ * render an ::after reliably, so it earns its height for real.
+ */
+test("every control in the settings sheet answers to a thumb", async ({ page }) => {
+  await openDrawer(page);
+  // The sheet arrives on a spring that overshoots, and a box read mid-flight is
+  // the animated size, not the settled one — which reads as a 43px control.
+  await settle(page);
+
+  const controls = [
+    ".pick",
+    ".switch",
+    "[data-theme-choice='system']",
+    "[data-theme-choice='light']",
+    "[data-theme-choice='dark']",
+    ".drawer-close",
+  ];
+
+  const measured = await page.evaluate((selectors) => {
+    const owns = (el: Element, x: number, y: number): boolean => {
+      const hit = document.elementFromPoint(x, y);
+      return hit !== null && (hit === el || el.contains(hit));
+    };
+    return selectors.map((selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return { selector, height: 0, ownsCentre: false };
+      const box = el.getBoundingClientRect();
+      const cx = box.left + box.width / 2;
+      const cy = box.top + box.height / 2;
+      const reach = (step: number): number => {
+        let n = 0;
+        while (n < 60 && owns(el, cx, cy + step * (box.height / 2 + n))) n++;
+        return n;
+      };
+      return {
+        selector,
+        height: Math.round(box.height + reach(1) + reach(-1)),
+        ownsCentre: owns(el, cx, cy),
+      };
+    });
+  }, controls);
+
+  for (const control of measured) {
+    expect(control.height, `${control.selector} tap height`).toBeGreaterThanOrEqual(44);
+    // Nothing may sit on top of a neighbour's own middle.
+    expect(control.ownsCentre, `${control.selector} owns its centre`).toBe(true);
+  }
 });
 
 test("the theme choice applies immediately and survives a reload", async ({ page }) => {

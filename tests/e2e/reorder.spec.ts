@@ -28,6 +28,71 @@ test("the ⋯ menu moves a row up and down", async ({ page }) => {
   expect(await shape(page)).toEqual(["gamma", "alpha", "beta"]);
 });
 
+/*
+ * The ⋯ menu is the keyboard and single-pointer alternative to dragging, which
+ * is what satisfies WCAG's requirement that a dragging movement have one. Its
+ * arrow-key handling had no test at all: `src/ui/menu.ts` is outside the unit
+ * coverage set, and the specs here only ever clicked its entries.
+ */
+test("the ⋯ menu moves focus with the arrow keys, and wraps", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+  await addItem(page, "gamma");
+
+  // A middle row, so both moves are live and the menu has three usable entries.
+  await menuOf(page, "beta").click();
+  const up = page.getByRole("menuitem", { name: "Move up" });
+  const down = page.getByRole("menuitem", { name: "Move down" });
+  const mark = page.getByRole("menuitem", { name: "Mark important" });
+
+  await expect(up).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(down).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(mark).toBeFocused();
+
+  // Off the end and round, in both directions.
+  await page.keyboard.press("ArrowDown");
+  await expect(up).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(mark).toBeFocused();
+});
+
+test("Home and End reach the ends of the ⋯ menu", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+  await addItem(page, "gamma");
+
+  await menuOf(page, "beta").click();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("menuitem", { name: "Mark important" })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(page.getByRole("menuitem", { name: "Move up" })).toBeFocused();
+});
+
+/*
+ * A spent move stays in the menu, disabled, so the rows do not reflow under a
+ * finger — which means the keyboard has to step over it rather than into it.
+ */
+test("the arrow keys skip a spent move rather than landing on it", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  // The top row: "Move up" is there but spent.
+  await menuOf(page, "alpha").click();
+  const up = page.getByRole("menuitem", { name: "Move up" });
+  const down = page.getByRole("menuitem", { name: "Move down" });
+  const mark = page.getByRole("menuitem", { name: "Mark important" });
+  await expect(up).toBeDisabled();
+
+  // Opening lands on the first entry that can actually be used.
+  await expect(down).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(mark).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(down).toBeFocused();
+});
+
 test("a spent move stays in place, disabled, rather than moving under the finger", async ({
   page,
 }) => {

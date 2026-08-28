@@ -28,6 +28,9 @@ export class Toast {
   }
 
   hide(): void {
+    // Dismissing by hand cancels the countdown rather than leaving it to fire
+    // into an already-hidden toast.
+    clearTimeout(this.#timer);
     this.#root.hidden = true;
   }
 }

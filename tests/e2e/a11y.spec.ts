@@ -36,9 +36,10 @@ const A_DAY = {
         { kind: "task", id: "t2", text: "walk the dog", target: 1, count: 0 },
       ],
     },
-    { kind: "group", id: "g2", title: "Later", collapsed: true, items: [] },
+    { kind: "group", id: "g2", title: "Later", collapsed: true, important: true, items: [] },
     { kind: "task", id: "t3", text: "make calls", target: 3, count: 1 },
     { kind: "task", id: "t4", text: "shopping", target: 1, count: 1 },
+    { kind: "task", id: "t5", text: "call the bank", target: 1, count: 0, important: true },
   ],
 };
 
@@ -123,7 +124,7 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
             - button "More for walk the dog": ⋯
             - button "Delete walk the dog"
       - listitem:
-        - button "Expand Later"
+        - button "Expand Later, important"
         - text: Later empty
         - button "Add to Later": +
         - button "More for Later": ⋯
@@ -140,6 +141,11 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
         - text: shopping
         - button "More for shopping": ⋯
         - button "Delete shopping"
+      - listitem:
+        - checkbox "call the bank, important"
+        - text: call the bank
+        - button "More for call the bank": ⋯
+        - button "Delete call the bank"
   `);
 });
 
@@ -151,6 +157,8 @@ test("the row menu is a menu, and axe agrees", async ({ page }) => {
     - menu:
       - menuitem "Move up Alt+↑"
       - menuitem "Move down Alt+↓"
+      - menuitem "Reset to 0"
+      - menuitem "Mark important"
       - menuitem "Into “Later” Tab"
   `);
 

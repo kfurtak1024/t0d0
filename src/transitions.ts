@@ -1,6 +1,6 @@
-import { parse } from "./parse";
+import { parse, parseTitle } from "./parse";
 import { allTasks, isDone } from "./progress";
-import { LIMITS, SCHEMA_VERSION } from "./types";
+import { SCHEMA_VERSION } from "./types";
 import type { Group, Node, State, Task } from "./types";
 
 /**
@@ -75,15 +75,16 @@ export function bump(state: State, id: string, delta: number, now: number): Stat
   return next;
 }
 
-/** Re-parse edited text so `[n]` stays editable after creation. */
+/** Re-parse edited text so `[n]` and the `!` mark stay editable after creation. */
 export function retitle(state: State, id: string, value: string, isGroup: boolean): State {
   const next = clone(state);
 
   if (isGroup) {
     const group = findGroup(next, id);
-    const title = value.trim().replace(/^#\s*/, "").slice(0, LIMITS.text);
-    if (!group || !title) return state;
-    group.title = title;
+    const head = parseTitle(value);
+    if (!group || !head) return state;
+    group.title = head.title;
+    group.important = head.important;
     return next;
   }
 
@@ -92,7 +93,24 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   if (!task || parsed?.kind !== "task") return state;
   task.text = parsed.text;
   task.target = parsed.target;
+  task.important = parsed.important;
   task.count = Math.min(task.count, task.target);
+  return next;
+}
+
+/**
+ * Flip a row's importance mark.
+ *
+ * The composer's way in is a trailing `!` and inline editing's is the same, but
+ * neither is reachable with a thumb on a row you are already looking at — so
+ * the `⋯` menu gets a third way to the same field. Works on a nested task as
+ * well as a root row, which is why it looks in both places.
+ */
+export function toggleImportant(state: State, id: string): State {
+  const next = clone(state);
+  const node: Task | Group | undefined = findTask(next, id) ?? findGroup(next, id);
+  if (!node) return state;
+  node.important = !node.important;
   return next;
 }
 
@@ -267,6 +285,35 @@ export function sink(state: State, id: string): State {
     const stepped = reorder(next, id, "down", "level");
     // reorder declines in place rather than throwing, and a decline it is not
     // our business to predict would spin here forever.
+    if (stepped === next) return next;
+    next = stepped;
+  }
+}
+
+/**
+ * Bring a row that is no longer finished back above the pile.
+ *
+ * The exact mirror of {@link sink}, and built the same way: repeat one
+ * level-scoped step while the row above is finished, rather than computing a
+ * destination. It comes to rest directly under the last of the work that is
+ * left.
+ *
+ * Unticking something says "this is still to do", and leaving it buried among
+ * the finished rows makes that a lie — you would have to go hunting for the
+ * thing you just put back. It stops against unfinished work rather than
+ * travelling to the top, so a row put back rejoins the end of the queue instead
+ * of jumping it.
+ */
+export function rise(state: State, id: string): State {
+  let next = state;
+  for (;;) {
+    const index = next.list.findIndex((node) => node.id === id);
+    const above = index <= 0 ? undefined : next.list[index - 1];
+    if (!above || !isFinished(above)) return next;
+
+    const stepped = reorder(next, id, "up", "level");
+    // Same guard as sink: a decline it is not our business to predict would
+    // spin here forever.
     if (stepped === next) return next;
     next = stepped;
   }

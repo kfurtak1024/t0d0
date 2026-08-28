@@ -1,5 +1,5 @@
 import { normalize } from "../normalize";
-import type { Prefs } from "../prefs";
+import { SUCCESS_STEPS, type Prefs } from "../prefs";
 import { allTasks } from "../progress";
 import { icon, type IconName } from "../render/context";
 import type { State } from "../types";
@@ -91,6 +91,26 @@ export class Drawer {
         this.#paintPrefs();
       });
     }
+
+    /*
+     * The success bar's options are generated from SUCCESS_STEPS rather than
+     * written into the markup, so the picker and the loader that validates a
+     * stored value cannot drift apart and leave the control blank.
+     */
+    const bar = this.#successPicker();
+    bar.replaceChildren(
+      ...SUCCESS_STEPS.map((step) => new Option(`${String(step)}%`, String(step))),
+    );
+    bar.addEventListener("change", () => {
+      const value = Number(bar.value);
+      if (!(SUCCESS_STEPS as readonly number[]).includes(value)) return;
+      this.#handlers.onPrefs({ ...this.#handlers.prefs(), successAt: value });
+      this.#paintPrefs();
+    });
+  }
+
+  #successPicker(): HTMLSelectElement {
+    return this.#need('[data-pref-choice="successAt"]') as HTMLSelectElement;
   }
 
   #paintPrefs(): void {
@@ -100,6 +120,7 @@ export class Drawer {
       if (!name || !(name in prefs)) continue;
       el.setAttribute("aria-checked", String(prefs[name as keyof Prefs]));
     }
+    this.#successPicker().value = String(prefs.successAt);
   }
 
   #wireTheme(): void {

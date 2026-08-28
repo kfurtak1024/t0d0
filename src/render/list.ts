@@ -29,11 +29,6 @@ export class KeyedList<T extends { id: string }> {
     return this.#entries.get(key);
   }
 
-  /** Drop an entry without touching the DOM — used when an exit animation owns the node. */
-  forget(key: string): void {
-    this.#entries.delete(key);
-  }
-
   patch(data: T[]): void {
     let index = 0;
 

@@ -64,6 +64,7 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
 
   const update = (next: Group): void => {
     box.classList.toggle("collapsed", next.collapsed);
+    box.classList.toggle("important", next.important);
     // Collapsing hides the rows visually; inert takes them out of the tab order
     // too, so nobody focuses a row they cannot see.
     body.toggleAttribute("inert", next.collapsed);
@@ -78,10 +79,10 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
     plus.classList.toggle("aimed", actions.isAimed(next.id));
     plus.setAttribute("aria-label", `Add to ${next.title}`);
     chevron.setAttribute("aria-expanded", String(!next.collapsed));
-    chevron.setAttribute(
-      "aria-label",
-      next.collapsed ? `Expand ${next.title}` : `Collapse ${next.title}`,
-    );
+    // Same reasoning as the tick's label: the chevron is the group's own handle,
+    // so it is where the mark reaches a screen reader.
+    const name = next.important ? `${next.title}, important` : next.title;
+    chevron.setAttribute("aria-label", next.collapsed ? `Expand ${name}` : `Collapse ${name}`);
     dots.setAttribute("aria-label", `More for ${next.title}`);
     kill.setAttribute("aria-label", `Delete ${next.title}`);
 

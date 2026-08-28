@@ -20,6 +20,10 @@ export function save(state: State): boolean {
   const raw = JSON.stringify(state);
   try {
     localStorage.setItem(STORAGE_KEY, raw);
+    // Dropped on the way out: once a write lands, real storage is the truth and
+    // a leftover copy here would shadow it with something older if reading ever
+    // started throwing on its own.
+    memory = null;
     return true;
   } catch {
     memory = raw;

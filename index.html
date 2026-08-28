@@ -66,7 +66,9 @@
           />
           <button class="add" type="submit" aria-label="Add">+</button>
         </form>
-        <p class="hint"><b>#&nbsp;Title</b> makes a group · <b>[3]</b> sets a count</p>
+        <p class="hint">
+          <b>#&nbsp;Title</b> makes a group · <b>[3]</b> sets a count · <b>!</b> marks it important
+        </p>
       </div>
     </div>
 
@@ -80,6 +82,7 @@
         <h2 id="sheettitle">Today</h2>
         <p class="score">0 of 0</p>
         <p class="of">done</p>
+        <p class="verdict"></p>
         <ul class="cleared"></ul>
         <p class="dur"></p>
         <button class="confirm" type="button">Clear the ticks</button>
@@ -141,6 +144,20 @@
                 >
                   <span class="knob"></span>
                 </button>
+              </div>
+              <div class="row rowtall">
+                <span class="row-main">
+                  <span class="row-label">Call it a good day at</span>
+                  <span class="row-sub"
+                    >How much of the rest has to be done. Anything marked <b>!</b> is required
+                    anyway</span
+                  >
+                </span>
+                <select
+                  class="pick"
+                  aria-label="Call it a good day at"
+                  data-pref-choice="successAt"
+                ></select>
               </div>
             </div>
           </section>

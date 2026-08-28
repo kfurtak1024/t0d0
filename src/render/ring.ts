@@ -1,10 +1,37 @@
 const SVG = "http://www.w3.org/2000/svg";
 
 /**
- * Progress is encoded as hue as well as fill: indigo at nothing done, green at
- * finished, sweeping through blue and teal on the way. Read before the number.
+ * A row's progress encoded as hue as well as fill: indigo at nothing done,
+ * green at finished, sweeping through blue and teal on the way.
+ *
+ * Green at the end is not decoration — it is the same hue as the finished
+ * frame, so a completed row's ring and its outline agree. The day's own ring
+ * runs a different, wider sweep; see `dayHue` in progress.ts.
  */
 export const hueAt = (progress: number): number => 268 - 118 * Math.min(1, Math.max(0, progress));
+
+/**
+ * How far into the warm band a hue sits, 0 to 1, peaking at yellow.
+ *
+ * The warm half of a rainbow is inherently light. Held at the ring's fixed
+ * lightness an OKLCH yellow renders olive, and the day's red→green stretch
+ * reads as mud; lifting that band is what makes it read as a rainbow. The
+ * amount is a token, so each theme sets its own.
+ */
+const warmth = (hue: number): number => Math.exp(-Math.pow((hue - 95) / 55, 2));
+
+/**
+ * The day ring's colour: a rainbow hue, with the warm band lifted.
+ *
+ * `alpha` is for the track behind the arc, which the day ring tints rather than
+ * leaving grey — otherwise "the day starts red" is a claim nobody can see,
+ * since at nothing-done there is no arc to paint.
+ */
+export const dayStroke = (hue: number, alpha?: number): string => {
+  const lightness = `calc(var(--ring-l) + var(--ring-lift) * ${warmth(hue).toFixed(3)})`;
+  const fade = alpha === undefined ? "" : ` / ${String(Math.round(alpha * 100))}%`;
+  return `oklch(${lightness} var(--ring-c) ${hue.toFixed(1)}${fade})`;
+};
 
 const strokeAt = (progress: number): string =>
   `oklch(var(--ring-l) var(--ring-c) ${hueAt(progress).toFixed(1)})`;
@@ -80,15 +107,20 @@ export function makeRing(size: number, width: number, target: number): Ring {
   return svg;
 }
 
-/** `count` may be fractional for meter rings (group and overall progress). */
-export function paintRing(ring: Ring, count: number, target: number): void {
+/**
+ * `count` may be fractional for meter rings (group and overall progress).
+ *
+ * `colour` overrides the row sweep, which is how the day's ring wears the
+ * rainbow while every row keeps the indigo→green one that matches its frame.
+ */
+export function paintRing(ring: Ring, count: number, target: number, colour?: string): void {
   const progress = Math.min(1, count / target);
-  const colour = strokeAt(progress);
+  const stroke = colour ?? strokeAt(progress);
 
   if (ring.continuous) {
     const [arc] = ring.segments;
     if (arc) {
-      arc.style.stroke = count > 0 ? colour : "transparent";
+      arc.style.stroke = count > 0 ? stroke : "transparent";
       arc.setAttribute(
         "stroke-dasharray",
         `${String(ring.circumference)} ${String(ring.circumference)}`,
@@ -97,9 +129,9 @@ export function paintRing(ring: Ring, count: number, target: number): void {
     }
   } else {
     ring.segments.forEach((segment, index) => {
-      segment.style.stroke = index < count ? colour : "transparent";
+      segment.style.stroke = index < count ? stroke : "transparent";
     });
   }
 
-  ring.check.style.stroke = colour;
+  ring.check.style.stroke = stroke;
 }
