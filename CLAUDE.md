@@ -137,13 +137,20 @@ Invariants worth defending in review:
   sits beside the green frame cleanly.) `tests/e2e/important.spec.ts` asserts the two
   are tellable apart rather than asserting a colour, so the treatment can change without
   the guarantee moving.
-- **A group and an item wear the mark differently, on purpose.** A group is a
-  container, so it wears it as its own left edge: a `linear-gradient` in the card's
-  background stopping at exactly `--r-card`, so the card's `border-radius` clips it and
-  the strip's flat inner side lands precisely where the curve ends. It _is_ the rounded
-  corner rather than a bar sitting inside it, and it follows `--r-card` if that changes.
-  An item is a row, so it takes a slim `::before` pill — a strip that wide would read as
-  a colour block on a 56px card and swamp a nested row.
+- **A card wears the mark as its own left edge; a nested row wears a pill.** The card
+  version is a `linear-gradient` in the background stopping at exactly `--r-card`, so the
+  card's `border-radius` clips it and the strip's flat inner side lands precisely where
+  the curve ends. It _is_ the rounded corner rather than a bar sitting inside it, and it
+  follows `--r-card` if that changes. Groups and top-level items share it, because they
+  are the same kind of thing to the eye — two cards side by side in one list. A nested
+  row has no card, and a strip that wide would swamp something half a card tall, so it
+  takes a slim `::before` pill instead.
+- **A root card's leading padding has to clear `--r-card`**, which is why it is 1.25rem
+  where the others are 0.75rem. At the narrower value the tick and the in-flow grip sat
+  six pixels inside the strip and were drawn over the colour — invisible on a pointer
+  device, where the grip is out in the margin, and obvious on a phone. It is
+  unconditional rather than only on a marked row, so nothing shifts when the mark goes
+  on or comes off.
 - **Do not draw the group's strip any other way.** Both alternatives were tried and both
   fought the corner: an inset `box-shadow` curves _both_ sides and reads as a fragment
   of the frame, and a pseudo-element cannot match an 18px corner at all, because a
