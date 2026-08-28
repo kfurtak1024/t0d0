@@ -115,18 +115,13 @@
 }
 
 /*
-  The two optional layers of a card's shadow, as named slots: --edge is the
-  finished outline, --bar the importance mark. Kept apart so a row can be both
-  without either rule having to restate the other's value.
-
-  Reset on every row rather than defined on :root, because they must not be
-  inherited — a finished group would otherwise hand its green outline down to
-  every task sitting inside it.
+  The finished outline, as a named slot on the card's shadow. Reset on every row
+  rather than defined on :root, because it must not be inherited — a finished
+  group would otherwise hand its green outline down to every task inside it.
 */
 .task,
 .group {
   --edge: 0 0 0 0 transparent;
-  --bar: 0 0 0 0 transparent;
 }
 
 /* ---------------------------------------------------------------- groups */
@@ -134,7 +129,7 @@
 .group {
   background: var(--card);
   border-radius: var(--r-card);
-  box-shadow: var(--shadow-card), var(--edge), var(--bar);
+  box-shadow: var(--shadow-card), var(--edge);
   padding: 0.55rem 0.55rem 0.3rem;
 }
 
@@ -234,7 +229,7 @@
 
 .list > .task {
   background: var(--card);
-  box-shadow: var(--shadow-card), var(--edge), var(--bar);
+  box-shadow: var(--shadow-card), var(--edge);
   padding: 0.7rem 0.75rem;
   border-radius: var(--r-card);
 }
@@ -301,7 +296,7 @@
   position: relative;
   z-index: 30;
   transform: translateY(var(--drag-y, 0));
-  box-shadow: var(--shadow-lift), var(--bar);
+  box-shadow: var(--shadow-lift);
   cursor: grabbing;
   /* The pointer owns this row's transform; a transition would trail the finger,
      and pointer-events would make the row hit-test itself instead of the list
@@ -567,33 +562,55 @@ body.dragging-row {
 /* ------------------------------------------------------------- important */
 
 /*
-  A bar at the leading edge and a heavier word. Two channels on purpose: weight
-  is not colour, so the mark survives a monochrome screen, and the tick's
+  A strip down the leading edge, and a heavier word. Two channels on purpose:
+  weight is not colour, so the mark survives a monochrome screen, and the tick's
   accessible name carries it for anyone reading neither.
 
-  A card carries it as an inset shadow: that follows the rounded corners for
-  free, and costs no pseudo-element on a row whose ::after is already spoken
-  for by the hit areas.
+  Painted as the row's own background rather than as a pseudo-element or an
+  inset shadow, so the row's `border-radius` clips it: the strip's outer side is
+  rounded by the card's real corner and its inner side is flat, which is what
+  makes it read as the card's edge rather than as something laid on top of it.
+
+  Doing it any other way fought the corner. An inset shadow curves *both* sides
+  and reads as a fragment of the frame; a pseudo-element with its own radius
+  cannot match an 18px corner at 8px wide, because the radius gets scaled down
+  to fit the box. A background has no such problem, and cannot intercept a tap
+  the way a pseudo-element sitting over the grip's hit area could.
 */
-.list > .task.important,
+/*
+  A group wears the mark as its own left edge, so the strip is exactly as wide
+  as the corner radius: its flat inner side lands precisely where the card's
+  curve ends, which makes the strip *be* the rounded corner rather than sit
+  inside it. Change --r-card and this follows.
+*/
 .group.important {
-  --bar: inset 3px 0 0 0 var(--flag);
+  background: linear-gradient(to right, var(--flag) 0 var(--r-card), var(--card) var(--r-card));
 }
 
 /*
-  A nested row has no card, and the same inset shadow there curves with the
-  much tighter --r-row until it reads as a bracket rather than a bar. So it is
-  drawn instead: straight, and held off the ends so it cannot round at all.
+  An item is a row, not a container, so it takes a slim pill instead — the same
+  mark at the scale of the thing being marked. A strip that wide on a 56px card
+  would read as a colour block, and on a nested row it would swamp it.
+
+  `pointer-events: none` because it is decoration sitting exactly where the
+  grip's hit area reaches: the row's leading edge.
 */
-.items > .task.important::before {
+.task.important::before {
   content: "";
   position: absolute;
   left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--flag);
+  pointer-events: none;
+}
+
+/* A nested row is half the height of a card, so it keeps a tighter inset. */
+.items > .task.important::before {
   top: 0.3rem;
   bottom: 0.3rem;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--flag);
 }
 
 .task.important > .label {

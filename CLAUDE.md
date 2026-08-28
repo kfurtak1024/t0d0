@@ -99,6 +99,18 @@ Invariants worth defending in review:
   finished group travel alike; nested tasks stay put, because a group moves as
   one block. `sink()` gets there by repeating the same level-scoped `reorder()`
   step, not by computing an index.
+- **An untick brings the row back, by the mirror rule.** `rise()` is `sink()` reflected:
+  the same level-scoped step, repeated while the row _above_ is finished, so the row
+  comes to rest directly under the last of the work. Unticking says "this is still to
+  do", and leaving it buried in the pile makes that a lie. It is **not** a general
+  inverse of `sink()` and must not become one: a row that sank past _unfinished_ work
+  keeps its new place, because remembering where it came from would be a second idea of
+  where a row belongs — the thing `reorder()` exists to prevent.
+- **The rise is immediate where the tidy waits.** The delay protects the reward: the
+  tick landing is the point, so nothing moves over it until it has played out. An untick
+  is a correction with no reward to protect, and a row that took half a second to come
+  back would feel stuck. Both are gated on `autoCollapseDone` — someone who turned off
+  automatic tidying does not want automatic reordering in either direction.
 - **A batch of tidies is applied bottom-most row first.** A row stops above
   whatever finished rows are already below it, so sending the upper one first
   strands it on top of a sibling that has not travelled yet. Ordering by
@@ -124,6 +136,20 @@ Invariants worth defending in review:
   sits beside the green frame cleanly.) `tests/e2e/important.spec.ts` asserts the two
   are tellable apart rather than asserting a colour, so the treatment can change without
   the guarantee moving.
+- **A group and an item wear the mark differently, on purpose.** A group is a
+  container, so it wears it as its own left edge: a `linear-gradient` in the card's
+  background stopping at exactly `--r-card`, so the card's `border-radius` clips it and
+  the strip's flat inner side lands precisely where the curve ends. It _is_ the rounded
+  corner rather than a bar sitting inside it, and it follows `--r-card` if that changes.
+  An item is a row, so it takes a slim `::before` pill — a strip that wide would read as
+  a colour block on a 56px card and swamp a nested row.
+- **Do not draw the group's strip any other way.** Both alternatives were tried and both
+  fought the corner: an inset `box-shadow` curves _both_ sides and reads as a fragment
+  of the frame, and a pseudo-element cannot match an 18px corner at all, because a
+  border-radius is scaled down to fit its own box. The background approach also cannot
+  intercept a tap — which is why the item's pill needs `pointer-events: none`, sitting
+  as it does exactly where the grip's hit area reaches. Only the green finished outline
+  is still a shadow slot (`--edge`).
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
   ", important". A bar and a font weight are a visual channel only.

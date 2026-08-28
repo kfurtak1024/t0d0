@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, settle, shape } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle, shape } from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
@@ -95,6 +95,78 @@ test("two ticks in the same breath both land", async ({ page }) => {
     ["a", "b"],
   );
   await expect.poll(() => shape(page)).toEqual(["c", "d", "a", "b"]);
+});
+
+/*
+ * The mirror of the tidy. Unticking says "this is still to do", so leaving the
+ * row buried among the finished ones would make that a lie — you would have to
+ * go hunting for the thing you just put back.
+ */
+test("unticking a finished item brings it back above the pile", async ({ page }) => {
+  for (const text of ["still to do", "first done", "second done"]) await addItem(page, text);
+
+  await tick(page, "first done").click();
+  await tick(page, "second done").click();
+  await expect.poll(() => shape(page)).toEqual(["still to do", "first done", "second done"]);
+
+  await tick(page, "second done").click();
+  await expect.poll(() => shape(page)).toEqual(["still to do", "second done", "first done"]);
+});
+
+test("it stops under the work rather than climbing to the top", async ({ page }) => {
+  for (const text of ["one", "two", "done it"]) await addItem(page, text);
+
+  await tick(page, "done it").click();
+  await tick(page, "done it").click();
+  // Nothing finished sits above it, so it has nowhere to climb to.
+  await expect.poll(() => shape(page)).toEqual(["one", "two", "done it"]);
+});
+
+test("a group comes back up when one of its items is unticked", async ({ page }) => {
+  // Seeded already tidied, so the group has a finished row above it to climb
+  // past — building this by ticking would batch the tidies and never produce it.
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now(),
+    list: [
+      { kind: "task", id: "w", text: "still to do", target: 1, count: 0, important: false },
+      { kind: "task", id: "f", text: "finished first", target: 1, count: 1, important: false },
+      {
+        kind: "group",
+        id: "g",
+        title: "Morning",
+        collapsed: false,
+        important: false,
+        items: [
+          { kind: "task", id: "e", text: "eat breakfast", target: 1, count: 1, important: false },
+        ],
+      },
+    ],
+  });
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["still to do", "finished first", "# Morning", "  eat breakfast"]);
+
+  // A group travels as one block, so putting its item back lifts the whole card
+  // over the finished row above it.
+  await tick(page, "eat breakfast").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["still to do", "# Morning", "  eat breakfast", "finished first"]);
+});
+
+test("with tidying off, an untick moves nothing either", async ({ page }) => {
+  await openDrawer(page);
+  await page.locator('[data-pref="autoCollapseDone"]').click();
+  await page.locator(".drawer-close").click();
+
+  for (const text of ["still to do", "first done", "second done"]) await addItem(page, text);
+  await tick(page, "first done").click();
+  await tick(page, "second done").click();
+  await tick(page, "second done").click();
+
+  // Nothing has moved in either direction: the preference governs both.
+  await expect.poll(() => shape(page)).toEqual(["still to do", "first done", "second done"]);
 });
 
 test("closing the day reopens every fold", async ({ page }) => {

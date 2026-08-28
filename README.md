@@ -44,7 +44,7 @@ that rather than merely promising it.
 - **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one. Tomorrow opens on the whole list, every fold reopened.
 - **Reorderable, three ways.** Drag by the grip and the row goes where you point, in or out of a group. `Alt`+arrows and the `⋯` menu move it among its own siblings and stop there — changing level is its own command, so a move never re-nests anything behind your back. One undo puts a whole drag back.
 - **Untickable.** Tap a finished item again and it comes back. A counted item counts up instead, and resets from its menu.
-- **Finished work gets out of the way.** Tick something off and it drops below what's left, settling on top of whatever finished before it rather than burying it. A group waits for its last item, then folds shut as it goes. On by default; Settings → Behaviour turns it off.
+- **Finished work gets out of the way.** Tick something off and it drops below what's left, settling on top of whatever finished before it rather than burying it. A group waits for its last item, then folds shut as it goes. Untick something and it comes straight back up above the pile. On by default; Settings → Behaviour turns it off.
 - **Offline and installable.** A real PWA; open it with the network off.
 - **Light, dark, or whatever your device says.** Settings → Theme, remembered per browser.
 - **Backups.** Save a `.json` copy, drop one back in. Loading previews what the file holds before replacing anything, and erasing takes two deliberate presses.

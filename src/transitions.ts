@@ -290,6 +290,35 @@ export function sink(state: State, id: string): State {
   }
 }
 
+/**
+ * Bring a row that is no longer finished back above the pile.
+ *
+ * The exact mirror of {@link sink}, and built the same way: repeat one
+ * level-scoped step while the row above is finished, rather than computing a
+ * destination. It comes to rest directly under the last of the work that is
+ * left.
+ *
+ * Unticking something says "this is still to do", and leaving it buried among
+ * the finished rows makes that a lie — you would have to go hunting for the
+ * thing you just put back. It stops against unfinished work rather than
+ * travelling to the top, so a row put back rejoins the end of the queue instead
+ * of jumping it.
+ */
+export function rise(state: State, id: string): State {
+  let next = state;
+  for (;;) {
+    const index = next.list.findIndex((node) => node.id === id);
+    const above = index <= 0 ? undefined : next.list[index - 1];
+    if (!above || !isFinished(above)) return next;
+
+    const stepped = reorder(next, id, "up", "level");
+    // Same guard as sink: a decline it is not our business to predict would
+    // spin here forever.
+    if (stepped === next) return next;
+    next = stepped;
+  }
+}
+
 export type MoveDirection = "in" | "out";
 
 /** The nearest group above a root task — the one it would move into. */

@@ -217,6 +217,71 @@ describe("the mark is only a mark", () => {
   });
 });
 
+describe("rise", () => {
+  const done = (state: State, ...items: string[]): State => {
+    let next = state;
+    for (const text of items) next = T.bump(next, taskOf(next, text).id, 1, NOW);
+    return next;
+  };
+
+  it("brings a row back above the finished pile", () => {
+    let state = done(rows("a", "f1", "f2"), "f1", "f2");
+    const id = taskOf(state, "f2").id;
+
+    state = T.bump(state, id, -1, NOW);
+    state = T.rise(state, id);
+    expect(shape(state)).toEqual(["a", "f2", "f1"]);
+  });
+
+  it("climbs past every finished row, not just one", () => {
+    let state = done(rows("a", "f1", "f2", "f3"), "f1", "f2", "f3");
+    const id = taskOf(state, "f3").id;
+
+    state = T.bump(state, id, -1, NOW);
+    state = T.rise(state, id);
+    expect(shape(state)).toEqual(["a", "f3", "f1", "f2"]);
+  });
+
+  it("stops under the last of the work rather than climbing to the top", () => {
+    let state = done(rows("a", "b", "f1", "c"), "f1");
+    const id = taskOf(state, "f1").id;
+    state = T.bump(state, id, -1, NOW);
+    // b is still work, so putting f1 back must not lift it over b.
+    expect(T.rise(state, id)).toBe(state);
+  });
+
+  it("leaves the top row alone", () => {
+    const state = rows("a", "b");
+    expect(T.rise(state, taskOf(state, "a").id)).toBe(state);
+  });
+
+  /*
+   * The rule is "back above the finished pile", not "back where it came from".
+   * A row that sank past *work* keeps its new place: remembering the old one
+   * would be a second idea of where a row belongs, which is exactly what
+   * `reorder` exists to prevent.
+   */
+  it("does not restore a place it lost to unfinished work", () => {
+    let state = done(rows("a", "b", "c", "d"), "b");
+    const id = taskOf(state, "b").id;
+    state = T.sink(state, id);
+    expect(shape(state)).toEqual(["a", "c", "d", "b"]);
+
+    state = T.bump(state, id, -1, NOW);
+    expect(T.rise(state, id)).toBe(state);
+  });
+
+  it("moves a group as one block, the same way sink does", () => {
+    let state = done(rows("a", "f1", "# Morning", "  x"), "f1", "x");
+    const groupId = groupOf(state, "Morning").id;
+    expect(shape(state)).toEqual(["a", "f1", "# Morning", "  x"]);
+
+    state = T.bump(state, taskOf(state, "x").id, -1, NOW);
+    state = T.rise(state, groupId);
+    expect(shape(state)).toEqual(["a", "# Morning", "  x", "f1"]);
+  });
+});
+
 describe("toggleImportant", () => {
   it("marks and unmarks a root task", () => {
     let state = build(["shopping"]);

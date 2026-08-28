@@ -291,6 +291,15 @@ export class App {
     const before = T.findTask(this.#state, id);
     if (!before) return;
     const wasDone = isDone(before);
+    /*
+     * The row this tick belongs to: the task itself, or the group holding it —
+     * the same row `#tidy` would have sent down, so the same one has to come
+     * back up. Read before the change, because whether it *was* finished is
+     * what says there is anything to come back from.
+     */
+    const rowId = T.ownerOf(this.#state, id)?.id ?? id;
+    const rowBefore = T.findRow(this.#state, rowId);
+    const wasFinished = rowBefore !== undefined && T.isFinished(rowBefore);
 
     this.#store.apply(T.bump(this.#state, id, delta, Date.now()));
 
@@ -302,6 +311,32 @@ export class App {
       this.#vibrate(12);
       this.#tidy(id);
     }
+
+    const rowAfter = T.findRow(this.#state, rowId);
+    if (wasFinished && rowAfter && !T.isFinished(rowAfter)) this.#untidy(rowId);
+  }
+
+  /**
+   * Bring back what an untick just put back into play.
+   *
+   * The mirror of {@link #tidy}, and gated on the same preference: someone who
+   * turned off automatic tidying does not want automatic reordering in either
+   * direction.
+   *
+   * Immediate, where tidying waits. The delay there protects the reward — the
+   * tick landing is the point, so nothing moves over it until it has played
+   * out. An untick is a correction, not a reward, and there is nothing to wait
+   * for; a row that took half a second to come back would feel stuck.
+   */
+  #untidy(id: string): void {
+    if (!this.#prefs.autoCollapseDone) return;
+    // Whatever was queued for this row is off: it is not going down any more.
+    this.#tidyIds.delete(id);
+
+    const next = T.rise(this.#state, id);
+    if (next === this.#state) return;
+    this.#animateNext = true;
+    this.#store.apply(next);
   }
 
   /**

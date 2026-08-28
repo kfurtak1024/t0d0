@@ -174,6 +174,22 @@ test("a finished important row is still tellable from an ordinary one", async ({
           { kind: "task", id: "np", text: "sweep up", target: 1, count: 1, important: false },
         ],
       },
+      {
+        kind: "group",
+        id: "gk",
+        title: "Admin",
+        collapsed: false,
+        important: true,
+        items: [{ kind: "task", id: "a1", text: "file it", target: 1, count: 1, important: false }],
+      },
+      {
+        kind: "group",
+        id: "gp",
+        title: "Later",
+        collapsed: false,
+        important: false,
+        items: [{ kind: "task", id: "b1", text: "read it", target: 1, count: 1, important: false }],
+      },
     ],
   });
 
@@ -181,22 +197,35 @@ test("a finished important row is still tellable from an ordinary one", async ({
     const paint = (id: string): string => {
       const row = document.querySelector(`[data-id="${id}"]`);
       if (!row) return "missing";
+      // Everything the mark could plausibly be drawn with, so the guarantee
+      // survives a change of technique.
       const own = getComputedStyle(row);
       const before = getComputedStyle(row, "::before");
-      return `${own.boxShadow}|${before.display}|${before.backgroundColor}`;
+      return [
+        own.boxShadow,
+        own.backgroundImage,
+        own.backgroundColor,
+        before.display,
+        before.backgroundColor,
+      ].join("|");
     };
     return {
       rootMarked: paint("k"),
       rootPlain: paint("p"),
       inMarked: paint("nk"),
       inPlain: paint("np"),
+      groupMarked: paint("gk"),
+      groupPlain: paint("gp"),
     };
   });
 
-  // Both are finished, so both wear the green frame; the marked ones must still
-  // carry something the plain ones do not.
+  // All of them are finished, so all of them wear the green frame; the marked
+  // ones must still carry something the plain ones do not. A group is in here
+  // because it is marked a different way from a row — a strip in its own
+  // background rather than a pill drawn over it.
   expect(marks.rootMarked).not.toBe(marks.rootPlain);
   expect(marks.inMarked).not.toBe(marks.inPlain);
+  expect(marks.groupMarked).not.toBe(marks.groupPlain);
 });
 
 /*
