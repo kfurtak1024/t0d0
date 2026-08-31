@@ -189,11 +189,56 @@
 
 .gcount {
   flex: none;
-  /* Everything after this is an action, and actions live on the right. */
-  margin-right: auto;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  What a fold is still holding, said the way the rows inside it say it: the pip
+  is the nested row's own pill — same --flag, same capsule, same third of
+  --r-card — so the header wears the mark of what it is hiding rather than
+  inventing a second sign for it. The number is the other channel: hue alone
+  would leave a monochrome screen with a grey dot that means nothing.
+
+  It fades with the fold instead of unmounting, like the header's actions, so
+  collapsing shifts nothing sideways. `hidden` is for having nothing to say at
+  all — there is no state to animate between there.
+*/
+.gmark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  opacity: 0;
+  /* Decoration sitting where the + button's hit overlay reaches, so it takes a
+     tap no more than the row's own pill does. */
+  pointer-events: none;
+  transition: opacity 0.24s var(--ease);
+}
+
+/* An author `display` beats the UA's [hidden], so it has to be said again —
+   the same guard .endday and the toast carry. */
+.gmark[hidden] {
+  display: none;
+}
+
+.group.collapsed .gmark {
+  opacity: 1;
+}
+
+.gmark .pip {
+  width: calc(var(--r-card) / 3);
+  height: 0.85rem;
+  border-radius: 999px;
+  background: var(--flag);
+}
+
+.gmark .num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--flag);
   font-variant-numeric: tabular-nums;
 }
 
@@ -496,6 +541,15 @@ body.dragging-row {
 .count:hover {
   background: var(--nest);
   color: var(--ink);
+}
+
+/*
+  The first action, and so the one that pushes the rest right. The gap used to
+  live on the tally, which meant whatever came after it was an action; the mark
+  beside the tally is not one, so it moved here instead.
+*/
+.ghead > .plus {
+  margin-left: auto;
 }
 
 .kill,

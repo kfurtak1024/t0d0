@@ -29,10 +29,33 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
   const count = document.createElement("div");
   count.className = "gcount";
 
+  /*
+   * What a fold is still holding: the mark its hidden rows wear, and how many
+   * of them are still to do.
+   *
+   * A folded group is the one place an important row can go out of sight while
+   * the day still turns on it — the ring refuses to go green and nothing says
+   * which group is the reason. So the group speaks for its contents here, the
+   * way the tally beside it already does, rather than the fold letting rows
+   * through: peeking would put the *item* back on screen in a group you have
+   * just put away, and a group where everything is marked would peek nothing.
+   *
+   * aria-hidden because the same fact reaches a screen reader through the
+   * chevron, which is the group's own handle — see the label below.
+   */
+  const mark = document.createElement("div");
+  mark.className = "gmark";
+  mark.setAttribute("aria-hidden", "true");
+  const pip = document.createElement("span");
+  pip.className = "pip";
+  const left = document.createElement("span");
+  left.className = "num";
+  mark.append(pip, left);
+
   // The tally belongs to the title, so it sits with it; the actions go right,
   // where a task row keeps its own. They fade rather than unmount, so arriving
   // on hover shifts nothing.
-  head.append(grip(), chevron, title, count, plus, dots, kill);
+  head.append(grip(), chevron, title, count, mark, plus, dots, kill);
 
   const body = document.createElement("div");
   body.className = "gbody";
@@ -70,6 +93,18 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
     body.toggleAttribute("inert", next.collapsed);
     if (!actions.isEditing(next.id)) title.textContent = next.title;
 
+    /*
+     * Only what is still owed: marked *and* unfinished. Every automatic fold is
+     * a group that has just finished, so counting finished rows too would leave
+     * a badge sitting on exactly the groups the tidy had cleared away.
+     */
+    const owed = next.items.filter((item) => item.important && !isDone(item)).length;
+    // Kept in the flow whenever there is something to say, and faded by the
+    // fold — the same "fade rather than unmount" the header's actions use, so
+    // collapsing shifts nothing sideways.
+    mark.hidden = owed === 0;
+    left.textContent = String(owed);
+
     const done = next.items.filter(isDone).length;
     count.textContent = next.items.length
       ? `${String(done)}/${String(next.items.length)}`
@@ -82,7 +117,13 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
     // Same reasoning as the tick's label: the chevron is the group's own handle,
     // so it is where the mark reaches a screen reader.
     const name = next.important ? `${next.title}, important` : next.title;
-    chevron.setAttribute("aria-label", next.collapsed ? `Expand ${name}` : `Collapse ${name}`);
+    // The badge is a visual channel only, so the count comes through here — and
+    // only while folded, because an open group's rows say it themselves.
+    const owing = next.collapsed && owed > 0 ? `, ${String(owed)} important left` : "";
+    chevron.setAttribute(
+      "aria-label",
+      next.collapsed ? `Expand ${name}${owing}` : `Collapse ${name}`,
+    );
     dots.setAttribute("aria-label", `More for ${next.title}`);
     kill.setAttribute("aria-label", `Delete ${next.title}`);
 

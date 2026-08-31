@@ -210,7 +210,22 @@ Invariants worth defending in review:
   it from then on, which is why that `!` does not survive an ordinary first item.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
-  ", important". A bar and a font weight are a visual channel only.
+  ", important". A bar and a font weight are a visual channel only. A folded
+  group's handle also carries what it owes: ", 2 important left".
+- **A fold speaks for what it hides; it does not leak rows.** A collapsed group
+  is the one place a marked row can go out of sight while the day still turns on
+  it — the ring refuses to go green and nothing says which group is the reason.
+  So the header carries `.gmark`: the nested row's own pill, at `--r-card / 3` in
+  `--flag`, and the number of items in there that are **marked and unfinished**.
+  Only that count — every automatic fold is a group that has just finished, so
+  counting finished rows would badge exactly the groups the tidy had cleared.
+  The badge stays in the flow and fades with the fold, like the header's actions,
+  so collapsing shifts nothing sideways, and it is `aria-hidden` because the
+  chevron already says it. Letting the fold peek the rows instead was considered
+  and rejected: it would put the _item_ back on screen in a group you had just
+  put away, it would need a second rule about which rows a fold may show, and a
+  group where _everything_ is marked would peek nothing while one with a single
+  marked row peeked it — the priority exactly backwards.
 - **Adding a field is not a schema bump.** `important` defaults to `false` in
   `normalize()`, so a list written before it existed loads unmarked. Moving
   `SCHEMA_VERSION` would have discarded every stored list — see the migration seam.

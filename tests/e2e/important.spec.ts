@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { addItem, clearStorage, seedStorage } from "./helpers";
 
 /**
@@ -451,4 +451,100 @@ test("a row's leading control clears the mark beside it", async ({ page }) => {
   expect(clearance.root).toBeGreaterThanOrEqual(4);
   expect(clearance.group).toBeGreaterThanOrEqual(4);
   expect(clearance.nested).toBeGreaterThanOrEqual(4);
+});
+
+/*
+ * A fold is the one place a marked row can go out of sight while the day still
+ * turns on it: the ring refuses to go green and nothing says which group is the
+ * reason. The group says it, the way the tally beside it already speaks for the
+ * rows it is hiding — the fold itself stays a fold.
+ */
+test.describe("what a folded group is still holding", () => {
+  const mixed = (collapsed: boolean, ticked = 0) => ({
+    v: 1,
+    openedAt: null,
+    list: [
+      {
+        kind: "group",
+        id: "g",
+        title: "Admin",
+        collapsed,
+        important: false,
+        items: [
+          {
+            kind: "task",
+            id: "i1",
+            text: "book the tickets",
+            target: 1,
+            count: ticked,
+            important: true,
+          },
+          { kind: "task", id: "i2", text: "reply to Dana", target: 1, count: 0, important: true },
+          { kind: "task", id: "i3", text: "tidy the desk", target: 1, count: 1, important: false },
+        ],
+      },
+    ],
+  });
+
+  const badge = (page: Page): Locator => page.locator(".group .gmark");
+
+  test("a collapsed group counts the marked work it hides", async ({ page }) => {
+    await seedStorage(page, mixed(true));
+
+    await expect(badge(page)).toBeVisible();
+    await expect(badge(page).locator(".num")).toHaveText("2");
+    // The visual badge is a channel of its own; the fact reaches a screen reader
+    // through the chevron, which is the group's handle.
+    await expect(page.locator(".group .chev")).toHaveAttribute(
+      "aria-label",
+      "Expand Admin, 2 important left",
+    );
+  });
+
+  test("an open group says nothing — its rows say it themselves", async ({ page }) => {
+    await seedStorage(page, mixed(false));
+
+    // Present, so folding shifts nothing sideways, but not shown.
+    await expect(badge(page)).toHaveCSS("opacity", "0");
+    await expect(page.locator(".group .chev")).toHaveAttribute("aria-label", "Collapse Admin");
+
+    await page.locator(".group .chev").click();
+    await expect(badge(page)).toBeVisible();
+    await expect(badge(page)).toHaveCSS("opacity", "1");
+  });
+
+  test("it counts what is owed, not what is marked", async ({ page }) => {
+    // One of the two marked rows is already done.
+    await seedStorage(page, mixed(true, 1));
+
+    await expect(badge(page).locator(".num")).toHaveText("1");
+  });
+
+  /*
+   * Every automatic fold is a group that has just finished, so a badge that
+   * counted finished rows would land on exactly the groups the tidy had cleared.
+   */
+  test("a group tidied away for being finished carries nothing", async ({ page }) => {
+    await addItem(page, "# Admin");
+    await addItem(page, "book the tickets!");
+    await addItem(page, "reply to Dana");
+
+    for (const text of ["book the tickets", "reply to Dana"])
+      await page.locator(".items > .task", { hasText: text }).locator(".tick").click();
+
+    const group = page.locator(".group");
+    await expect(group).toHaveClass(/collapsed/);
+    await expect(badge(page)).toBeHidden();
+    // Nothing owed, so the handle says no more than it did before.
+    await expect(group.locator(".chev")).toHaveAttribute("aria-label", "Expand Admin");
+  });
+
+  test("a group with nothing marked carries nothing", async ({ page }) => {
+    await addItem(page, "# Admin");
+    await addItem(page, "tidy the desk");
+    await page.locator(".group .chev").click();
+
+    await expect(page.locator(".group")).toHaveClass(/collapsed/);
+    await expect(badge(page)).toBeHidden();
+  });
 });
