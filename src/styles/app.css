@@ -134,22 +134,32 @@
   controls all carry their own.
 */
 .group {
+  /* Named because the header's leading padding is measured back from the card's
+     edge and has to subtract it. */
+  --card-pad: 0.55rem;
+
   position: relative;
   background: var(--card);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card), var(--edge);
-  padding: 0.55rem 0.55rem 0.3rem;
+  padding: var(--card-pad) var(--card-pad) 0.3rem;
 }
 
 .group.clear {
   --edge: 0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / 50%);
 }
 
+/*
+  The leading padding is the card's clearance less what the card already spends,
+  so the header's first control starts where a root row's does. Hand-set it was
+  16.8px against an 18px mark: the chevron, and on a phone the grip in front of
+  it, were drawn over the strip.
+*/
 .ghead {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.4rem 0.5rem 0.5rem;
+  padding: 0.4rem 0.5rem 0.5rem calc(var(--lead-card) - var(--card-pad));
 }
 
 .chev {
@@ -229,7 +239,8 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.42rem 0.5rem;
+  /* Leading padding clears the pill a nested row wears — see --lead-nested. */
+  padding: 0.42rem 0.5rem 0.42rem var(--lead-nested);
   border-radius: var(--r-row);
   transition: background 0.18s;
 }
@@ -238,12 +249,14 @@
   background: var(--card);
   box-shadow: var(--shadow-card), var(--edge);
   /*
-   * The leading padding clears --r-card, because that is how wide the
-   * importance strip runs: at the old 0.75rem the tick and the in-flow grip sat
-   * six pixels inside it, drawn over the colour. Unconditional rather than only
-   * on a marked row, so nothing shifts when the mark goes on or comes off.
+   * The leading padding clears the importance strip, which is --r-card wide, by
+   * --mark-clear: at the old 0.75rem the tick and the in-flow grip sat six
+   * pixels inside it, drawn over the colour, and at 1.25rem they cleared it by
+   * two — close enough to read as touching, which on a phone is where the grip
+   * lives. Unconditional rather than only on a marked row, so nothing shifts
+   * when the mark goes on or comes off.
    */
-  padding: 0.7rem 0.75rem 0.7rem 1.25rem;
+  padding: 0.7rem 0.75rem 0.7rem var(--lead-card);
   border-radius: var(--r-card);
 }
 

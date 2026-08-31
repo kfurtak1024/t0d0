@@ -162,12 +162,17 @@ Invariants worth defending in review:
   are the same kind of thing to the eye — two cards side by side in one list. A nested
   row has no card, and a strip that wide would swamp something half a card tall, so it
   takes a slim `::before` pill instead.
-- **A root card's leading padding has to clear `--r-card`**, which is why it is 1.25rem
-  where the others are 0.75rem. At the narrower value the tick and the in-flow grip sat
-  six pixels inside the strip and were drawn over the colour — invisible on a pointer
-  device, where the grip is out in the margin, and obvious on a phone. It is
-  unconditional rather than only on a marked row, so nothing shifts when the mark goes
-  on or comes off.
+- **Every leading padding is derived from the mark, never hand-set.** `--mark-clear` is
+  the gap a row's first control keeps from it, and `--lead-card` / `--lead-nested` add it
+  to the mark's own width — `--r-card` for a card, a third of that for a nested row's
+  pill. Hand-set, all three were wrong and none of it was visible on a pointer device,
+  where the grip is out in the margin: a root row cleared the strip by two pixels, and a
+  group's header, whose padding is spent twice over (the card's, then the header's), put
+  its chevron and — on a phone, where the grip is in the flow — its grip _inside_ the
+  colour. `.group` names its own `--card-pad` so `.ghead` can subtract it. The paddings
+  are unconditional rather than only on a marked row, so nothing shifts when the mark
+  goes on or comes off, and `tests/e2e/important.spec.ts` measures the clearance on
+  whichever control actually leads the row.
 - **Do not draw the group's strip any other way.** Both alternatives were tried and both
   fought the corner: an inset `box-shadow` curves _both_ sides and reads as a fragment
   of the frame, and a pseudo-element cannot match an 18px corner at all, because a

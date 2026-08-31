@@ -381,3 +381,74 @@ test("a marked item still sinks when it is finished", async ({ page }) => {
     )
     .toEqual(["water plants", "call the bank"]);
 });
+
+/*
+ * The mark is drawn on the row's leading edge, and so is the first control —
+ * the grip, which on a touch device stays in the flow because there it is
+ * always visible and has to be somewhere real. So the two have to be measured
+ * against each other, and this went wrong in both places at once: a group's
+ * grip was drawn *over* its strip (-1.2px) and a root row's cleared it by two,
+ * which reads as touching. Every leading padding is now derived from the mark's
+ * own width plus --mark-clear; this is what says so.
+ *
+ * Asserted as a floor rather than the exact number, so the token can be tuned
+ * without moving the guarantee.
+ */
+test("a row's leading control clears the mark beside it", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [
+      { kind: "task", id: "k", text: "call the bank", target: 1, count: 0, important: true },
+      {
+        kind: "group",
+        id: "g",
+        title: "Admin",
+        collapsed: false,
+        important: true,
+        items: [{ kind: "task", id: "a1", text: "file it", target: 1, count: 0, important: true }],
+      },
+      {
+        // Plain, so the item inside it wears its own pill to measure against.
+        kind: "group",
+        id: "gp",
+        title: "Errands",
+        collapsed: false,
+        important: false,
+        items: [
+          { kind: "task", id: "n", text: "post it", target: 1, count: 0, important: true },
+          { kind: "task", id: "np", text: "sweep up", target: 1, count: 0, important: false },
+        ],
+      },
+    ],
+  });
+
+  const clearance = await page.evaluate(() => {
+    const radius = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("--r-card"),
+    );
+    const measure = (id: string, markWidth: number): number => {
+      const row = document.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
+      const bar = row.querySelector<HTMLElement>(":scope > .ghead") ?? row;
+      /*
+       * Whichever control actually leads the row: on a pointer device the grip
+       * leaves the flow for the margin and the tick or chevron leads instead.
+       */
+      const lead = [...bar.children].find((el) => {
+        const { position } = getComputedStyle(el);
+        return position !== "absolute" && position !== "fixed";
+      }) as HTMLElement;
+      return lead.getBoundingClientRect().left - (row.getBoundingClientRect().left + markWidth);
+    };
+    // A card's mark is exactly its corner; a nested row's pill is a third of it.
+    return {
+      root: measure("k", radius),
+      group: measure("g", radius),
+      nested: measure("n", radius / 3),
+    };
+  });
+
+  expect(clearance.root).toBeGreaterThanOrEqual(4);
+  expect(clearance.group).toBeGreaterThanOrEqual(4);
+  expect(clearance.nested).toBeGreaterThanOrEqual(4);
+});
