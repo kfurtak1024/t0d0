@@ -598,12 +598,23 @@ for (const scheme of ["light", "dark"] as const) {
         head: against(read("--flag-head")),
         foot: against(read("--flag-foot")),
         mid: against(read("--flag")),
+        doneHead: against(read("--flag-done-head")),
+        doneFoot: against(read("--flag-done-foot")),
+        doneMid: against(read("--flag-done")),
       };
     });
 
-    expect(ratios.head).toBeGreaterThanOrEqual(3);
-    expect(ratios.foot).toBeGreaterThanOrEqual(3);
-    // --flag itself still paints the pill, the fold's pip and the gate's pip.
-    expect(ratios.mid).toBeGreaterThanOrEqual(3);
+    /*
+     * Both mid-tones are ends in their own right, not just interpolation: --flag
+     * paints the nested pill, the fold's pip and the gate's pip, and --flag-done
+     * the finished pill.
+     *
+     * Which end is the tight one flips with the theme rather than with the hue —
+     * on a white card it is the lighter head, on a dark card the darker foot —
+     * so the check is the same for all six and the failure message says which.
+     */
+    for (const [name, ratio] of Object.entries(ratios)) {
+      expect(ratio, `${name} on --card in ${scheme}`).toBeGreaterThanOrEqual(3);
+    }
   });
 }

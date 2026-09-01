@@ -155,7 +155,23 @@ Invariants worth defending in review:
   that prompted the suppression came from _dimming_ the bar to 40%; at full strength it
   sits beside the green frame cleanly.) `tests/e2e/important.spec.ts` asserts the two
   are tellable apart rather than asserting a colour, so the treatment can change without
-  the guarantee moving.
+  the guarantee moving — and it since has: the mark stays, but it turns green.
+- **A finished mark is green, at the hue the frame and the ring already end on.** A red
+  strip inside a green frame was the card saying two things at once; one hue makes a
+  completed card say one. It is the ramp again, `--flag-done-head` → `--flag-done-foot`,
+  with `--flag-done` as its mid-tone — that mid is `oklch(--ring-l --ring-c 150)` written
+  out, the same finished green `.gcount` and `.group.clear` already wear, so there is no
+  third green to keep in step. The nested pill takes the mid, having no room for a ramp.
+  Groups and top-level items turn together, because they share the unfinished treatment
+  and splitting them here would read as two different marks. **It does not weaken the
+  mark**: a finished marked card still carries a strip where a finished plain one carries
+  none, which is the whole reason the mark stays on at all.
+- **The green ramp steps less than the red one, and the tight end is not the same.**
+  Green is the more luminous hue, so the red ramp's ±6 measured 3.39 at the head against a
+  3:1 bar; it runs +4/−8 instead, for 3.70 and 6.09 in light. Which end is tight flips
+  with the theme rather than the hue — the lighter head on a white card, the darker foot
+  on a dark one — which is why the guard checks all six values the same way and names the
+  one that failed.
 - **A card wears the mark as its own left edge; a nested row wears a pill.** The card
   version is a background layer exactly `--r-card` wide, so the card's `border-radius`
   clips it and the strip's flat inner side lands precisely where the curve ends. It _is_

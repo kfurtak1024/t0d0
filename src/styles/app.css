@@ -786,6 +786,27 @@ body.dragging-row {
 }
 
 /*
+  Once the card is finished the ramp turns green — the hue the row's ring ends
+  on and the frame around it already wears. A red strip inside a green frame was
+  the card saying two things at once; this way a completed card says one.
+
+  It does not weaken the mark, which is the point of keeping it on at all: a
+  finished marked card still carries a strip where a finished plain one carries
+  none, so you can still see what you actually got done. `important.spec.ts`
+  asserts that difference rather than either colour.
+
+  Groups and top-level items together, because the two share the unfinished
+  treatment and splitting them here would read as two different marks.
+*/
+.list > .task.done.important,
+.group.clear.important {
+  background:
+    linear-gradient(to bottom, var(--flag-done-head), var(--flag-done-foot)) 0 0 / var(--r-card)
+      100% no-repeat,
+    var(--card);
+}
+
+/*
   A nested row has no card of its own, so it takes a slim pill instead — the
   same mark at the scale of the thing being marked. A strip that wide would
   swamp a row half the height of a card.
@@ -801,6 +822,13 @@ body.dragging-row {
 */
 .group.important .items > .task.important::before {
   display: none;
+}
+
+/* The pill follows the strip, at the ramp's mid-tone — a pill this slim has no
+   room for a ramp of its own. Specificity keeps it under the rule above that
+   hides the pill entirely inside an important group. */
+.items > .task.done.important::before {
+  background: var(--flag-done);
 }
 
 .items > .task.important::before {
