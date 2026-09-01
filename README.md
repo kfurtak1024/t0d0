@@ -13,7 +13,7 @@ file, and losing it should cost nothing.
 
 <br>
 
-[![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE) [![Bundle](https://img.shields.io/badge/bundle-under_27_kB_gzipped-158A62)](./.github/actions/verify/action.yml) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json) [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
+[![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE) [![Bundle](https://img.shields.io/badge/bundle-under_28_kB_gzipped-158A62)](./.github/actions/verify/action.yml) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json) [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
 
 ### [**→ t0d0.krfu.dev**](https://t0d0.krfu.dev)
 
