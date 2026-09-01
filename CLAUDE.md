@@ -237,6 +237,24 @@ Invariants worth defending in review:
 - **Destructive actions confirm in place**, never in a dialog stacked on a dialog: the
   control swaps into a confirm state and reverts on a timeout. Erase, and replace-on-
   import, both follow this.
+- **The ring reports; the closer ends the day.** Pressing the day ring opens the
+  day-stands card, whose only button goes back to the list — a second card that could
+  clear the ticks would be a second answer to the question the closer already answers.
+  On an empty list the ring is `disabled`: it is already dimmed and has nothing to say.
+- **The card's rail is the hue axis, and the gates are landmarks on it.** The dot sits at
+  `hueMark(dayHue(...))` and wears `dayStroke` of the same hue, so the card and the ring
+  cannot drift; the rail's gradient is sampled from `dayStroke` for the same reason. It
+  follows that **the green landmark is drawn only when something is marked** — with
+  nothing marked the sweep runs red straight to blue, and a tick there would promise a
+  gate the ring is not keeping, though the dot may well be sitting on green.
+- **"Two more clears the bar" is computed, not estimated.** `stepsToBar()` takes the
+  largest remaining contributions first, which is the fewest by construction. The obvious
+  `ceil(bar × n − sum)` is wrong: it counts every unfinished task as a whole point, so on
+  a list of part-counted items it names a number that does not actually reach — and a card
+  that says "one more" and is wrong is not believed twice.
+- **The card names the next landmark, which is not the same as praising you.** The closing
+  card deliberately says nothing to an unfinished day; this one always says what the next
+  tick buys, because a card opened mid-morning that said nothing would be opened once.
 - **Reordering is one step, applied repeatedly.** `reorder()` moves a row a single
   place and **is its own inverse**, so repeating it reaches any position. Everything else
   is a way of asking for that step — `Alt`+arrows, the `⋯` menu, and the drag, which just
@@ -313,8 +331,8 @@ src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
 src/render/       keyed DOM patching — list, task, group, ring, flip
-src/ui/           toast, day-summary sheet, drawer, row menu, drag, inline edit,
-                  focus trap, confetti, dom
+src/ui/           toast, day-summary sheet, the day-stands card, drawer, row menu,
+                  drag, inline edit, focus trap, confetti, dom
 src/styles/       tokens.css first, then base.css, then app.css
 ```
 

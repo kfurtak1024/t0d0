@@ -83,6 +83,15 @@ test.describe("no violations", () => {
     expect(violations.map((v) => `${v.id}: ${String(v.nodes.length)}`)).toEqual([]);
   });
 
+  test("the day-stands card", async ({ page }) => {
+    await seedStorage(page, A_DAY);
+    await page.locator("#totalring").click();
+    await expect(page.locator(".stands")).toBeVisible();
+
+    const { violations } = await scan(page);
+    expect(violations.map((v) => `${v.id}: ${String(v.nodes.length)}`)).toEqual([]);
+  });
+
   test("the settings sheet", async ({ page }) => {
     await seedStorage(page, A_DAY);
     await page.locator("#databtn").click();

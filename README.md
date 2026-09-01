@@ -108,7 +108,7 @@ src/
 ├─ storage.ts store.ts                          persistence and one level of undo
 ├─ theme.ts prefs.ts                            appearance and behaviour, own storage keys
 ├─ render/    list flip ring task group         keyed DOM patching, and FLIP
-├─ ui/        drawer sheet menu drag toast edit focus confetti dom
+├─ ui/        drawer sheet stands menu drag toast edit focus confetti dom
 └─ styles/    tokens.css base.css app.css
 ```
 

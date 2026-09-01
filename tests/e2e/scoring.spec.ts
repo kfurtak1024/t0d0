@@ -159,13 +159,13 @@ test("the day card reports the verdict before it clears anything", async ({ page
 
   await tick(page, "call the bank, important").click();
   await page.locator("#closeday").click();
-  await expect(page.locator(".sheet .verdict")).toHaveText("The important things are done.");
-  await page.locator(".dismiss").click();
+  await expect(page.locator("#veil .verdict")).toHaveText("The important things are done.");
+  await page.locator("#veil .dismiss").click();
 
   await tick(page, "a").click();
   await tick(page, "b").click();
   await page.locator("#closeday").click();
-  await expect(page.locator(".sheet .verdict")).toHaveText("Everything done.");
+  await expect(page.locator("#veil .verdict")).toHaveText("Everything done.");
 });
 
 test("an unfinished day is given no verdict rather than a consoling one", async ({ page }) => {
@@ -173,8 +173,8 @@ test("an unfinished day is given no verdict rather than a consoling one", async 
   await addItem(page, "a");
 
   await page.locator("#closeday").click();
-  await expect(page.locator(".sheet .verdict")).toBeHidden();
-  await expect(page.locator(".sheet .score")).toHaveText("0 of 2");
+  await expect(page.locator("#veil .verdict")).toBeHidden();
+  await expect(page.locator("#veil .score")).toHaveText("0 of 2");
 });
 
 /*
