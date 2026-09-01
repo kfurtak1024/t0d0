@@ -255,6 +255,25 @@ Invariants worth defending in review:
 - **The card names the next landmark, which is not the same as praising you.** The closing
   card deliberately says nothing to an unfinished day; this one always says what the next
   tick buys, because a card opened mid-morning that said nothing would be opened once.
+- **Both day cards wear the same rail and the same gates**, from `src/ui/rail.ts` and
+  `src/ui/gates.ts`. Two copies would be two rainbows able to drift from `dayStroke` and
+  from each other, and the rail's whole claim is that it cannot disagree with the ring.
+  The _numbers_ are shared; the **words are not** — one card is looking forward ("one more
+  clears the bar") and the other is reporting a day that is over ("short of the bar"), so
+  each passes in its own note.
+- **The closing card carries them because it is the one card that erases something.** A
+  day that finished 5 of 6 with the marked item outstanding used to read as a good day and
+  then clear the evidence: the number is honest and says nothing about _which_ thing was
+  left, and `verdictOf` is silent there on purpose. The rail and the gates are how the card
+  is honest without praising a day that did not earn it — which is what lets that silence
+  stand. Do not fill it with a consoling line instead; `tests/e2e/scoring.spec.ts` pins
+  both halves.
+- **An empty list gets no gates and no rail**, not "Everything 0 of 0" — reachable through
+  the stale-day card, which opens on a day left overnight whose list has since been emptied.
+- **The closing card must fit without scrolling.** It is the one card with a destructive
+  button, and "Clear the ticks" below the fold is how someone taps it without reading it.
+  Measured in `scoring.spec.ts` the way `drawer.spec.ts` measures the settings sheet;
+  adding a row to this card means re-running it.
 - **Reordering is one step, applied repeatedly.** `reorder()` moves a row a single
   place and **is its own inverse**, so repeating it reaches any position. Everything else
   is a way of asking for that step — `Alt`+arrows, the `⋯` menu, and the drag, which just
@@ -331,8 +350,8 @@ src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
 src/render/       keyed DOM patching — list, task, group, ring, flip
-src/ui/           toast, day-summary sheet, the day-stands card, drawer, row menu,
-                  drag, inline edit, focus trap, confetti, dom
+src/ui/           toast, the two day cards and the rail and gates they share,
+                  drawer, row menu, drag, inline edit, focus trap, confetti, dom
 src/styles/       tokens.css first, then base.css, then app.css
 ```
 
@@ -396,6 +415,12 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
 - `tests/e2e/a11y.spec.ts` is the net under the accessibility work: axe must report zero
   WCAG 2.1 AA violations on the list, both dialogs and the empty state, and an ARIA
   snapshot pins the roles, names and states of the whole list.
+- **Two day cards are in the DOM at once, and they share their classes** — `.sheet`,
+  `.score`, `.dismiss`, `.gate`, `.track`. A spec must therefore say _which_ card it
+  means, by scoping to `#veil` or `.stands`; an unscoped `.sheet .score` matched both and
+  failed strict mode the moment the second card existed. The ones that still pass
+  unscoped only do so because the other card has not been opened in that test, which is
+  not a property to rely on.
 - **The settings sheet is measured, not eyeballed.** Two things went wrong there and
   neither was visible: it scrolled with a screenful of room around it because the
   _absolute_ `max-height` cap bound rather than the viewport one, and three of its

@@ -311,3 +311,73 @@ test("crossing two gates on one tick celebrates once", async ({ page }) => {
     )
     .toBe(1);
 });
+
+/*
+ * The case the closing card used to be silent about, and the reason it now
+ * carries the gates: five of six done, and the one thing left was marked. The
+ * number alone reads as a good day, the verdict line is deliberately blank, and
+ * the next thing this card does is erase the evidence.
+ */
+test("the closing card names what held the day back", async ({ page }) => {
+  await addItem(page, "call the bank!");
+  await addItem(page, "ship the patch!");
+  await addItem(page, "water plants");
+  await addItem(page, "shopping");
+
+  for (const name of ["ship the patch, important", "water plants", "shopping"])
+    await tick(page, name).click();
+  await page.locator("#closeday").click();
+
+  const gates = page.locator("#veil .gate");
+  await expect(gates).toHaveCount(2);
+  await expect(gates.nth(0).locator(".gtally")).toHaveText("1 of 2");
+  await expect(gates.nth(0)).toContainText("call the bank");
+  await expect(gates.nth(1).locator(".gtally")).toHaveText("2 of 2");
+
+  // Still no words of praise: the gates report, they do not console.
+  await expect(page.locator("#veil .verdict")).toBeHidden();
+  // And it is the same rail the ring is painted from, short of its first gate.
+  const at = (sel: string) =>
+    page.locator(sel).evaluate((el) => parseFloat((el as HTMLElement).style.left));
+  expect(await at("#veil .you")).toBeLessThan(await at("#veil .rail .tick >> nth=0"));
+});
+
+/*
+ * The card grew, and it is the one card with a destructive button. "Clear the
+ * ticks" below the fold is how someone taps it without reading what it says.
+ */
+test("the closing card fits a roomy window, so the confirm is never below the fold", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await addItem(page, "call the bank!");
+  await addItem(page, "water plants");
+  await addItem(page, "shopping");
+  await page.locator("#closeday").click();
+
+  const fit = await page.evaluate(() => {
+    const sheet = document.querySelector("#veil .sheet");
+    return sheet ? { content: sheet.scrollHeight, box: sheet.clientHeight } : null;
+  });
+  expect(fit?.content).toBeLessThanOrEqual(fit?.box ?? 0);
+
+  const confirm = await page.locator("#veil .confirm").boundingBox();
+  expect(confirm?.y).toBeLessThan(900 - (confirm?.height ?? 0));
+});
+
+/*
+ * A day left open overnight opens on its own card. With the list emptied since,
+ * there are no gates to report and no rail worth reading.
+ */
+test("a stale day with nothing in it opens the card without a rail", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now() - 20 * 60 * 60 * 1000,
+    list: [],
+  });
+
+  await expect(page.locator("#veil")).toBeVisible();
+  await expect(page.locator("#veil .score")).toHaveText("0 of 0");
+  await expect(page.locator("#veil .track")).toBeHidden();
+  await expect(page.locator("#veil .gate")).toHaveCount(0);
+});

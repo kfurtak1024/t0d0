@@ -59,8 +59,8 @@ test("the ring opens the day's card, and the card only reports", async ({ page }
     "2 important things left, then the day turns green.",
   );
   // The marked work still to do, named, so the card says what to do next.
-  await expect(page.locator(".gate").first()).toContainText("book the tickets");
-  await expect(page.locator(".gate").first()).toContainText("reply to Dana");
+  await expect(page.locator(".stands .gate").first()).toContainText("book the tickets");
+  await expect(page.locator(".stands .gate").first()).toContainText("reply to Dana");
   await expect(page.locator("#standsdur")).toHaveText("1h 30m in");
 
   // Nothing here can change the list: one way out, and it is not a confirm.
@@ -72,7 +72,7 @@ test("both gates are reported, because the day turns on both", async ({ page }) 
   await seedStorage(page, A_DAY);
   await open(page);
 
-  const gates = page.locator(".gate");
+  const gates = page.locator(".stands .gate");
   await expect(gates).toHaveCount(2);
   await expect(gates.nth(0)).toContainText("Important");
   await expect(gates.nth(0).locator(".gtally")).toHaveText("1 of 3");
@@ -98,11 +98,11 @@ test("a list with nothing marked has no green landmark and one gate", async ({ p
   });
   await open(page);
 
-  await expect(page.locator("#standsgreen")).toBeHidden();
-  await expect(page.locator("#standsmarks span")).toHaveCount(1);
-  await expect(page.locator("#standsmarks span")).toHaveText("the bar");
+  await expect(page.locator(".stands .rail .tick").first()).toBeHidden();
+  await expect(page.locator(".stands .marks span")).toHaveCount(1);
+  await expect(page.locator(".stands .marks span")).toHaveText("the bar");
 
-  const gates = page.locator(".gate");
+  const gates = page.locator(".stands .gate");
   await expect(gates).toHaveCount(1);
   await expect(gates).toContainText("Everything");
   await expect(page.locator("#standsnext")).toHaveText("2 more and it's a good day.");
@@ -114,10 +114,14 @@ test("the dot sits where the ring's own hue says it does", async ({ page }) => {
 
   // Not a pixel assertion: the dot has to be short of the important gate, since
   // the marked work is not done, and the gates in their own order along the rail.
-  const at = (sel: string) => page.locator(sel).evaluate((el) => parseFloat(el.style.left));
-  expect(await at("#standsyou")).toBeLessThan(await at("#standsgreen"));
-  expect(await at("#standsgreen")).toBeLessThan(await at("#standsblue"));
-  expect(await at("#standsyou")).toBeGreaterThan(0);
+  const at = (sel: string) =>
+    page.locator(sel).evaluate((el) => parseFloat((el as HTMLElement).style.left));
+  const green = await at(".stands .rail .tick >> nth=0");
+  const blue = await at(".stands .rail .tick >> nth=1");
+  const you = await at(".stands .you");
+  expect(you).toBeLessThan(green);
+  expect(green).toBeLessThan(blue);
+  expect(you).toBeGreaterThan(0);
 });
 
 test("an empty list has nothing to report, so the ring is not a button", async ({ page }) => {
@@ -167,7 +171,7 @@ test("the card reads the list as it stands now, not as it was opened", async ({ 
   await page.locator(".task", { hasText: "sweep up" }).locator(".tick").click();
   await open(page);
   await expect(page.locator("#standsscore")).toHaveText("5 of 8");
-  await expect(page.locator(".gate").nth(1).locator(".gnote")).toHaveText(
+  await expect(page.locator(".stands .gate").nth(1).locator(".gnote")).toHaveText(
     "past the bar, set at 70%",
   );
 });

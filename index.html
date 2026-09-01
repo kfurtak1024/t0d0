@@ -88,6 +88,9 @@
         <p class="score">0 of 0</p>
         <p class="of">done</p>
         <p class="verdict"></p>
+        <!-- The rail is inserted here by the card: both cards build it from one
+             place rather than carrying two copies of the same markup. -->
+        <div class="gates" id="closegates"></div>
         <ul class="cleared"></ul>
         <p class="dur"></p>
         <button class="confirm" type="button">Clear the ticks</button>
@@ -106,17 +109,7 @@
         <h2 id="standstitle">Where the day stands</h2>
         <p class="score" id="standsscore">0 of 0</p>
         <p class="of">done</p>
-        <!-- The rainbow the ring wears, unrolled. A restatement of what the
-             gates below say in words, so it is hidden from a screen reader. -->
-        <div class="track" aria-hidden="true">
-          <div class="rail" id="standsrail">
-            <span class="tick" id="standsgreen"></span>
-            <span class="tick" id="standsblue"></span>
-            <span class="you" id="standsyou"></span>
-          </div>
-          <div class="marks" id="standsmarks"></div>
-          <div class="ends"><span>nothing</span><span>everything</span></div>
-        </div>
+        <!-- The rail goes in above this line; see the note on the closing card. -->
         <p class="next" id="standsnext"></p>
         <div class="gates" id="standsgates"></div>
         <p class="dur" id="standsdur"></p>

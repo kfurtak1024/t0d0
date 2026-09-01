@@ -1106,7 +1106,8 @@ body.dragging-row {
   box-shadow: var(--shadow-lift);
   padding: 2rem 1.75rem 1.5rem;
   width: 100%;
-  max-width: 20rem;
+  /* Both day cards carry the rail and the two gates, so both need the room. */
+  max-width: 22rem;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1244,12 +1245,17 @@ body.dragging-row {
   closer's 0.35rem rhythm is for a card of single lines.
 */
 .stands {
-  max-width: 22rem;
   gap: 0;
 }
 
 .stands .score {
   margin-top: 0.2rem;
+}
+
+/* The rail sits under the score on both cards, and hides itself on a day with
+   nothing in it. */
+.track[hidden] {
+  display: none;
 }
 
 /*
