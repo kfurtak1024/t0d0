@@ -23,12 +23,37 @@ test("a counted item needs one tap per unit", async ({ page }) => {
 
   const row = page.locator(".task", { hasText: "make calls" });
   await expect(row.locator(".count")).toHaveText("0/3");
-  await expect(row.locator(".label")).toContainText("[3]");
+  // The tally says the target; the label is the name and nothing else. `!` and
+  // `~` do not survive into the text either — the bracket now matches them.
+  await expect(row.locator(".label")).toHaveText("make calls");
 
   for (let i = 0; i < 3; i++) await row.locator(".tick").click();
 
   await expect(row.locator(".count")).toHaveText("3/3");
   await expect(row).toHaveClass(/done/);
+});
+
+/*
+ * The three things the composer parses all leave the text on the way in, and
+ * each is shown by something built for it: the accent edge, the tag, the tally.
+ * The bracket was the odd one out — spelled into the label *and* counted in
+ * `.count` — which made a counted row the only row whose text was not what you
+ * typed. All three come back when you edit, which `raw()` covers.
+ */
+test("a row's label is its name, and none of the marks", async ({ page }) => {
+  await addItem(page, "call the bank! [3]~");
+
+  const row = page.locator(".task", { hasText: "call the bank" });
+  await expect(row.locator(".label")).toHaveText("call the bank");
+
+  // Each mark still shows, just not as text in the name.
+  await expect(row).toHaveClass(/important/);
+  await expect(row.locator(".once")).toBeVisible();
+  await expect(row.locator(".count")).toHaveText("0/3");
+
+  // And editing hands all three back.
+  await row.locator(".label").click();
+  await expect(row.locator(".label")).toHaveText("call the bank!~ [3]");
 });
 
 /*

@@ -22,6 +22,7 @@ const task = (text: string, count = 0, target = 1): Task => ({
   target,
   count,
   important: false,
+  once: false,
 });
 
 const key = (text: string, count = 0, target = 1): Task => ({

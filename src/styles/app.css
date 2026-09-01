@@ -27,7 +27,7 @@
 
 .brand i {
   font-style: normal;
-  color: oklch(var(--ring-l) var(--ring-c) 268);
+  color: var(--accent-ink);
 }
 
 .headline {
@@ -194,7 +194,8 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.4rem 0.5rem 0.5rem calc(var(--lead-card) - var(--card-pad));
+  padding: 0.4rem calc(var(--trail-card) - var(--card-pad)) 0.5rem
+    calc(var(--lead-card) - var(--card-pad));
 }
 
 .chev {
@@ -319,10 +320,24 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  /* Leading padding clears the pill a nested row wears — see --lead-nested. */
+  /* Leading padding clears the pill a nested row wears — see --lead-nested.
+     The trailing edge is set below, where the card's own padding is in scope. */
   padding: 0.42rem 0.5rem 0.42rem var(--lead-nested);
   border-radius: var(--r-row);
   transition: background 0.18s;
+}
+
+/*
+  A nested row sits inside the group's card, so its trailing edge spends that
+  card's padding first and subtracts it — the same sum `.ghead` does, and the
+  mirror of --lead-card at the leading end.
+
+  Hand-set at 0.5rem it did not: every ⋯ inside a group sat 4.8px left of the
+  ones outside one, which is invisible on an icon and plain the moment a word
+  sits beside it.
+*/
+.items > .task {
+  padding-right: calc(var(--trail-card) - var(--card-pad));
 }
 
 .list > .task {
@@ -336,7 +351,7 @@
    * lives. Unconditional rather than only on a marked row, so nothing shifts
    * when the mark goes on or comes off.
    */
-  padding: 0.7rem 0.75rem 0.7rem var(--lead-card);
+  padding: 0.7rem var(--trail-card) 0.7rem var(--lead-card);
   border-radius: var(--r-card);
 }
 
@@ -551,13 +566,38 @@ body.dragging-row {
   color: var(--ink);
 }
 
-.qty {
-  color: oklch(var(--ring-l) var(--ring-c) 268);
+/*
+  The one-off tag: a word, sitting beside the label rather than inside it.
+  Outside `.label` because that is the edit target and its textContent is what
+  a rename commits; outside `.line` because the strike is scoped to the words,
+  and this has to stay legible on a ticked row — that is precisely the row the
+  closer is about to take away.
+
+  A word, not a hue: the removal is the only thing on a row that tomorrow
+  cannot undo, so reading it must not depend on noticing a colour. The word is
+  the channel, which is why nothing else is asked to carry it — a dotted
+  underline was tried and only fought the box below.
+
+  The same type and the same box as `.count`, deliberately. They are the two
+  quiet things at the end of a row and they sit side by side on a counted
+  one-off: at different sizes their baselines disagreed, and where a row has no
+  count the tag has to stop exactly where a count would, or the column wanders
+  row to row. Everything but the pointer affordances — a tag is not a button.
+*/
+.once {
+  flex: none;
+  font-size: 0.76rem;
   font-weight: 600;
+  color: var(--accent-ink);
+  /* Only the trailing half of `.count`'s box: the right padding is what puts
+     the tag in the count's column on a row that has no count, and the left
+     would just take width off the label — which on a narrow screen is a line
+     of wrap on the row's actual text. The gap already separates it. */
+  padding: 0.2rem 0.35rem 0.2rem 0;
 }
 
-.done .qty {
-  color: inherit;
+.once[hidden] {
+  display: none;
 }
 
 .count {
@@ -566,7 +606,11 @@ body.dragging-row {
   font-size: 0.76rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  /* The tally and the one-off tag are the same kind of thing as the wordmark's
+     zeros — a small fact about an item — so all three share --accent-ink. The
+     target used to be spelled out in the label as well, in this same blue;
+     saying it twice was the reason to stop. */
+  color: var(--accent-ink);
   padding: 0.2rem 0.35rem;
   border-radius: 6px;
   cursor: pointer;
@@ -715,10 +759,30 @@ body.dragging-row {
   Groups and top-level items alike, because they are the same kind of thing to
   the eye — two cards side by side in one list — and marking them differently
   read as two different marks rather than one.
+
+  Two background layers rather than one horizontal gradient, so the strip can
+  carry a ramp of its own: the first layer is the strip, sized to --r-card and
+  not repeated, and the card colour sits under it. Still a background, so the
+  card's border-radius still clips it and it still cannot intercept a tap —
+  which is the whole reason the strip is drawn this way. Both alternatives were
+  tried and both fought the corner; a second layer does not change that.
+
+  The ramp deepens downward rather than shifting hue. A hue that moved would
+  leave the nested pill, the fold's pip and the day card's gate pip — all flat
+  --flag — visibly disagreeing with the card beside them, which is a second
+  change and a second thing to keep in step. Deepening keeps one red, with
+  --flag as its mid-tone.
+
+  It runs over the card's own height, so a tall group shows a gradual ramp and a
+  short row a compressed one. That is the intent: every card shows the whole
+  mark, at the scale of the card.
 */
 .list > .task.important,
 .group.important {
-  background: linear-gradient(to right, var(--flag) 0 var(--r-card), var(--card) var(--r-card));
+  background:
+    linear-gradient(to bottom, var(--flag-head), var(--flag-foot)) 0 0 / var(--r-card) 100%
+      no-repeat,
+    var(--card);
 }
 
 /*
@@ -1219,6 +1283,23 @@ body.dragging-row {
   font-size: 0.8rem;
   color: var(--faint);
   margin-top: 0.6rem;
+}
+
+/*
+  Sits directly above the one destructive button on the card, in the danger
+  colour, because it names what that button takes away for good. Not a warning
+  the eye can skip: --danger clears 4.5:1 on the card, which the a11y spec
+  pins.
+*/
+.sheet .departing {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.sheet .departing[hidden] {
+  display: none;
 }
 
 .sheet button {

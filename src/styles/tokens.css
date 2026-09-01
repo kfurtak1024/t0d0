@@ -49,6 +49,25 @@
      bolder word — all non-text, so 3:1 against --card is the bar, not 4.5:1. */
   --flag: oklch(52% 0.19 20);
 
+  /* The ends of the strip's ramp. --flag is the colour of the mark and sits at
+     the ramp's middle, which is what lets the nested pill, the fold's pip and
+     the day card's gate pip stay a flat --flag and still agree with the card
+     beside them: they are the strip's own mid-tone, not a fourth red.
+     Measured against --card: 4.75:1 at the head, 8.52:1 at the foot. The strip
+     is non-text, so 3:1 is the bar — re-measure rather than nudge, and mind the
+     foot especially, which is where a ramp runs out of contrast. */
+  --flag-head: oklch(58% 0.2 22);
+  --flag-foot: oklch(44% 0.17 16);
+
+  /* The app's blue at text size: the wordmark's zeros, an item's tally, and the
+     one-off tag. All three are the same kind of thing — a small fact about the
+     list rather than the list itself — so they are one colour rather than three.
+     Two points darker than --ring-l, which is what it takes to clear 4.5:1 on
+     --nest: a nested row takes that background on hover, and the ring's own 56%
+     landed at 4.45 there. At 54% it is 5.21 on --card, 4.85 on --nest and 4.52
+     on --bg, so it clears as normal text on every surface it can reach. */
+  --accent-ink: oklch(54% 0.15 268);
+
   /* Text sitting on a filled accent, and the destructive red. Both flip with
      the theme: the accent lightens in dark mode, so white stops being legible
      on it, and the red has to lighten to stay readable on a dark surface. */
@@ -104,6 +123,16 @@
      of it. See the important section in app.css. */
   --lead-card: calc(var(--r-card) + var(--mark-clear));
   --lead-nested: calc(var(--r-card) / 3 + var(--mark-clear));
+  /*
+    The trailing edge every row's last control stops at, measured from the card
+    it sits in. One value for the whole list, because a group's contents are
+    inside a second box: a nested row and a group header both spend the card's
+    own padding first and subtract it, the same way --lead-card does at the
+    other end. Hand-set at 0.5rem they did not — every ⋯ inside a group sat
+    4.8px left of the ones outside it, which is invisible on an icon and plain
+    the moment a word sits next to it.
+  */
+  --trail-card: 0.75rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -121,6 +150,14 @@
     --ring-c: 0.14;
     --ring-lift: 6%;
     --flag: oklch(68% 0.18 22);
+    /* 6.45:1 at the head, 4.04:1 at the foot. The ramp deepens downward in
+       both themes, so in dark it runs toward the card rather than away from it
+       and the foot is the tighter end. */
+    --flag-head: oklch(74% 0.19 24);
+    --flag-foot: oklch(60% 0.16 16);
+    /* Clear on every surface without moving off --ring-l: 7.31 on --card, 6.76
+       on --nest, 8.01 on --bg. See the note in the light block. */
+    --accent-ink: oklch(74% 0.14 268);
     --on-accent: #10141a;
     --danger: oklch(74% 0.15 25);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);
@@ -143,6 +180,11 @@
   --ring-c: 0.14;
   --ring-lift: 6%;
   --flag: oklch(68% 0.18 22);
+  /* 6.45:1 at the head, 4.04:1 at the foot — see the note above. */
+  --flag-head: oklch(74% 0.19 24);
+  --flag-foot: oklch(60% 0.16 16);
+  /* 7.31 on --card, 6.76 on --nest, 8.01 on --bg — see the note above. */
+  --accent-ink: oklch(74% 0.14 268);
   --on-accent: #10141a;
   --danger: oklch(74% 0.15 25);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 6px 16px -6px rgb(0 0 0 / 45%);

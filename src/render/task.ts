@@ -7,7 +7,14 @@ import { makeRing, paintRing } from "./ring";
 const RING_SIZE = { root: 26, nested: 24 } as const;
 
 /**
- * Show the quantity as part of the label, styled, without touching stored text.
+ * Write the row's name, and only its name.
+ *
+ * None of the three things the composer parses survive into the label: `!`
+ * becomes the accent edge, `~` becomes the tag, and `[n]` becomes the tally.
+ * The target used to be spelled out here as well as counted in `.count`, which
+ * said it twice and made a counted row the one row whose text was not what you
+ * typed. `raw()` still puts all three back when you edit, which is where they
+ * are editable and where they belong.
  *
  * The text lives in an inline span so the strike-through spans the words rather
  * than the whole flexed row.
@@ -16,13 +23,6 @@ function writeLabel(el: HTMLElement, task: Task): void {
   const line = document.createElement("span");
   line.className = "line";
   line.textContent = task.text;
-
-  if (task.target > 1) {
-    const quantity = document.createElement("span");
-    quantity.className = "qty";
-    quantity.textContent = ` [${String(task.target)}]`;
-    line.append(quantity);
-  }
   el.replaceChildren(line);
 }
 
@@ -49,6 +49,23 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
 
   const label = document.createElement("div");
   label.className = "label";
+
+  /*
+   * A one-off says so in a word, and as a sibling of the label rather than
+   * inside it. The label is the edit target and its `textContent` is what a
+   * commit reads, so a tag living in there would be text you had to delete to
+   * rename the row. Staying outside also keeps it clear of the strike-through,
+   * which is scoped to the words — and a ticked one-off is exactly the row
+   * whose tag matters, since that is the one the closer will take away.
+   *
+   * A word rather than a colour: the removal is the only thing on a row that
+   * tomorrow cannot undo, so reading it must not depend on noticing a hue.
+   * `aria-hidden` because the tick's accessible name already carries it.
+   */
+  const tag = document.createElement("span");
+  tag.className = "once";
+  tag.textContent = "once";
+  tag.setAttribute("aria-hidden", "true");
 
   const count = document.createElement("button");
   count.type = "button";
@@ -107,12 +124,14 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     actions.beginEdit(label, task.id, false);
   });
 
-  row.append(grip(), tick, label, count, dots, kill);
+  row.append(grip(), tick, label, tag, count, dots, kill);
 
   const update = (next: Task): void => {
     current = next;
     row.classList.toggle("done", isDone(next));
     row.classList.toggle("important", next.important);
+    row.classList.toggle("oneoff", next.once);
+    tag.hidden = !next.once;
 
     // The arc count is baked into the ring, so a changed target needs a new one.
     if (ring.target !== next.target) {
@@ -143,9 +162,10 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
         tick.removeAttribute(attr);
       }
     }
-    // The accent bar is a visual channel and nothing else, so the one control
-    // that carries the row's name says it out loud too.
-    tick.setAttribute("aria-label", next.important ? `${next.text}, important` : next.text);
+    // The accent bar and the tag are visual channels and nothing else, so the
+    // one control that carries the row's name says both out loud too.
+    const marks = [next.important ? "important" : "", next.once ? "one-off" : ""].filter(Boolean);
+    tick.setAttribute("aria-label", [next.text, ...marks].join(", "));
     dots.setAttribute("aria-label", `More for ${next.text}`);
     kill.setAttribute("aria-label", `Delete ${next.text}`);
   };

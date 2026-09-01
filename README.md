@@ -36,12 +36,13 @@ that rather than merely promising it.
 
 - **One persistent list.** It's still there tomorrow. You edit it; nothing expires on its own.
 - **Groups, one level deep.** Enough to separate _Morning_ from _Work_, not enough to become an outliner.
-- **Counted items.** `make calls [3]` takes three ticks, and partial progress counts.
+- **Counted items.** `make calls [3]` takes three ticks, and partial progress counts. The row reads `make calls` — the target lives in the `0/3` tally beside it, the same way `!` and `~` leave the text and become a mark of their own.
 - **Important items.** A trailing `!` — `call the bank!`, `# Work!` — gives a row an accent edge and a heavier word, and the `⋯` menu marks one without typing. Marking a group marks everything in it, unmarking it clears them again, and marking every item in a group marks the group. A mark and nothing more: it never reorders anything, and it stays on once the row is finished, so you can still see what you got done.
+- **One-off items.** A trailing `~` — `post the parcel~` — tags a row as not part of the standing list, and the `⋯` menu tags one without typing. Tick it and closing the day takes it away instead of resetting it; leave it undone and it is still there in the morning, because the errand you did not run is the one you most need to see. The closer names what it is about to remove before you press the button.
 - **A day is scored on two gates.** Everything marked `!` has to be done, _and_ enough of the rest — 70% by default, and Settings → Behaviour moves the bar. So an almost-perfect day with one important thing still open is not a success, while a day with nothing marked is judged on the rest alone.
 - **The day's ring runs a rainbow.** Red at nothing done, **green** the moment the important work lands, **blue** the moment the rest clears the bar, **violet** at everything. All three are celebrated. The arc still measures the whole list — the colour is the verdict on it.
 - **A rewarding tick.** Springy rings that sweep indigo → green as each row fills in, a wiping strike-through, and confetti at every milestone.
-- **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one. Tomorrow opens on the whole list, every fold reopened.
+- **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one. Tomorrow opens on the whole list, every fold reopened and the finished one-offs gone.
 - **Reorderable, three ways.** Drag by the grip and the row goes where you point, in or out of a group. `Alt`+arrows and the `⋯` menu move it among its own siblings and stop there — changing level is its own command, so a move never re-nests anything behind your back. One undo puts a whole drag back.
 - **Untickable.** Tap a finished item again and it comes back. A counted item counts up instead, and resets from its menu.
 - **Finished work gets out of the way.** Tick something off and it drops below what's left, settling on top of whatever finished before it rather than burying it. A group waits for its last item, then folds shut as it goes. Untick something and it comes straight back up above the pile. On by default; Settings → Behaviour turns it off.
@@ -59,20 +60,22 @@ that rather than merely promising it.
 | `call the bank!`  | an important task — `# Work!` marks a group           |
 | `make calls! [3]` | both; `make calls [3]!` reads the same                |
 | `ship it!!`       | an important `ship it!` — one `!` is the mark         |
+| `post parcel~`    | a one-off: removed at the close, once it is ticked    |
+| `call back!~`     | both marks; `call back~!` reads the same              |
 
-| Do this                                          | To                                                                                 |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| Click a ring                                     | tick it, or untick it — a counted item counts up instead                           |
-| Shift-click a ring                               | count back down — on touch, tap the `1/3` label                                    |
-| Drag the `⠿` grip                                | move a row, in and out of groups as it travels; `Escape` calls it off              |
-| Click any text                                   | edit in place, `[3]` and `!` included; `Enter` commits, `Escape` reverts           |
-| <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>         | move the focused row up or down among its siblings                                 |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | with a tick focused, move that item into the group above or back out               |
-| <kbd>Space</kbd> / <kbd>Enter</kbd>              | tick the focused item                                                              |
-| <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                              |
-| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, a move, an import, or a cleared day                                 |
-| `⋯` on a row                                     | move it up or down; take it in or out of a group; reset a count; mark it important |
-| `⋯` in the header                                | theme, tidying, the success bar, save a copy, load one back, erase everything      |
+| Do this                                          | To                                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Click a ring                                     | tick it, or untick it — a counted item counts up instead                              |
+| Shift-click a ring                               | count back down — on touch, tap the `1/3` label                                       |
+| Drag the `⠿` grip                                | move a row, in and out of groups as it travels; `Escape` calls it off                 |
+| Click any text                                   | edit in place, `[3]`, `!` and `~` included; `Enter` commits, `Escape` reverts         |
+| <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>         | move the focused row up or down among its siblings                                    |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | with a tick focused, move that item into the group above or back out                  |
+| <kbd>Space</kbd> / <kbd>Enter</kbd>              | tick the focused item                                                                 |
+| <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                                 |
+| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, a move, an import, or a cleared day                                    |
+| `⋯` on a row                                     | move it up or down; in or out of a group; reset a count; mark it important or one-off |
+| `⋯` in the header                                | theme, tidying, the success bar, save a copy, load one back, erase everything         |
 
 ## Quick start
 

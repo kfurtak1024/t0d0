@@ -25,6 +25,10 @@ const ID = /^[A-Za-z0-9_-]{1,64}$/;
  * and regenerates duplicate ids (which would otherwise collide in the render
  * cache and make rows share a DOM node). Returns null only when the shape is
  * unusable, so a caller can fall back to a fresh list.
+ *
+ * New fields default to false rather than bumping SCHEMA_VERSION: a list
+ * written before `important` or `once` existed loads unmarked, where a version
+ * bump would have discarded it outright. See the migration seam below.
  */
 export function normalize(input: unknown): State | null {
   if (!isRecord(input)) return null;
@@ -60,6 +64,7 @@ export function normalize(input: unknown): State | null {
       target,
       count,
       important: value["important"] === true,
+      once: value["once"] === true,
     };
   };
 

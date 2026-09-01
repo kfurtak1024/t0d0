@@ -548,3 +548,62 @@ test.describe("what a folded group is still holding", () => {
     await expect(badge(page)).toBeHidden();
   });
 });
+
+/*
+ * The strip is a ramp now, and a ramp is two colours that can drift apart in
+ * two themes without anyone noticing. It is non-text, so 3:1 against --card is
+ * the bar rather than 4.5:1 — the note on --flag in tokens.css says so, and
+ * this is what holds it to it. Both ends, because the foot is where a ramp
+ * that deepens runs out of contrast, and both themes, because in dark the ramp
+ * runs toward the card rather than away from it.
+ */
+for (const scheme of ["light", "dark"] as const) {
+  test(`the mark's ramp clears 3:1 on the card in ${scheme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await addItem(page, "call the bank!");
+    await expect(page.locator(".task.important")).toBeVisible();
+
+    const ratios = await page.evaluate(() => {
+      const relative = (px: number[]): number => {
+        const f = (c: number): number => {
+          const v = c / 255;
+          return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * f(px[0]!) + 0.7152 * f(px[1]!) + 0.0722 * f(px[2]!);
+      };
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const cx = canvas.getContext("2d", { willReadFrequently: true })!;
+      // Painted over the layer beneath, so a stop carrying alpha is measured as
+      // it actually lands rather than as it was written.
+      const paint = (colour: string, under: string): number[] => {
+        cx.fillStyle = under;
+        cx.fillRect(0, 0, 1, 1);
+        cx.fillStyle = colour;
+        cx.fillRect(0, 0, 1, 1);
+        return [...cx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+      };
+      const style = getComputedStyle(document.querySelector(".task.important")!);
+      const read = (name: string): string => style.getPropertyValue(name).trim();
+
+      const card = paint(read("--card"), "#ffffff");
+      const cardCss = `rgb(${card.join(",")})`;
+      const against = (colour: string): number => {
+        const a = relative(paint(colour, cardCss));
+        const b = relative(card);
+        const [hi, lo] = a > b ? [a, b] : [b, a];
+        return (hi + 0.05) / (lo + 0.05);
+      };
+      return {
+        head: against(read("--flag-head")),
+        foot: against(read("--flag-foot")),
+        mid: against(read("--flag")),
+      };
+    });
+
+    expect(ratios.head).toBeGreaterThanOrEqual(3);
+    expect(ratios.foot).toBeGreaterThanOrEqual(3);
+    // --flag itself still paints the pill, the fold's pip and the gate's pip.
+    expect(ratios.mid).toBeGreaterThanOrEqual(3);
+  });
+}
