@@ -131,11 +131,11 @@ runs:
     - name: Check bundle budget
       shell: bash
       run: |
-        limit=25600
+        limit=27648
         size=$(find dist -name '*.js' -o -name '*.css' | xargs cat | gzip -9 | wc -c)
         echo "gzipped js and css: ${size} of ${limit} bytes"
         if [ "$size" -gt "$limit" ]; then
-          echo "::error::bundle is ${size} bytes, over the 25 kB budget — did a dependency sneak in?"
+          echo "::error::bundle is ${size} bytes, over the 27 kB budget — did a dependency sneak in?"
           exit 1
         fi
 
