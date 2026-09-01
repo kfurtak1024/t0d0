@@ -255,6 +255,14 @@ Invariants worth defending in review:
 - **The card names the next landmark, which is not the same as praising you.** The closing
   card deliberately says nothing to an unfinished day; this one always says what the next
   tick buys, because a card opened mid-morning that said nothing would be opened once.
+- **The rail shows the stretch not yet reached as dimmed, and a gate's mark is drawn over
+  everything — the dot included.** Both came from the same measured failure: at 95% of the
+  way to the bar, an 18px dot with a 3px halo covered the bar's mark completely, in the
+  card's own colour, so a day the gates called "short of the bar" read as a day sitting on
+  it. The dot is 14px with a 2px ring, the marks are `--muted` lines standing clear of the
+  rail, and the dimming is what turns "did it clear that gate?" into something you look at
+  rather than judge by a dot's centre. Six treatments were rendered before this one; a
+  smaller dot alone does not fix it, because the halo is what hides the mark.
 - **Both day cards wear the same rail and the same gates**, from `src/ui/rail.ts` and
   `src/ui/gates.ts`. Two copies would be two rainbows able to drift from `dayStroke` and
   from each other, and the rail's whole claim is that it cannot disagree with the ring.

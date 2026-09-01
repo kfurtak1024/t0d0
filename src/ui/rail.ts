@@ -18,6 +18,7 @@ import { dayStroke } from "../render/ring";
 export class Rail {
   readonly element: HTMLElement;
   #green: HTMLElement;
+  #spent: HTMLElement;
   #you: HTMLElement;
   #marks: HTMLElement;
 
@@ -40,8 +41,16 @@ export class Rail {
     rail.style.background = `linear-gradient(to right, ${stops.join(", ")})`;
 
     this.#green = tick(HUE.green);
+    /*
+     * The rainbow the day has not reached yet, dimmed. Without it the dot alone
+     * had to answer "did it get past that gate?", and at 95% of the way to the
+     * bar the dot's own halo covered the gate's mark entirely: a day the gates
+     * called short read as a day sitting on the line.
+     */
+    this.#spent = span("");
+    this.#spent.className = "spent";
     this.#you = div("you");
-    rail.append(this.#green, tick(HUE.blue), this.#you);
+    rail.append(this.#green, tick(HUE.blue), this.#spent, this.#you);
 
     this.#marks = div("marks");
     const ends = div("ends");
@@ -53,8 +62,10 @@ export class Rail {
   /** Put the dot where the day is, and label the gates the day actually has. */
   paint(score: DayScore, bar: number): void {
     const hue = dayHue(score, bar);
-    this.#you.style.left = at(hueMark(hue));
+    const here = at(hueMark(hue));
+    this.#you.style.left = here;
     this.#you.style.background = dayStroke(hue);
+    this.#spent.style.left = here;
 
     this.#green.hidden = !score.hasImportant;
     /*

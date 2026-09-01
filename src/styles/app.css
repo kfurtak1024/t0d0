@@ -1275,30 +1275,52 @@ body.dragging-row {
   border-radius: 999px;
 }
 
+/*
+  A gate's mark, drawn over everything else on the rail — including the dot.
+  Cut out of the rail in --card it was invisible exactly where it mattered: the
+  dot's halo is the same colour, so a day sitting just short of the bar covered
+  its mark and read as sitting on it.
+*/
 .rail .tick {
   position: absolute;
-  top: -3px;
-  bottom: -3px;
+  top: -6px;
+  bottom: -6px;
+  z-index: 3;
   width: 2px;
-  background: var(--card);
-  opacity: 0.85;
+  background: var(--muted);
 }
 
 .rail .tick[hidden] {
   display: none;
 }
 
+/* The stretch of rainbow the day has not reached, dimmed. It is what makes
+   "did it clear that gate?" a matter of looking rather than of judging a dot's
+   centre against a line. */
+.rail .spent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--card);
+  opacity: 0.55;
+  transition: left 0.5s var(--ease);
+}
+
 /* Ringed in the card's own colour so it reads as sitting on the rail rather
-   than as a stop in the gradient. */
+   than as a stop in the gradient. Small, and a thin ring: at 18px with a 3px
+   halo it swallowed a gate's mark whole. */
 .rail .you {
   position: absolute;
   top: 50%;
-  width: 18px;
-  height: 18px;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
   transform: translate(-50%, -50%);
   box-shadow:
-    0 0 0 3px var(--card),
+    0 0 0 2px var(--card),
     var(--shadow-card);
   transition:
     left 0.5s var(--ease),
