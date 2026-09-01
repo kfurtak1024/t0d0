@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   allTasks,
   dayHue,
+  hueMark,
+  HUE,
   isComplete,
   isDone,
+  outstandingImportant,
   partition,
   progress,
   scoreDay,
+  stepsToBar,
   summarise,
 } from "../src/progress";
 import type { Group, State, Task } from "../src/types";
@@ -250,5 +254,99 @@ describe("summarise", () => {
     const s = state([key("ship", 1), task("a", 1), task("b", 1), task("c", 1), task("d", 0)]);
     expect(summarise(s, 0, 0.7).score).toMatchObject({ cleared: true, succeeded: true });
     expect(summarise(s, 0, 0.9).score).toMatchObject({ cleared: true, succeeded: false });
+  });
+});
+
+describe("hueMark", () => {
+  it("puts the rainbow's ends at the ends", () => {
+    expect(hueMark(HUE.red)).toBe(0);
+    expect(hueMark(HUE.violet)).toBe(1);
+  });
+
+  it("places the gates where their hues fall, not at even thirds", () => {
+    // The rail is the hue axis, so the landmarks sit wherever their own hue is.
+    expect(hueMark(HUE.green)).toBeCloseTo((150 - 25) / (320 - 25), 6);
+    expect(hueMark(HUE.blue)).toBeCloseTo((260 - 25) / (320 - 25), 6);
+    expect(hueMark(HUE.green)).toBeLessThan(hueMark(HUE.blue));
+  });
+
+  it("agrees with the ring: the day's hue is the day's place", () => {
+    const s = state([key("ship", 1), task("a", 1), task("b", 0)]);
+    const mark = hueMark(dayHue(scoreDay(s, 0.7), 0.7));
+    expect(mark).toBeGreaterThan(hueMark(HUE.green));
+    expect(mark).toBeLessThan(1);
+  });
+});
+
+describe("outstandingImportant", () => {
+  it("is the marked work still to do, in list order", () => {
+    const s = state([
+      keyGroup("Admin", [key("book it"), key("call", 1)]),
+      key("bank", 1),
+      key("post"),
+      task("plants"),
+    ]);
+    expect(outstandingImportant(s.list).map((item) => item.text)).toEqual(["book it", "post"]);
+  });
+
+  it("counts a marked group's items even when they carry no mark of their own", () => {
+    const s = state([keyGroup("Admin", [{ ...task("book it") }])]);
+    expect(outstandingImportant(s.list)).toHaveLength(1);
+  });
+
+  it("is empty when nothing is marked", () => {
+    expect(outstandingImportant(state([task("a"), task("b", 1)]).list)).toEqual([]);
+  });
+});
+
+describe("stepsToBar", () => {
+  it("is zero once the bar is cleared", () => {
+    const s = state([task("a", 1), task("b", 1), task("c", 1), task("d", 0)]);
+    expect(stepsToBar(s, 0.7)).toBe(0);
+  });
+
+  it("is zero when there is nothing but marked work", () => {
+    // An empty set clears the bar vacuously, the way scoreDay reads it.
+    expect(stepsToBar(state([key("ship"), key("call")]), 0.7)).toBe(0);
+  });
+
+  it("counts the whole items a plain list still owes", () => {
+    const s = state([task("a", 1), task("b"), task("c"), task("d")]);
+    // 1 of 4 done, the bar wants 3 of 4: two more.
+    expect(stepsToBar(s, 0.75)).toBe(2);
+  });
+
+  /*
+   * The reason this is not ceil(bar × n − sum): that arithmetic treats every
+   * remaining task as worth a whole point. Here two are half-counted, so
+   * finishing one of them does not move the mean by one.
+   */
+  it("does not count a part-counted item as a whole step", () => {
+    const s = state([task("a", 1, 2), task("b", 1, 2), task("c"), task("d")]);
+    // Progress is (0.5 + 0.5 + 0 + 0) / 4 = 0.25; the bar wants 0.75, so one
+    // whole point is short. The naive ceil says 1; the halves only give 0.5.
+    expect(stepsToBar(s, 0.75)).toBe(2);
+  });
+
+  it("takes the largest remaining contributions first, so it is the fewest", () => {
+    const s = state([task("a", 3, 4), task("b"), task("c", 1, 2)]);
+    // Remaining: 0.25, 1, 0.5. Progress is (0.75 + 0 + 0.5) / 3 ≈ 0.4167, and
+    // the bar wants 0.8, so it is 1.15 short — the whole item plus the half.
+    expect(stepsToBar(s, 0.8)).toBe(2);
+  });
+
+  it("never asks for more than there is left to finish", () => {
+    const s = state([task("a"), task("b"), task("c")]);
+    expect(stepsToBar(s, 1)).toBe(3);
+  });
+
+  it("is zero at a bar of nothing", () => {
+    expect(stepsToBar(state([task("a"), task("b")]), 0)).toBe(0);
+  });
+
+  it("ignores marked work, which is the other gate's business", () => {
+    const s = state([key("ship"), key("call"), task("a", 1), task("b")]);
+    // The rest is a-done and b-undone: half, and the bar wants all of it.
+    expect(stepsToBar(s, 1)).toBe(1);
   });
 });

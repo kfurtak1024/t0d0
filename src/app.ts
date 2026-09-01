@@ -19,6 +19,7 @@ import { Dragger } from "./ui/drag";
 import { beginEdit } from "./ui/edit";
 import { RowMenu, type MenuItem } from "./ui/menu";
 import { DaySheet } from "./ui/sheet";
+import { hasDay, StandsSheet } from "./ui/stands";
 import { Toast } from "./ui/toast";
 
 const STALE_MS = 16 * 60 * 60 * 1000;
@@ -88,10 +89,12 @@ export class App {
   #input = el("#input") as HTMLInputElement;
   #composer = el(".composer");
 
+  #ringButton = el("#totalring") as HTMLButtonElement;
   #totalRing = makeRing(40, 4, 1);
   #rows: KeyedList<Node>;
   #toast: Toast;
   #sheet: DaySheet;
+  #stands: StandsSheet;
   #drawer: Drawer;
   #confetti: Confetti;
   #menu = new RowMenu();
@@ -123,7 +126,7 @@ export class App {
     this.#store = store;
 
     this.#rows = this.#makeRows(this.#rowActions());
-    el("#totalring").append(this.#totalRing);
+    this.#ringButton.append(this.#totalRing);
 
     this.#toast = new Toast(el("#toast"), () => {
       this.#undo();
@@ -132,6 +135,7 @@ export class App {
       this.#store.apply(T.clearTicks(this.#state), { undoable: true });
       this.#toast.show("Ticks cleared");
     });
+    this.#stands = new StandsSheet(el("#standsveil"));
     this.#drawer = new Drawer(el("#dataveil"), {
       current: () => this.#state,
       prefs: () => this.#prefs,
@@ -755,6 +759,8 @@ export class App {
     paintRing(this.#totalRing, tasks.length ? frame.done : 0, 1, dayStroke(hue));
     this.#totalRing.style.setProperty("--track-tint", dayStroke(hue, 0.2));
     this.#totalRing.style.opacity = tasks.length ? "1" : "0.3";
+    // Nothing to report on an empty list, so the ring is not a button there.
+    this.#ringButton.disabled = tasks.length === 0;
     const frac = `${String(tasks.filter(isDone).length)} of ${String(tasks.length)}`;
     // Writing the same text still fires the live region, so only write changes.
     if (this.#frac.textContent !== frac) this.#frac.textContent = frac;
@@ -843,6 +849,14 @@ export class App {
     this.#closer.addEventListener("click", () => {
       this.#sheet.show(this.#state, Date.now(), this.#bar);
     });
+    /*
+     * The ring reports; the closer ends the day. Two cards, and only one of
+     * them can change anything — which is why this one is on the ring rather
+     * than a second thing to press next to the closer.
+     */
+    this.#ringButton.addEventListener("click", () => {
+      if (hasDay(this.#state)) this.#stands.show(this.#state, Date.now(), this.#bar);
+    });
     (el("#databtn") as HTMLButtonElement).addEventListener("click", () => {
       this.#drawer.show();
     });
@@ -885,6 +899,7 @@ export class App {
     if (event.key === "Escape") {
       if (this.#menu.isOpen) this.#menu.close();
       if (this.#sheet.isOpen) this.#sheet.hide();
+      if (this.#stands.isOpen) this.#stands.hide();
       if (this.#drawer.isOpen) this.#drawer.hide();
     }
     if (this.#editingId !== null) return;

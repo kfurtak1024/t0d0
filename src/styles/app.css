@@ -50,8 +50,43 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+  The ring is a button: it opens the day's card. It keeps the bare look it had
+  as a div — a ring that grew a border would read as a control rather than as
+  the day — so the affordance is the cursor, a lift on hover and the hit area
+  below. Disabled on an empty list, where it is already dimmed and has nothing
+  to report.
+*/
 .totalring {
   flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* A button brings the UA's own padding, and this one has no width to absorb
+     it: left alone it grew the ring's box by 12px and shifted the header. */
+  padding: 0;
+  border-radius: 999px;
+  transition: transform 0.3s var(--spring);
+}
+
+/* 40px of ring, so the last 4 come from the overlay every control here uses. */
+.totalring::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+}
+
+.totalring:disabled {
+  cursor: default;
+}
+
+.totalring:not(:disabled):hover,
+.totalring:focus-visible {
+  transform: scale(1.06);
+}
+
+.totalring:not(:disabled):active {
+  transform: scale(0.96);
 }
 
 .more {
@@ -134,22 +169,32 @@
   controls all carry their own.
 */
 .group {
+  /* Named because the header's leading padding is measured back from the card's
+     edge and has to subtract it. */
+  --card-pad: 0.55rem;
+
   position: relative;
   background: var(--card);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card), var(--edge);
-  padding: 0.55rem 0.55rem 0.3rem;
+  padding: var(--card-pad) var(--card-pad) 0.3rem;
 }
 
 .group.clear {
   --edge: 0 0 0 1.5px oklch(var(--ring-l) var(--ring-c) 150 / 50%);
 }
 
+/*
+  The leading padding is the card's clearance less what the card already spends,
+  so the header's first control starts where a root row's does. Hand-set it was
+  16.8px against an 18px mark: the chevron, and on a phone the grip in front of
+  it, were drawn over the strip.
+*/
 .ghead {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.4rem 0.5rem 0.5rem;
+  padding: 0.4rem 0.5rem 0.5rem calc(var(--lead-card) - var(--card-pad));
 }
 
 .chev {
@@ -179,11 +224,56 @@
 
 .gcount {
   flex: none;
-  /* Everything after this is an action, and actions live on the right. */
-  margin-right: auto;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  What a fold is still holding, said the way the rows inside it say it: the pip
+  is the nested row's own pill — same --flag, same capsule, same third of
+  --r-card — so the header wears the mark of what it is hiding rather than
+  inventing a second sign for it. The number is the other channel: hue alone
+  would leave a monochrome screen with a grey dot that means nothing.
+
+  It fades with the fold instead of unmounting, like the header's actions, so
+  collapsing shifts nothing sideways. `hidden` is for having nothing to say at
+  all — there is no state to animate between there.
+*/
+.gmark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  opacity: 0;
+  /* Decoration sitting where the + button's hit overlay reaches, so it takes a
+     tap no more than the row's own pill does. */
+  pointer-events: none;
+  transition: opacity 0.24s var(--ease);
+}
+
+/* An author `display` beats the UA's [hidden], so it has to be said again —
+   the same guard .endday and the toast carry. */
+.gmark[hidden] {
+  display: none;
+}
+
+.group.collapsed .gmark {
+  opacity: 1;
+}
+
+.gmark .pip {
+  width: calc(var(--r-card) / 3);
+  height: 0.85rem;
+  border-radius: 999px;
+  background: var(--flag);
+}
+
+.gmark .num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--flag);
   font-variant-numeric: tabular-nums;
 }
 
@@ -229,7 +319,8 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.42rem 0.5rem;
+  /* Leading padding clears the pill a nested row wears — see --lead-nested. */
+  padding: 0.42rem 0.5rem 0.42rem var(--lead-nested);
   border-radius: var(--r-row);
   transition: background 0.18s;
 }
@@ -238,12 +329,14 @@
   background: var(--card);
   box-shadow: var(--shadow-card), var(--edge);
   /*
-   * The leading padding clears --r-card, because that is how wide the
-   * importance strip runs: at the old 0.75rem the tick and the in-flow grip sat
-   * six pixels inside it, drawn over the colour. Unconditional rather than only
-   * on a marked row, so nothing shifts when the mark goes on or comes off.
+   * The leading padding clears the importance strip, which is --r-card wide, by
+   * --mark-clear: at the old 0.75rem the tick and the in-flow grip sat six
+   * pixels inside it, drawn over the colour, and at 1.25rem they cleared it by
+   * two — close enough to read as touching, which on a phone is where the grip
+   * lives. Unconditional rather than only on a marked row, so nothing shifts
+   * when the mark goes on or comes off.
    */
-  padding: 0.7rem 0.75rem 0.7rem 1.25rem;
+  padding: 0.7rem 0.75rem 0.7rem var(--lead-card);
   border-radius: var(--r-card);
 }
 
@@ -483,6 +576,15 @@ body.dragging-row {
 .count:hover {
   background: var(--nest);
   color: var(--ink);
+}
+
+/*
+  The first action, and so the one that pushes the rest right. The gap used to
+  live on the tally, which meant whatever came after it was an action; the mark
+  beside the tally is not one, so it moved here instead.
+*/
+.ghead > .plus {
+  margin-left: auto;
 }
 
 .kill,
@@ -1004,7 +1106,8 @@ body.dragging-row {
   box-shadow: var(--shadow-lift);
   padding: 2rem 1.75rem 1.5rem;
   width: 100%;
-  max-width: 20rem;
+  /* Both day cards carry the rail and the two gates, so both need the room. */
+  max-width: 22rem;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1132,6 +1235,214 @@ body.dragging-row {
 
 .sheet button:active {
   transform: scale(0.96);
+}
+
+/* ------------------------------------------------- where the day stands */
+
+/*
+  The reporting card. Wider than the closing card because it carries two gates
+  and a scale, and gapless because its own sections set their spacing — the
+  closer's 0.35rem rhythm is for a card of single lines.
+*/
+.stands {
+  gap: 0;
+}
+
+.stands .score {
+  margin-top: 0.2rem;
+}
+
+/* The rail sits under the score on both cards, and hides itself on a day with
+   nothing in it. */
+.track[hidden] {
+  display: none;
+}
+
+/*
+  The rainbow, unrolled. The rail is the hue axis and the gates are landmarks
+  on it, which is why the green tick can be absent: with nothing marked the
+  day's sweep runs red straight to blue, and a tick there would promise a gate
+  that is not being kept.
+*/
+.track {
+  width: 100%;
+  margin: 1.15rem 0 0.4rem;
+}
+
+.rail {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+}
+
+/*
+  A gate's mark, drawn over everything else on the rail — including the dot.
+  Cut out of the rail in --card it was invisible exactly where it mattered: the
+  dot's halo is the same colour, so a day sitting just short of the bar covered
+  its mark and read as sitting on it.
+*/
+.rail .tick {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  z-index: 3;
+  width: 2px;
+  background: var(--muted);
+}
+
+.rail .tick[hidden] {
+  display: none;
+}
+
+/* The stretch of rainbow the day has not reached, dimmed. It is what makes
+   "did it clear that gate?" a matter of looking rather than of judging a dot's
+   centre against a line. */
+.rail .spent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--card);
+  opacity: 0.55;
+  transition: left 0.5s var(--ease);
+}
+
+/* Ringed in the card's own colour so it reads as sitting on the rail rather
+   than as a stop in the gradient. Small, and a thin ring: at 18px with a 3px
+   halo it swallowed a gate's mark whole. */
+.rail .you {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 2px var(--card),
+    var(--shadow-card);
+  transition:
+    left 0.5s var(--ease),
+    background 0.5s var(--ease);
+}
+
+.marks {
+  position: relative;
+  height: 1.1rem;
+  margin-top: 0.42rem;
+}
+
+.marks span {
+  position: absolute;
+  top: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/*
+  The rail's two ends. A row of their own rather than two more placed labels:
+  the bar's landmark lands at 80% of the hue axis, and a centred label there
+  ran straight through an "everything" pinned to the end.
+*/
+.ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--faint);
+  margin-top: 0.1rem;
+}
+
+.stands .next {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--ink);
+  line-height: 1.35;
+  margin: 0.85rem 0 0.15rem;
+}
+
+/* Both gates, because the day turns on both and the ring can only show one. */
+.gates {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 1.1rem;
+  text-align: left;
+}
+
+.gate {
+  background: var(--nest);
+  border-radius: 14px;
+  padding: 0.6rem 0.75rem;
+}
+
+.gate .ghead-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.gate .gname {
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.gate .gtally {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gate .gnote {
+  font-size: 0.72rem;
+  color: var(--faint);
+  margin-top: 0.25rem;
+}
+
+.gate .gitems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.4rem;
+}
+
+.gate .gitems li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+/* The same pill the row wears, so the card names the work in the list's own
+   language rather than inventing a second mark for it. */
+.gate .gitems .pip {
+  flex: none;
+  width: calc(var(--r-card) / 3);
+  height: 0.85rem;
+  border-radius: 999px;
+  background: var(--flag);
+}
+
+.gate .gmore {
+  font-size: 0.78rem;
+  color: var(--faint);
+  padding-left: calc(var(--r-card) / 3 + 0.45rem);
+}
+
+.stands .dur {
+  margin-top: 1rem;
+}
+
+.stands .dur[hidden] {
+  display: none;
 }
 
 .sheet .dismiss {

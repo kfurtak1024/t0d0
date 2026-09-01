@@ -2,6 +2,8 @@ import { summarise, type DayScore } from "../progress";
 import { need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
+import { dayGates } from "./gates";
+import { Rail } from "./rail";
 
 function formatElapsed(ms: number): string {
   const minutes = Math.round(ms / 60_000);
@@ -25,15 +27,31 @@ function verdictOf(score: DayScore): string {
   return "";
 }
 
+/** How the rest of the list finished against the bar, for a day that is over. */
+function barNote(steps: number, bar: number): string {
+  const at = `set at ${String(Math.round(bar * 100))}%`;
+  return steps === 0 ? `past the bar, ${at}` : `short of the bar, ${at}`;
+}
+
 /**
  * The end-of-day card. It reports before it resets: an ordinary 7-of-9 day
  * gets an ending, not just a perfect one.
+ *
+ * It wears the same rail and the same gates as the mid-day card, because this
+ * is the moment they matter most and the one card that erases something. A day
+ * that finished 5 of 6 with the marked item outstanding used to read as a good
+ * day and then clear the evidence: the number was honest and said nothing about
+ * *which* thing was left, and the verdict line is deliberately silent there.
+ * The rail and the gates are how the card can be honest without praising a day
+ * that did not earn it — which is what lets `verdictOf` keep its silence.
  */
 export class DaySheet {
   #veil: HTMLElement;
   #score: HTMLElement;
   #label: HTMLElement;
   #verdict: HTMLElement;
+  #rail = new Rail();
+  #gates: HTMLElement;
   #cleared: HTMLElement;
   #elapsed: HTMLElement;
   #panel: HTMLElement;
@@ -45,8 +63,10 @@ export class DaySheet {
     this.#score = need(veil, ".score");
     this.#label = need(veil, ".of");
     this.#verdict = need(veil, ".verdict");
+    this.#gates = need(veil, "#closegates");
     this.#cleared = need(veil, ".cleared");
     this.#elapsed = need(veil, ".dur");
+    this.#panel.insertBefore(this.#rail.element, this.#gates);
 
     need(veil, ".confirm").addEventListener("click", () => {
       onConfirm();
@@ -73,6 +93,11 @@ export class DaySheet {
     const verdict = verdictOf(summary.score);
     this.#verdict.textContent = verdict;
     this.#verdict.hidden = verdict === "";
+
+    this.#rail.paint(summary.score, bar);
+    this.#gates.replaceChildren(...dayGates(state, bar, (steps) => barNote(steps, bar)));
+    // An empty list has no gates to report and no rail worth reading.
+    this.#rail.element.hidden = summary.total === 0;
 
     this.#cleared.replaceChildren(
       ...summary.clearedGroups.map((title) => {

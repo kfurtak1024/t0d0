@@ -164,3 +164,56 @@ export function summarise(state: State, now: number, bar: number): DaySummary {
     elapsedMs: state.openedAt === null ? null : Math.max(0, now - state.openedAt),
   };
 }
+
+/**
+ * Where a hue sits on the day's rainbow, as a fraction from red to violet.
+ *
+ * The card draws the rainbow as a rail and puts a dot at `dayHue`'s answer, so
+ * the dot and the day ring are the same colour in the same place by
+ * construction rather than by two sets of numbers agreeing.
+ *
+ * The gates are landmarks *on* that rail, not divisions of it: with nothing
+ * marked the sweep runs straight from red to blue, and green is a colour it
+ * passes through rather than a place — so the card must not draw a green
+ * landmark there, the same rule `dayHue` follows.
+ */
+export const hueMark = (hue: number): number => (hue - HUE.red) / (HUE.violet - HUE.red);
+
+/** Every marked thing still to do, in the order the list keeps them. */
+export function outstandingImportant(list: Node[]): Task[] {
+  return partition(list).important.filter((task) => !isDone(task));
+}
+
+const EPSILON = 1e-9;
+
+/**
+ * The fewest tasks that, finished, would carry the rest of the list over the bar.
+ *
+ * Not `ceil(bar × n − sum)`: that counts every remaining task as a whole point,
+ * which a part-counted `[3]` item is not — it can name a number that does not
+ * actually reach, and a card that says "one more" and is wrong is a card nobody
+ * believes twice. Taking the largest remaining contributions first is the
+ * fewest by construction, since no task can add more than one.
+ *
+ * Zero when the bar is already cleared, and zero when there is nothing but
+ * marked work — an empty set clears it vacuously, the same way `scoreDay` reads
+ * it.
+ */
+export function stepsToBar(state: State, bar: number): number {
+  const { rest } = partition(state.list);
+  if (rest.length === 0) return 0;
+
+  const remaining = rest
+    .map((task) => 1 - Math.min(1, task.count / task.target))
+    .filter((left) => left > 0)
+    .sort((a, b) => b - a);
+
+  let short = bar * rest.length - (rest.length - remaining.reduce((sum, left) => sum + left, 0));
+  let steps = 0;
+  for (const left of remaining) {
+    if (short <= EPSILON) break;
+    short -= left;
+    steps++;
+  }
+  return steps;
+}

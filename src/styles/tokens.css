@@ -92,6 +92,18 @@
 
   --r-card: 18px;
   --r-row: 12px;
+
+  /*
+    The clearance a row's leading control keeps from the importance mark. Every
+    leading padding is measured from the mark's own width plus this, rather than
+    guessed: at a hand-set value the group's chevron and, on a phone, its grip
+    sat *inside* the strip, and a root row cleared it by two pixels.
+  */
+  --mark-clear: 0.4rem;
+  /* The mark a card wears is exactly its corner; a nested row's pill is a third
+     of it. See the important section in app.css. */
+  --lead-card: calc(var(--r-card) + var(--mark-clear));
+  --lead-nested: calc(var(--r-card) / 3 + var(--mark-clear));
 }
 
 @media (prefers-color-scheme: dark) {

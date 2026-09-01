@@ -162,12 +162,17 @@ Invariants worth defending in review:
   are the same kind of thing to the eye — two cards side by side in one list. A nested
   row has no card, and a strip that wide would swamp something half a card tall, so it
   takes a slim `::before` pill instead.
-- **A root card's leading padding has to clear `--r-card`**, which is why it is 1.25rem
-  where the others are 0.75rem. At the narrower value the tick and the in-flow grip sat
-  six pixels inside the strip and were drawn over the colour — invisible on a pointer
-  device, where the grip is out in the margin, and obvious on a phone. It is
-  unconditional rather than only on a marked row, so nothing shifts when the mark goes
-  on or comes off.
+- **Every leading padding is derived from the mark, never hand-set.** `--mark-clear` is
+  the gap a row's first control keeps from it, and `--lead-card` / `--lead-nested` add it
+  to the mark's own width — `--r-card` for a card, a third of that for a nested row's
+  pill. Hand-set, all three were wrong and none of it was visible on a pointer device,
+  where the grip is out in the margin: a root row cleared the strip by two pixels, and a
+  group's header, whose padding is spent twice over (the card's, then the header's), put
+  its chevron and — on a phone, where the grip is in the flow — its grip _inside_ the
+  colour. `.group` names its own `--card-pad` so `.ghead` can subtract it. The paddings
+  are unconditional rather than only on a marked row, so nothing shifts when the mark
+  goes on or comes off, and `tests/e2e/important.spec.ts` measures the clearance on
+  whichever control actually leads the row.
 - **Do not draw the group's strip any other way.** Both alternatives were tried and both
   fought the corner: an inset `box-shadow` curves _both_ sides and reads as a fragment
   of the frame, and a pseudo-element cannot match an 18px corner at all, because a
@@ -205,7 +210,22 @@ Invariants worth defending in review:
   it from then on, which is why that `!` does not survive an ordinary first item.
 - **The mark reaches a screen reader through the row's own handle** — the tick's
   `aria-label` for a task, the chevron's for a group, both as a trailing
-  ", important". A bar and a font weight are a visual channel only.
+  ", important". A bar and a font weight are a visual channel only. A folded
+  group's handle also carries what it owes: ", 2 important left".
+- **A fold speaks for what it hides; it does not leak rows.** A collapsed group
+  is the one place a marked row can go out of sight while the day still turns on
+  it — the ring refuses to go green and nothing says which group is the reason.
+  So the header carries `.gmark`: the nested row's own pill, at `--r-card / 3` in
+  `--flag`, and the number of items in there that are **marked and unfinished**.
+  Only that count — every automatic fold is a group that has just finished, so
+  counting finished rows would badge exactly the groups the tidy had cleared.
+  The badge stays in the flow and fades with the fold, like the header's actions,
+  so collapsing shifts nothing sideways, and it is `aria-hidden` because the
+  chevron already says it. Letting the fold peek the rows instead was considered
+  and rejected: it would put the _item_ back on screen in a group you had just
+  put away, it would need a second rule about which rows a fold may show, and a
+  group where _everything_ is marked would peek nothing while one with a single
+  marked row peeked it — the priority exactly backwards.
 - **Adding a field is not a schema bump.** `important` defaults to `false` in
   `normalize()`, so a list written before it existed loads unmarked. Moving
   `SCHEMA_VERSION` would have discarded every stored list — see the migration seam.
@@ -217,6 +237,51 @@ Invariants worth defending in review:
 - **Destructive actions confirm in place**, never in a dialog stacked on a dialog: the
   control swaps into a confirm state and reverts on a timeout. Erase, and replace-on-
   import, both follow this.
+- **The ring reports; the closer ends the day.** Pressing the day ring opens the
+  day-stands card, whose only button goes back to the list — a second card that could
+  clear the ticks would be a second answer to the question the closer already answers.
+  On an empty list the ring is `disabled`: it is already dimmed and has nothing to say.
+- **The card's rail is the hue axis, and the gates are landmarks on it.** The dot sits at
+  `hueMark(dayHue(...))` and wears `dayStroke` of the same hue, so the card and the ring
+  cannot drift; the rail's gradient is sampled from `dayStroke` for the same reason. It
+  follows that **the green landmark is drawn only when something is marked** — with
+  nothing marked the sweep runs red straight to blue, and a tick there would promise a
+  gate the ring is not keeping, though the dot may well be sitting on green.
+- **"Two more clears the bar" is computed, not estimated.** `stepsToBar()` takes the
+  largest remaining contributions first, which is the fewest by construction. The obvious
+  `ceil(bar × n − sum)` is wrong: it counts every unfinished task as a whole point, so on
+  a list of part-counted items it names a number that does not actually reach — and a card
+  that says "one more" and is wrong is not believed twice.
+- **The card names the next landmark, which is not the same as praising you.** The closing
+  card deliberately says nothing to an unfinished day; this one always says what the next
+  tick buys, because a card opened mid-morning that said nothing would be opened once.
+- **The rail shows the stretch not yet reached as dimmed, and a gate's mark is drawn over
+  everything — the dot included.** Both came from the same measured failure: at 95% of the
+  way to the bar, an 18px dot with a 3px halo covered the bar's mark completely, in the
+  card's own colour, so a day the gates called "short of the bar" read as a day sitting on
+  it. The dot is 14px with a 2px ring, the marks are `--muted` lines standing clear of the
+  rail, and the dimming is what turns "did it clear that gate?" into something you look at
+  rather than judge by a dot's centre. Six treatments were rendered before this one; a
+  smaller dot alone does not fix it, because the halo is what hides the mark.
+- **Both day cards wear the same rail and the same gates**, from `src/ui/rail.ts` and
+  `src/ui/gates.ts`. Two copies would be two rainbows able to drift from `dayStroke` and
+  from each other, and the rail's whole claim is that it cannot disagree with the ring.
+  The _numbers_ are shared; the **words are not** — one card is looking forward ("one more
+  clears the bar") and the other is reporting a day that is over ("short of the bar"), so
+  each passes in its own note.
+- **The closing card carries them because it is the one card that erases something.** A
+  day that finished 5 of 6 with the marked item outstanding used to read as a good day and
+  then clear the evidence: the number is honest and says nothing about _which_ thing was
+  left, and `verdictOf` is silent there on purpose. The rail and the gates are how the card
+  is honest without praising a day that did not earn it — which is what lets that silence
+  stand. Do not fill it with a consoling line instead; `tests/e2e/scoring.spec.ts` pins
+  both halves.
+- **An empty list gets no gates and no rail**, not "Everything 0 of 0" — reachable through
+  the stale-day card, which opens on a day left overnight whose list has since been emptied.
+- **The closing card must fit without scrolling.** It is the one card with a destructive
+  button, and "Clear the ticks" below the fold is how someone taps it without reading it.
+  Measured in `scoring.spec.ts` the way `drawer.spec.ts` measures the settings sheet;
+  adding a row to this card means re-running it.
 - **Reordering is one step, applied repeatedly.** `reorder()` moves a row a single
   place and **is its own inverse**, so repeating it reaches any position. Everything else
   is a way of asking for that step — `Alt`+arrows, the `⋯` menu, and the drag, which just
@@ -293,8 +358,8 @@ src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
 src/render/       keyed DOM patching — list, task, group, ring, flip
-src/ui/           toast, day-summary sheet, drawer, row menu, drag, inline edit,
-                  focus trap, confetti, dom
+src/ui/           toast, the two day cards and the rail and gates they share,
+                  drawer, row menu, drag, inline edit, focus trap, confetti, dom
 src/styles/       tokens.css first, then base.css, then app.css
 ```
 
@@ -358,6 +423,12 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
 - `tests/e2e/a11y.spec.ts` is the net under the accessibility work: axe must report zero
   WCAG 2.1 AA violations on the list, both dialogs and the empty state, and an ARIA
   snapshot pins the roles, names and states of the whole list.
+- **Two day cards are in the DOM at once, and they share their classes** — `.sheet`,
+  `.score`, `.dismiss`, `.gate`, `.track`. A spec must therefore say _which_ card it
+  means, by scoping to `#veil` or `.stands`; an unscoped `.sheet .score` matched both and
+  failed strict mode the moment the second card existed. The ones that still pass
+  unscoped only do so because the other card has not been opened in that test, which is
+  not a property to rely on.
 - **The settings sheet is measured, not eyeballed.** Two things went wrong there and
   neither was visible: it scrolled with a screenful of room around it because the
   _absolute_ `max-height` cap bound rather than the viewport one, and three of its

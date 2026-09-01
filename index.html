@@ -37,7 +37,12 @@
           <span class="pct" id="pct" aria-hidden="true">0%</span>
           <span class="frac" id="frac" role="status">0 of 0</span>
         </div>
-        <div class="totalring" id="totalring"></div>
+        <button
+          class="totalring"
+          id="totalring"
+          type="button"
+          aria-label="How the day is going"
+        ></button>
         <button class="more" id="databtn" type="button" aria-label="Settings">⋯</button>
       </header>
 
@@ -83,10 +88,32 @@
         <p class="score">0 of 0</p>
         <p class="of">done</p>
         <p class="verdict"></p>
+        <!-- The rail is inserted here by the card: both cards build it from one
+             place rather than carrying two copies of the same markup. -->
+        <div class="gates" id="closegates"></div>
         <ul class="cleared"></ul>
         <p class="dur"></p>
         <button class="confirm" type="button">Clear the ticks</button>
         <button class="dismiss" type="button">Not yet</button>
+      </div>
+    </div>
+
+    <div class="veil" id="standsveil" hidden>
+      <div
+        class="sheet stands"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="standstitle"
+        tabindex="-1"
+      >
+        <h2 id="standstitle">Where the day stands</h2>
+        <p class="score" id="standsscore">0 of 0</p>
+        <p class="of">done</p>
+        <!-- The rail goes in above this line; see the note on the closing card. -->
+        <p class="next" id="standsnext"></p>
+        <div class="gates" id="standsgates"></div>
+        <p class="dur" id="standsdur"></p>
+        <button class="dismiss" type="button">Back to the list</button>
       </div>
     </div>
 
