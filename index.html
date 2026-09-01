@@ -73,6 +73,7 @@
         </form>
         <p class="hint">
           <b>#&nbsp;Title</b> makes a group · <b>[3]</b> sets a count · <b>!</b> marks it important
+          · <b>~</b> makes it a one-off
         </p>
       </div>
     </div>
@@ -93,6 +94,9 @@
         <div class="gates" id="closegates"></div>
         <ul class="cleared"></ul>
         <p class="dur"></p>
+        <!-- What this button takes away for good, said before it is pressed:
+             ticks come back tomorrow, a removed one-off does not. -->
+        <p class="departing" hidden></p>
         <button class="confirm" type="button">Clear the ticks</button>
         <button class="dismiss" type="button">Not yet</button>
       </div>

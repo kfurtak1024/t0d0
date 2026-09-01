@@ -42,7 +42,15 @@ const rows = (...spec: string[]): State => {
       continue;
     }
     const text = row.trim();
-    const task: Task = { kind: "task", id: text, text, target: 1, count: 0, important: false };
+    const task: Task = {
+      kind: "task",
+      id: text,
+      text,
+      target: 1,
+      count: 0,
+      important: false,
+      once: false,
+    };
     const last = state.list[state.list.length - 1];
     if (row.startsWith("  ") && last?.kind === "group") last.items.push(task);
     else state.list.push(task);
@@ -927,6 +935,26 @@ describe("findRow", () => {
   });
 });
 
+describe("departing", () => {
+  it("names exactly what a close would take away", () => {
+    // The closer says this out loud before the button is pressed, so it has to
+    // agree with clearTicks rather than approximate it.
+    let state = build(["a~", "b~", "c", "# Errands", "  d~"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    state = T.bump(state, taskOf(state, "c").id, 1, NOW);
+    state = T.bump(state, taskOf(state, "d").id, 1, NOW);
+
+    expect(T.departing(state).map((task) => task.text)).toEqual(["a", "d"]);
+
+    const survivors = texts(T.clearTicks(state));
+    expect(survivors).toEqual(["b", "c"]);
+  });
+
+  it("is empty when nothing finished is marked", () => {
+    expect(T.departing(build(["a~", "b"]))).toEqual([]);
+  });
+});
+
 describe("clearTicks", () => {
   it("zeroes every count, keeps the list, and closes the day", () => {
     let state = build(["# Morning", "a", "make calls [3]"]);
@@ -942,6 +970,60 @@ describe("clearTicks", () => {
   it("leaves group structure alone", () => {
     const state = T.clearTicks(build(["# Morning", "a", "b"]));
     expect(shape(state)).toEqual(["# Morning", "  a", "  b"]);
+  });
+
+  it("takes away a finished one-off", () => {
+    let state = build(["a~", "b"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    state = T.clearTicks(state);
+    expect(texts(state)).toEqual(["b"]);
+  });
+
+  it("keeps a one-off nobody got to", () => {
+    // The mark is a convenience, not a trapdoor: an errand you did not do is
+    // precisely the thing you most need to see in the morning.
+    const state = T.clearTicks(build(["a~", "b"]));
+    expect(texts(state)).toEqual(["a", "b"]);
+  });
+
+  it("keeps a finished item that was never marked one-off", () => {
+    let state = build(["a", "b"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    expect(texts(T.clearTicks(state))).toEqual(["a", "b"]);
+  });
+
+  it("takes one out of a group and leaves the group behind", () => {
+    let state = build(["# Morning", "  a~", "  b"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    expect(shape(T.clearTicks(state))).toEqual(["# Morning", "  b"]);
+  });
+
+  it("re-derives the group mark it just changed the membership of", () => {
+    /*
+     * Removing an item is a membership change, so the marks have to settle on
+     * the way out. Alpha is unmarked only because of the plain one-off in it;
+     * once that leaves, everything remaining is marked and the group is too.
+     * Without the settle the group would be stuck disagreeing with its items
+     * until some unrelated edit corrected it.
+     */
+    let state = build(["# Alpha", "  plain~", "  keep!"]);
+    expect(groupOf(state, "Alpha").important).toBe(false);
+
+    state = T.bump(state, taskOf(state, "plain").id, 1, NOW);
+    state = T.clearTicks(state);
+
+    expect(shape(state)).toEqual(["# Alpha", "  keep"]);
+    expect(groupOf(state, "Alpha").important).toBe(true);
+  });
+
+  it("leaves an emptied group standing, with the mark it was given", () => {
+    // An empty group is a heading you might refill, and `settle` does not
+    // re-read one — the same rule that keeps `# Work!` marked before its first
+    // item lands.
+    let state = build(["# Errands", "  a~"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    state = T.clearTicks(state);
+    expect(shape(state)).toEqual(["# Errands"]);
   });
 
   it("unfolds every group, however it came to be folded", () => {
@@ -1014,7 +1096,9 @@ describe("the group mark holds under any sequence of transitions", () => {
     state = T.add(state, "b1!", beta, NOW).state;
     state = T.add(state, "b2!", beta, NOW).state;
     state = T.add(state, "loose", null, NOW).state;
-    return T.add(state, "loose2!", null, NOW).state;
+    state = T.add(state, "loose2!", null, NOW).state;
+    state = T.add(state, "errand~", null, NOW).state;
+    return T.add(state, "chore!~", alpha, NOW).state;
   };
 
   type Op =
@@ -1027,7 +1111,10 @@ describe("the group mark holds under any sequence of transitions", () => {
     | { do: "addPlain"; at: number }
     | { do: "addMarked"; at: number }
     | { do: "renamePlain"; at: number }
-    | { do: "renameMarked"; at: number };
+    | { do: "renameMarked"; at: number }
+    | { do: "once"; at: number }
+    | { do: "tick"; at: number }
+    | { do: "close"; at: number };
 
   const step = (state: State, op: Op, n: number): State => {
     const rows = [...state.list.map((node) => node.id), ...allTasks(state.list).map((t) => t.id)];
@@ -1058,6 +1145,17 @@ describe("the group mark holds under any sequence of transitions", () => {
         return T.retitle(state, id, `r${String(n)}`, isGroup);
       case "renameMarked":
         return T.retitle(state, id, `r${String(n)}!`, isGroup);
+      case "once":
+        return T.toggleOnce(state, id);
+      case "tick":
+        return T.bump(state, id, 1, NOW);
+      /*
+       * Closing the day removes finished one-offs, which makes it a transition
+       * that changes a group's membership — the kind that has to re-derive the
+       * marks. It is in this fold for exactly that reason.
+       */
+      case "close":
+        return T.clearTicks(state);
     }
   };
 
@@ -1073,6 +1171,9 @@ describe("the group mark holds under any sequence of transitions", () => {
       "addMarked",
       "renamePlain",
       "renameMarked",
+      "once",
+      "tick",
+      "close",
     ),
     at: fc.nat({ max: 40 }),
   }) as fc.Arbitrary<Op>;

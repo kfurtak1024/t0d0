@@ -22,7 +22,8 @@ These are decisions, not defaults. Changing one is a conversation, not a refacto
 - **No dates.** `openedAt` is the only timestamp in the app, and it exists solely so the
   end-of-day card can report elapsed time. Nothing rolls over, expires, or resets itself.
 - **No history.** Ticks are cleared, never archived. No streaks, no yesterday, no stats
-  beyond the current list.
+  beyond the current list. A one-off removed at the close is deleted, not filed away —
+  deleting is not archiving, which is why `once` does not breach this.
 - **One level of grouping.** The type system forbids deeper nesting; keep it that way.
 - **Offline-first.** The list lives in one `localStorage` key. It must work with the
   network off, and a write that cannot reach storage must say so rather than
@@ -38,6 +39,7 @@ type Task = {
   target: number;
   count: number;
   important: boolean;
+  once: boolean;
 };
 type Group = {
   kind: "group";
@@ -153,15 +155,49 @@ Invariants worth defending in review:
   that prompted the suppression came from _dimming_ the bar to 40%; at full strength it
   sits beside the green frame cleanly.) `tests/e2e/important.spec.ts` asserts the two
   are tellable apart rather than asserting a colour, so the treatment can change without
-  the guarantee moving.
+  the guarantee moving — and it since has: the mark stays, but it turns green.
+- **A finished mark is green, at the hue the frame and the ring already end on.** A red
+  strip inside a green frame was the card saying two things at once; one hue makes a
+  completed card say one. It is the ramp again, `--flag-done-head` → `--flag-done-foot`,
+  with `--flag-done` as its mid-tone — that mid is `oklch(--ring-l --ring-c 150)` written
+  out, the same finished green `.gcount` and `.group.clear` already wear, so there is no
+  third green to keep in step. The nested pill takes the mid, having no room for a ramp.
+  Groups and top-level items turn together, because they share the unfinished treatment
+  and splitting them here would read as two different marks. **It does not weaken the
+  mark**: a finished marked card still carries a strip where a finished plain one carries
+  none, which is the whole reason the mark stays on at all.
+- **The green ramp steps less than the red one, and the tight end is not the same.**
+  Green is the more luminous hue, so the red ramp's ±6 measured 3.39 at the head against a
+  3:1 bar; it runs +4/−8 instead, for 3.70 and 6.09 in light. Which end is tight flips
+  with the theme rather than the hue — the lighter head on a white card, the darker foot
+  on a dark one — which is why the guard checks all six values the same way and names the
+  one that failed.
 - **A card wears the mark as its own left edge; a nested row wears a pill.** The card
-  version is a `linear-gradient` in the background stopping at exactly `--r-card`, so the
-  card's `border-radius` clips it and the strip's flat inner side lands precisely where
-  the curve ends. It _is_ the rounded corner rather than a bar sitting inside it, and it
-  follows `--r-card` if that changes. Groups and top-level items share it, because they
-  are the same kind of thing to the eye — two cards side by side in one list. A nested
-  row has no card, and a strip that wide would swamp something half a card tall, so it
-  takes a slim `::before` pill instead.
+  version is a background layer exactly `--r-card` wide, so the card's `border-radius`
+  clips it and the strip's flat inner side lands precisely where the curve ends. It _is_
+  the rounded corner rather than a bar sitting inside it, and it follows `--r-card` if
+  that changes. Groups and top-level items share it, because they are the same kind of
+  thing to the eye — two cards side by side in one list. A nested row has no card, and a
+  strip that wide would swamp something half a card tall, so it takes a slim `::before`
+  pill instead.
+- **The strip is a ramp that deepens downward, and the hue never moves.** Two background
+  layers — the strip, sized to `--r-card` and not repeated, over `--card` — so it is
+  still a background and the two rules above still hold. The ramp runs
+  `--flag-head` → `--flag-foot` down the card's own height, which means a tall group
+  shows it gradually and a short row compressed; that is intended, since every card then
+  shows the whole mark at the scale of the card. **Deepening rather than shifting hue is
+  the load-bearing part**: `--flag` is the ramp's mid-tone and still paints the nested
+  pill, the fold's `.gmark` pip and the day card's gate pip, so those stay flat and go on
+  agreeing with the card beside them. A hue that travelled would leave all three
+  disagreeing and turn one change into four. Five treatments were rendered and measured
+  before this one; a strip fading to transparent looked the best of them and was ruled
+  out on the numbers, at 1.53:1 in light and 1.42:1 in dark.
+- **The strip is non-text, so 3:1 against `--card` is the bar, not 4.5:1** — and a ramp
+  is two colours that can drift apart in two themes without anyone noticing. Both ends
+  and both themes are measured in `tests/e2e/important.spec.ts`, `--flag` included since
+  it still paints three other things. The foot is the end to watch: it is where a ramp
+  that deepens runs out of contrast, and in dark it runs toward the card rather than away
+  from it.
 - **Every leading padding is derived from the mark, never hand-set.** `--mark-clear` is
   the gap a row's first control keeps from it, and `--lead-card` / `--lead-nested` add it
   to the mark's own width — `--r-card` for a card, a third of that for a nested row's
@@ -226,9 +262,66 @@ Invariants worth defending in review:
   put away, it would need a second rule about which rows a fold may show, and a
   group where _everything_ is marked would peek nothing while one with a single
   marked row peeked it — the priority exactly backwards.
-- **Adding a field is not a schema bump.** `important` defaults to `false` in
-  `normalize()`, so a list written before it existed loads unmarked. Moving
-  `SCHEMA_VERSION` would have discarded every stored list — see the migration seam.
+- **`once` is the mark for work that is not part of the standing list.** The list persists
+  and `clearTicks()` only zeroes counts, so an errand added today comes back tomorrow
+  looking like work nobody has done — which is the defect the mark repairs. It is a flag
+  on `Task`, not a third `kind`: a one-off task has the same shape as any other and only
+  its fate at the close differs, where a union member would ripple through `allTasks`,
+  `isFinished`, `reorder`'s group-swallowing branch and every renderer for nothing.
+- **Only a _finished_ one-off departs.** An errand you did not get to is precisely the
+  thing you most need to see in the morning, and taking it away because the day ended
+  would make the mark a trapdoor rather than a convenience. It is one-off; it has not
+  been done once yet. `tests/transitions.test.ts` pins both halves.
+- **The day ends at the closer, never at the ring.** Removal hangs off `clearTicks()` —
+  the one explicit end-of-day act. Hanging it off `scoreDay()` going complete would have
+  rows vanishing under the pointer mid-afternoon.
+- **`clearTicks()` changes a group's membership, so it settles.** Removing an item is the
+  same obligation every other membership-changing transition carries, and it is exactly
+  the "seventh transition arriving without a `settle()`" the property test exists for.
+  The property fold reaches it rarely, so there is a named test for it as well — remove
+  the call and `re-derives the group mark it just changed the membership of` fails.
+- **A group cannot be one-off, and does not need to be.** A one-off group would ask the
+  question `important` needed the whole two-way `settle()` to answer — whether the mark
+  belongs to the card or to everything under it. A group emptied by departures stays,
+  with the mark it was given: it is a heading you might refill, the same rule that keeps
+  `# Work!` marked before its first item lands.
+- **The closer names what it will not bring back.** Ticks return tomorrow; a removed
+  one-off does not, and undo is one level that does not survive a reload — so the loss
+  is stated above the button rather than discovered in the morning. Named while naming
+  is short, counted once it would not be, and **one line either way**: this is the card
+  that must fit without scrolling, and a note that grew with the day would be the thing
+  that pushed the confirm under the fold. `tests/e2e/oneoff.spec.ts` re-measures the fit.
+- **`raw()` is an inverse over the states `parse` can reach, which is the contract.** A
+  line ending in `!` _is_ an important line, so text ending in a bang only ever comes
+  with the mark set — there is no spelling of an unimportant task called "Sale!", and
+  the same holds for `~`. `normalize()` deliberately leaves such a pair alone rather
+  than flipping a mark on an imported list nobody asked it to change; both halves are
+  pinned in `tests/parse.test.ts`.
+- **The one-off tag sits beside the label, never inside it.** `.label` is the edit target
+  and its `textContent` is what a rename commits, so a tag in there would be text you had
+  to delete to rename the row. Outside `.line` too, because the strike is scoped to the
+  words and a ticked one-off is exactly the row whose tag matters — it is the one the
+  closer is about to take away. A word rather than a hue: the removal is the only thing
+  on a row that tomorrow cannot undo, so the word is the channel and nothing else is
+  asked to carry it.
+- **The tag wears `.count`'s type and `.count`'s trailing box.** They are the two quiet
+  things at the end of a row and they sit side by side on a counted one-off: at
+  different sizes their baselines disagreed, and a dotted underline under the smaller
+  one made it read as dropped. Only the _right_ padding is copied — that is what puts
+  the tag in the count's column on a row that has no count, where the left padding would
+  only take width off the label and cost a line of wrap on a narrow screen.
+- **One trailing column for the whole list, via `--trail-card`.** A group's contents sit
+  inside a second card, so a nested row and a `.ghead` spend that card's padding first
+  and subtract it — the mirror of `--lead-card` at the other end. Hand-set at `0.5rem`
+  they did not, and every `⋯` inside a group sat 4.8px left of the ones outside one:
+  invisible for as long as only icons lived there, and plain the moment the one-off tag
+  put a word in that column. `tests/e2e/oneoff.spec.ts` measures it, to within half a
+  pixel — a group card lands on a fractional edge where a root card lands on a whole
+  one, so everything inside carries about 0.02px of that.
+- **Adding a field is not a schema bump.** `important` and `once` both default to `false`
+  in `normalize()`, so a list written before either existed loads unmarked — and, for
+  `once`, not primed to be deleted tonight. Moving `SCHEMA_VERSION` would have discarded
+  every stored list — see the migration seam.
 - **All external data goes through `normalize()`** — stored JSON and pasted imports alike.
   It repairs rather than trusts: clamps `target` to 1–99, clamps `count` to `target`, drops
   empty text, regenerates duplicate ids. Never parse straight into state.
@@ -301,13 +394,30 @@ Invariants worth defending in review:
   "Mark important" / "Unmark important". The menu exists because the other two mean
   typing, which is no use with a thumb on a row already in front of you. Do not give any
   of them a second behaviour, and keep the labels naming _important_ rather than "the
-  mark" — nobody outside this file calls the accent bar that.
+  mark" — nobody outside this file calls the accent bar that. **`once` has the same
+  three**, with the menu reading "One-off, remove tonight" / "Keep for tomorrow" — a
+  label naming the consequence, because "one-off" alone does not say that something
+  gets deleted.
 - **"Adding to" is a promise about the item you are about to add.** A group always lands
   at the root, so while the composer holds a `#` the row must read "Top level" — and
   display-only, because clearing the aim would cost you the group you picked when you
   delete one character. `isGroupInput()` is shared with `parse` so the preview and the
   outcome cannot disagree. The composer is also **emptied before the state is applied**,
   since the render triggered by the apply reads it.
+- **A row's label is its name and none of the marks.** All three of the things the
+  composer parses leave the text on the way in, and each is shown by something built for
+  it: `!` is the accent edge, `~` is the tag, `[n]` is the tally. The bracket was the odd
+  one out for a while — spelled into the label _and_ counted in `.count` — which said it
+  twice and made a counted row the only row whose text was not what you typed. `raw()`
+  hands all three back the moment you edit, which is where they are editable and where
+  they belong.
+- **`--accent-ink` is the app's blue at text size**, and one colour rather than three: the
+  wordmark's zeros, an item's tally, and the one-off tag are all a small fact about the
+  list rather than the list itself. It is two points darker than `--ring-l` because a
+  nested row takes `--nest` on hover and the ring's own lightness measured 4.45 there —
+  under the 4.5 floor by a margin nobody would ever see. `tests/e2e/a11y.spec.ts`
+  measures it on `--card`, `--nest` and `--bg` in both themes, because axe only ever sees
+  the resting surface.
 - **A plain item's tick toggles; a counted one does not.** `role="checkbox"` promises a
   way back, and on a phone there is no Shift and no arrow key. `target > 1` counts up,
   and steps down via the count label or the row menu.
@@ -317,13 +427,20 @@ Invariants worth defending in review:
 The composer parses three things, and all of them must round-trip through inline editing:
 
 - `# Morning` creates a group.
-- `make calls [3]` creates a task with `target: 3`. Editing shows `make calls [3]` again.
+- `make calls [3]` creates a task with `target: 3`. The row is then named `make calls`;
+  the target is the tally's business. Editing shows `make calls [3]` again.
 - A trailing `!` marks either kind important. It may sit at the end of the line or at
   the end of the name — `make calls [3]!` and `make calls! [3]` both work, because both
   are what people type. **At most one `!` is ever consumed**, from wherever it came:
   that ceiling is what makes `raw()` a true inverse, so `ship it!!` is an important
   `ship it!` and round-trips as one. `raw()` covers groups too, which is why inline
   editing seeds itself from it rather than from `title`.
+- A trailing `~` marks a task one-off, by the same rules: either side of the bracket,
+  at most one consumed, and either order beside a `!` — `call back!~` and `call back~!`
+  are the same row. `strip()` stops on a sigil already spent rather than reading past
+  it, which is what keeps `ship it!!` an important `ship it!`. `raw()` writes one
+  canonical order, `!` then `~`, because `parse` reads them from the right and does not
+  care. Groups have no `~`: a tilde in a heading is a character someone typed.
 
 ## Commands
 
@@ -354,7 +471,7 @@ src/marks.ts      a group's mark, derived from its items
 src/storage.ts    load/save against one localStorage key
 src/store.ts      the live state, persistence, and one level of undo
 src/transitions.ts  every state change as State -> State
-src/parse.ts      "# Title", "[n]" and "!" parsing, and the raw() round-trip
+src/parse.ts      "# Title", "[n]", "!" and "~" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
 src/render/       keyed DOM patching — list, task, group, ring, flip
@@ -429,6 +546,10 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
   failed strict mode the moment the second card existed. The ones that still pass
   unscoped only do so because the other card has not been opened in that test, which is
   not a property to rely on.
+- **Adding an entry to the `⋯` menu means re-running `reorder.spec.ts`.** Three tests
+  there walk the menu with the arrow keys and with Home/End, so they name whichever
+  entry is last. That is deliberate — a menu that grew an item nobody could reach by
+  keyboard is exactly what those tests are for — but it does mean the names move.
 - **The settings sheet is measured, not eyeballed.** Two things went wrong there and
   neither was visible: it scrolled with a screenful of room around it because the
   _absolute_ `max-height` cap bound rather than the viewport one, and three of its

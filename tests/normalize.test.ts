@@ -122,6 +122,42 @@ describe("normalize", () => {
     expect(state?.list.map((node) => node.important)).toEqual([false, true, false, false, true]);
   });
 
+  it("coerces once to a boolean on tasks, defaulting to false", () => {
+    // Same reasoning as the mark above: a list written before one-offs existed
+    // has no field, and must not load with items primed to be deleted tonight.
+    const state = normalize(
+      wrap([
+        { kind: "task", text: "old" },
+        { kind: "task", text: "yes", once: true },
+        { kind: "task", text: "truthy", once: 1 },
+        { kind: "group", title: "G", items: [{ kind: "task", text: "nested", once: true }] },
+      ]),
+    );
+    expect(allTasks(state?.list ?? []).map((task) => task.once)).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it("does not put a mark on a task whose text merely ends in a sigil", () => {
+    // normalize repairs structure, not spelling. "Sale!" is a name someone
+    // chose, and flipping a flag on an imported list nobody asked it to change
+    // would be a surprise rather than a repair — see the parse spec.
+    const state = normalize(
+      wrap([
+        { kind: "task", text: "Sale!" },
+        { kind: "task", text: "hm~" },
+      ]),
+    );
+    expect(state?.list.map((node) => node.kind === "task" && node.important)).toEqual([
+      false,
+      false,
+    ]);
+    expect(state?.list.map((node) => node.kind === "task" && node.once)).toEqual([false, false]);
+  });
+
   /*
    * A group's mark is derived from its items, so a backup that disagrees with
    * itself is repaired on the way in. Left alone, it would survive until some

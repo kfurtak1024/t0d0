@@ -125,6 +125,68 @@ describe("the importance mark", () => {
   });
 });
 
+describe("the one-off mark", () => {
+  it("lifts a trailing ~ off a task", () => {
+    expect(task("post the parcel~")).toMatchObject({ text: "post the parcel", once: true });
+  });
+
+  it("leaves everything else unmarked", () => {
+    expect(task("post the parcel").once).toBe(false);
+    expect(task("roughly ~10 minutes").once).toBe(false);
+  });
+
+  it("takes the mark from either side of a quantity", () => {
+    expect(task("post parcels [3]~")).toMatchObject({
+      text: "post parcels",
+      target: 3,
+      once: true,
+    });
+    expect(task("post parcels~ [3]")).toMatchObject({
+      text: "post parcels",
+      target: 3,
+      once: true,
+    });
+  });
+
+  it("consumes exactly one ~, so a doubled one keeps a tilde in the text", () => {
+    expect(task("wave~~")).toMatchObject({ text: "wave~", once: true });
+  });
+
+  it("carries both marks, in either order", () => {
+    for (const input of ["call back!~", "call back~!"]) {
+      expect(task(input)).toMatchObject({ text: "call back", important: true, once: true });
+    }
+  });
+
+  it("carries both marks across a quantity, from either side", () => {
+    for (const input of ["call back!~ [2]", "call back [2]~!", "call back~ [2]!"]) {
+      expect(task(input)).toMatchObject({
+        text: "call back",
+        target: 2,
+        important: true,
+        once: true,
+      });
+    }
+  });
+
+  it("stops at a spent sigil rather than reading past it", () => {
+    // "ship it!!" has to stay an important "ship it!" — skipping the second
+    // bang to look for a tilde behind it would break that round-trip.
+    expect(task("ship it!!")).toMatchObject({ text: "ship it!", important: true, once: false });
+    expect(task("ship it!!~")).toMatchObject({ text: "ship it!", important: true, once: true });
+  });
+
+  it("is a task mark only — a group title keeps its tilde", () => {
+    expect(parse("# Errands~")).toMatchObject({ kind: "group", title: "Errands~" });
+  });
+
+  it("still rejects input that is only a mark", () => {
+    expect(parse("~")).toBeNull();
+    expect(parse("!~")).toBeNull();
+    expect(parse("[3]~")).toBeNull();
+  });
+});
+
 describe("raw", () => {
   it("round-trips through parse so the quantity stays editable", () => {
     const original = task("make calls [3]");
@@ -147,6 +209,71 @@ describe("raw", () => {
     expect(original).toMatchObject({ text: "ship it!", important: true });
     expect(raw(original)).toBe("ship it!!");
     expect(task(raw(original))).toMatchObject({ text: "ship it!", important: true });
+  });
+
+  it("writes the one-off mark back, after the bang", () => {
+    expect(raw(task("post the parcel~"))).toBe("post the parcel~");
+    expect(raw(task("call back~!"))).toBe("call back!~");
+    expect(raw(task("call back~ [2]!"))).toBe("call back!~ [2]");
+  });
+
+  it("round-trips text that itself ends in a tilde, by doubling it", () => {
+    const original = task("wave~~");
+    expect(original).toMatchObject({ text: "wave~", once: true });
+    expect(raw(original)).toBe("wave~~");
+    expect(task(raw(original))).toMatchObject({ text: "wave~", once: true });
+  });
+
+  it("is an inverse for every combination of marks and a quantity", () => {
+    /*
+     * The round-trip is what lets inline editing seed itself from `raw`, so it
+     * has to hold for text that itself ends in a sigil as well as text that
+     * does not — that is the case the doubling exists for.
+     *
+     * Over the states `parse` can reach, which is the contract that matters.
+     * A line ending in `!` *is* an important line, so text ending in a bang
+     * only ever comes with the mark set; the same for `~`. See the test below
+     * for what that rules out.
+     */
+    for (const text of ["tidy", "ship it!", "wave~", "odd!~"]) {
+      for (const important of text.endsWith("!") ? [true] : [false, true]) {
+        for (const once of text.endsWith("~") ? [true] : [false, true]) {
+          for (const target of [1, 4]) {
+            const node: Task = {
+              kind: "task",
+              id: "x",
+              text,
+              target,
+              count: 0,
+              important,
+              once,
+            };
+            expect(task(raw(node))).toMatchObject({ text, target, important, once });
+          }
+        }
+      }
+    }
+  });
+
+  it("cannot express an unmarked line that ends in a sigil, and does not pretend to", () => {
+    /*
+     * A ceiling of the grammar rather than a gap in `raw`: a trailing `!` is
+     * what *makes* a line important, so "Sale!" is an important "Sale" and
+     * there is no spelling of an unimportant task called "Sale!". The pair is
+     * unreachable through `parse`, and only a hand-edited import could hold
+     * one; `normalize` deliberately leaves it alone rather than flipping a
+     * mark on a list nobody asked it to change.
+     */
+    const odd: Task = {
+      kind: "task",
+      id: "x",
+      text: "Sale!",
+      target: 1,
+      count: 0,
+      important: false,
+      once: false,
+    };
+    expect(task(raw(odd))).toMatchObject({ text: "Sale", important: true });
   });
 
   it("round-trips a group title, which is how inline editing seeds itself", () => {

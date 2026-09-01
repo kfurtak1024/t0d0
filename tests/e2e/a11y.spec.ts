@@ -40,6 +40,10 @@ const A_DAY = {
     { kind: "task", id: "t3", text: "make calls", target: 3, count: 1 },
     { kind: "task", id: "t4", text: "shopping", target: 1, count: 1 },
     { kind: "task", id: "t5", text: "call the bank", target: 1, count: 0, important: true },
+    // Finished and one-off, so the day card scan also covers the line naming
+    // what the close is about to remove — it is drawn in --danger, and that
+    // token's contrast is exactly the kind of thing this spec exists to hold.
+    { kind: "task", id: "t6", text: "post the parcel", target: 1, count: 1, once: true },
   ],
 };
 
@@ -141,7 +145,7 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
         - list
       - listitem:
         - spinbutton "make calls"
-        - text: make calls [3]
+        - text: make calls
         - 'button "make calls: one fewer"': 1/3
         - button "More for make calls": ⋯
         - button "Delete make calls"
@@ -155,6 +159,11 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
         - text: call the bank
         - button "More for call the bank": ⋯
         - button "Delete call the bank"
+      - listitem:
+        - checkbox "post the parcel, one-off" [checked]
+        - text: post the parcel
+        - button "More for post the parcel": ⋯
+        - button "Delete post the parcel"
   `);
 });
 
@@ -168,9 +177,62 @@ test("the row menu is a menu, and axe agrees", async ({ page }) => {
       - menuitem "Move down Alt+↓"
       - menuitem "Reset to 0"
       - menuitem "Mark important"
+      - menuitem "One-off, remove tonight"
       - menuitem "Into “Later” Tab"
   `);
 
   const { violations } = await scan(page);
   expect(violations.map((v) => `${v.id}: ${String(v.nodes.length)}`)).toEqual([]);
 });
+
+/*
+ * Text tokens have to clear 4.5:1 on every surface they can land on, and axe
+ * only ever sees the resting one. --accent-ink is the case that needs the
+ * difference said out loud: it paints the tally and the one-off tag, and a
+ * nested row takes --nest on hover, where the ring's own lightness measured
+ * 4.45 — under the floor by a margin nobody would see.
+ */
+for (const scheme of ["light", "dark"] as const) {
+  test(`--accent-ink clears 4.5:1 on every surface in ${scheme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await seedStorage(page, A_DAY);
+    await settled(page);
+
+    const ratios = await page.evaluate(() => {
+      const relative = (px: number[]): number => {
+        const f = (c: number): number => {
+          const v = c / 255;
+          return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * f(px[0]!) + 0.7152 * f(px[1]!) + 0.0722 * f(px[2]!);
+      };
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const cx = canvas.getContext("2d", { willReadFrequently: true })!;
+      const paint = (colour: string, under: string): number[] => {
+        cx.fillStyle = under;
+        cx.fillRect(0, 0, 1, 1);
+        cx.fillStyle = colour;
+        cx.fillRect(0, 0, 1, 1);
+        return [...cx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+      };
+      const style = getComputedStyle(document.documentElement);
+      const token = (name: string): string => style.getPropertyValue(name).trim();
+      const ink = token("--accent-ink");
+
+      const out: Record<string, number> = {};
+      for (const surface of ["--card", "--nest", "--bg"]) {
+        const ground = paint(token(surface), "#ffffff");
+        const a = relative(paint(ink, `rgb(${ground.join(",")})`));
+        const b = relative(ground);
+        const [hi, lo] = a > b ? [a, b] : [b, a];
+        out[surface] = (hi + 0.05) / (lo + 0.05);
+      }
+      return out;
+    });
+
+    for (const [surface, ratio] of Object.entries(ratios)) {
+      expect(ratio, `--accent-ink on ${surface}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+}

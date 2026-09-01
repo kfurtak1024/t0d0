@@ -128,14 +128,20 @@ runs:
     # The limit sits a little above the real size rather than far above it, so
     # growth is a decision someone makes rather than something that just happens.
     # Raising it is fine — but the README badge states this number, so move both.
+    #
+    # `sort` because the files are concatenated before gzip, so the order they
+    # arrive in changes how well the whole thing compresses — 66 bytes between
+    # find's order and sorted order, which is real money against a threshold this
+    # tight. find makes no promise about order across filesystems, so without
+    # this the same commit can measure differently on two machines.
     - name: Check bundle budget
       shell: bash
       run: |
-        limit=27648
-        size=$(find dist -name '*.js' -o -name '*.css' | xargs cat | gzip -9 | wc -c)
+        limit=28672
+        size=$(find dist -name '*.js' -o -name '*.css' | sort | xargs cat | gzip -9 | wc -c)
         echo "gzipped js and css: ${size} of ${limit} bytes"
         if [ "$size" -gt "$limit" ]; then
-          echo "::error::bundle is ${size} bytes, over the 27 kB budget — did a dependency sneak in?"
+          echo "::error::bundle is ${size} bytes, over the 28 kB budget — did a dependency sneak in?"
           exit 1
         fi
 

@@ -3,6 +3,13 @@
  *
  * `important` is a mark and nothing more: it changes how the row reads, never
  * where it sits. Ordering stays the list's own business.
+ *
+ * `once` is the other kind of mark: a thing that is not part of the standing
+ * list. The list persists and `clearTicks` only zeroes counts, so an errand
+ * added today comes back tomorrow looking like work nobody has done yet — the
+ * mark is what lets the closer take it away instead. A flag rather than a
+ * third `kind` because a one-off task is the same shape as any other; only its
+ * fate at the end of the day differs.
  */
 export interface Task {
   kind: "task";
@@ -11,6 +18,7 @@ export interface Task {
   target: number;
   count: number;
   important: boolean;
+  once: boolean;
 }
 
 /** A heading with tasks under it. Groups never nest — that is the whole point. */

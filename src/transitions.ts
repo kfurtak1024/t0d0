@@ -88,7 +88,7 @@ export function bump(state: State, id: string, delta: number, now: number): Stat
   return next;
 }
 
-/** Re-parse edited text so `[n]` and the `!` mark stay editable after creation. */
+/** Re-parse edited text so `[n]`, `!` and `~` stay editable after creation. */
 export function retitle(state: State, id: string, value: string, isGroup: boolean): State {
   const next = clone(state);
 
@@ -110,6 +110,7 @@ export function retitle(state: State, id: string, value: string, isGroup: boolea
   task.text = parsed.text;
   task.target = parsed.target;
   task.important = parsed.important;
+  task.once = parsed.once;
   task.count = Math.min(task.count, task.target);
   settle(next);
   return next;
@@ -143,6 +144,22 @@ export function toggleImportant(state: State, id: string): State {
   if (!task) return state;
   task.important = !task.important;
   settle(next);
+  return next;
+}
+
+/**
+ * Flip a row's one-off mark.
+ *
+ * Tasks only. A group is a heading you keep, and a one-off group would raise a
+ * question `important` needed a whole derivation to answer — whether the mark
+ * belongs to the card or to everything under it. There is no such question
+ * here while only items carry it.
+ */
+export function toggleOnce(state: State, id: string): State {
+  const next = clone(state);
+  const task = findTask(next, id);
+  if (!task) return state;
+  task.once = !task.once;
   return next;
 }
 
@@ -447,9 +464,34 @@ export function move(state: State, id: string, dir: MoveDirection): State {
   return next;
 }
 
-/** End of day: zero every count, unfold every group, keep the curated list, forget the start time. */
+/** The one-off items this close would take away: marked, and actually finished. */
+export function departing(state: State): Task[] {
+  return allTasks(state.list).filter((task) => task.once && isDone(task));
+}
+
+/**
+ * End of day: take away the finished one-offs, zero every count, unfold every
+ * group, keep the curated list, forget the start time.
+ *
+ * **Only the finished ones go.** An errand you did not get to is precisely the
+ * thing you most need to see tomorrow, and deleting it because the day ended
+ * would make the mark a trapdoor rather than a convenience. It is one-off; it
+ * has not been done once yet.
+ *
+ * Removing an item changes a group's membership, so the group marks are
+ * re-derived on the way out — the same obligation every other transition that
+ * touches membership carries.
+ */
 export function clearTicks(state: State): State {
   const next = clone(state);
+
+  const goes = (task: Task): boolean => task.once && isDone(task);
+  next.list = next.list.filter((node) => node.kind === "group" || !goes(node));
+  for (const node of next.list) {
+    if (node.kind === "group") node.items = node.items.filter((task) => !goes(task));
+  }
+  settle(next);
+
   for (const task of allTasks(next.list)) task.count = 0;
   // Folds were earned by yesterday's ticks, and those are gone. Leaving them
   // shut would open tomorrow on a list that hides most of itself, and the first

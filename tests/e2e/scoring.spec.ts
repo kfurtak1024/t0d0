@@ -199,6 +199,22 @@ test("each milestone is celebrated once, and a doubled crossing only once", asyn
   });
   await clearStorage(page);
 
+  /*
+   * Tidying off, because this test is about which moments fire and not about
+   * where rows land — and with it on, every tick sends a row travelling under
+   * FLIP while the next click is being aimed at a different one. That made the
+   * test quietly depend on the timing of a reorder it never meant to exercise:
+   * a tick that landed on the finished marked row instead would untick it, drop
+   * the day back below the first gate, and leave the count one short for good.
+   * Seen once on mobile-safari, which is the slowest project and so the one
+   * where the gap between ticks outruns the tidy's own delay.
+   *
+   * The reordering has its own coverage in prefs.spec.ts and important.spec.ts.
+   */
+  await openDrawer(page);
+  await page.locator('[data-pref="autoCollapseDone"]').click();
+  await page.locator(".drawer-close").click();
+
   /** Milestone buzzes only: a finished tick buzzes a bare number. */
   const milestones = (): Promise<number> =>
     page.evaluate(

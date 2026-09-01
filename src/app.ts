@@ -562,6 +562,18 @@ export class App {
       });
     }
 
+    // Tasks only, and the same three routes as the mark it sits beside: a
+    // trailing `~` in the composer, the same when editing, and this — the one
+    // that works with a thumb on a row already in front of you.
+    if (task) {
+      items.push({
+        label: task.once ? "Keep for tomorrow" : "One-off, remove tonight",
+        onSelect: () => {
+          this.#store.apply(T.toggleOnce(this.#state, id), { undoable: true });
+        },
+      });
+    }
+
     // Nesting is reachable by stepping, but only one row at a time; on a phone
     // that is a lot of taps to cross a long group, so it gets its own entry.
     const owner = T.ownerOf(this.#state, id);
