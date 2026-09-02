@@ -4,7 +4,7 @@ import { barAtClose, departingNote, didHeading, verdictOf } from "../words";
 import { keyboardScrollable, need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
-import { namedList, renderGates } from "./gates";
+import { renderGates } from "./gates";
 import { Rail } from "./rail";
 
 /**
@@ -28,9 +28,35 @@ import { Rail } from "./rail";
  * on screen from the first frame and only travels *to* its resting value, so a
  * run that is skipped or interrupted has lost nothing.
  */
-const BARS_MS = 620;
-const STAGGER_MS = 130;
-const COUNT_MS = 560;
+/*
+ * A gate's bar fills while its finished rows are counted off over it, so the
+ * two are one event: the bar moves *because* that name just landed. A gate with
+ * nothing finished still gets the floor, so an empty one does not simply blink.
+ *
+ * The step is clamped rather than fixed, so a thirty-item day is a satisfying
+ * blur instead of half a minute — the whole run has to stay something you can
+ * sit through in front of a destructive button, and can cut short at any press.
+ */
+const FLASH_STEP_MS = 420;
+const FLASH_MIN_MS = 90;
+const PHASE_MIN_MS = 620;
+const BUDGET_MS = 1900;
+const COUNT_MS = 900;
+
+/**
+ * How long a gate's phase runs, and how far apart its names land.
+ *
+ * An unhurried step on an ordinary day — this is the reward, and a name gone
+ * before it registered is not one. A busy gate divides a budget instead, down
+ * to a floor, and its phase stretches to fit rather than letting the names
+ * outrun the bar they are filling: the step is chosen first and the phase is
+ * whatever holds it.
+ */
+function pace(names: number): { phase: number; step: number } {
+  if (names === 0) return { phase: PHASE_MIN_MS, step: 0 };
+  const step = Math.min(FLASH_STEP_MS, Math.max(FLASH_MIN_MS, BUDGET_MS / names));
+  return { phase: Math.max(PHASE_MIN_MS, names * step), step };
+}
 
 export class DaySheet {
   #veil: HTMLElement;
@@ -126,7 +152,14 @@ export class DaySheet {
       const title = document.createElement("p");
       title.className = "did-title";
       title.textContent = heading;
-      this.#did.replaceChildren(title, namedList(summary.finished));
+      /*
+       * The heading alone. The list of names under it was a quarter of the
+       * card's height and the card was already overflowing its box on a phone;
+       * the names are counted off over the gates instead, and what survives is
+       * this line — which is also what reduced motion and a screen reader get,
+       * so the record does not live only inside an animation.
+       */
+      this.#did.replaceChildren(title);
     }
 
     const note = departingNote(departing(state).map((task) => task.text));
@@ -157,38 +190,90 @@ export class DaySheet {
       return;
     }
 
-    const bars = [...this.#gates.querySelectorAll<HTMLElement>(".gfill")];
-    bars.forEach((fill, index) => {
-      this.#playing.push(
-        fill.animate([{ width: "0%" }, { width: fill.style.getPropertyValue("--fill") }], {
-          duration: BARS_MS,
-          delay: index * STAGGER_MS,
-          easing: "cubic-bezier(0.22, 0.68, 0.36, 1)",
-          fill: "backwards",
-        }),
-      );
-    });
+    /*
+     * One phase per gate, in the order the day turns on them: the marked work
+     * first, then everything else. Each phase fills that gate's bar while its
+     * finished rows rise and vaporise over it, and the next phase does not begin
+     * until the one before has finished — which is what makes the card read as
+     * "the important work, and then the rest" rather than as two bars racing.
+     */
+    let at = 0;
 
-    // A gate's ✓ lands once its own bar has arrived, not before it.
-    this.#gates.querySelectorAll<HTMLElement>(".gstamp").forEach((stamp, index) => {
-      this.#playing.push(
-        stamp.animate(
-          [
-            { transform: "scale(0)", opacity: 0 },
-            { transform: "none", opacity: 1 },
-          ],
-          {
-            duration: 320,
-            delay: BARS_MS + index * STAGGER_MS,
-            // Overshoots, because a stamp that lands should look like it landed.
-            easing: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    for (const gate of this.#gates.querySelectorAll<HTMLElement>(".gate")) {
+      const fill = gate.querySelector<HTMLElement>(".gfill");
+      const names = [...gate.querySelectorAll<HTMLElement>(".gflash span")];
+      const { phase, step } = pace(names.length);
+
+      if (fill) {
+        this.#playing.push(
+          /*
+           * A steady fill, and linear on purpose twice over.
+           *
+           * The names land evenly across the same phase, so at the moment the
+           * i-th lands the bar is exactly i-of-n along: the correspondence is
+           * exact without the bar having to jump for it. Stepping it per name
+           * was tried and read as a lurch — the landing's overshoot carried the
+           * bar past each mark and pulled it back, so a two-item gate wobbled
+           * backwards twice. An easing here would slide the bar off the names
+           * as surely as the steps did.
+           */
+          fill.animate([{ width: "0%" }, { width: fill.style.getPropertyValue("--fill") }], {
+            duration: phase,
+            delay: at,
+            easing: "linear",
             fill: "backwards",
-          },
-        ),
-      );
-    });
+          }),
+        );
+      }
 
-    if (!this.#rail.element.hidden) this.#playing.push(...this.#rail.play(0, BARS_MS));
+      names.forEach((name, index) => {
+        this.#playing.push(
+          name.animate(
+            [
+              { opacity: 0, transform: "translateY(12px) scale(0.92)" },
+              // Arrives past its size and settles back, so it lands rather than
+              // merely appears.
+              { opacity: 1, transform: "translateY(0) scale(1.06)", offset: 0.18 },
+              { opacity: 1, transform: "none", offset: 0.32 },
+              { opacity: 1, transform: "none", offset: 0.62 },
+              { opacity: 0, transform: "translateY(-20px) scale(1)" },
+            ],
+            {
+              // Held well past the step, so one name is still on its way out as
+              // the next arrives and the run reads as a stream rather than a
+              // flicker.
+              duration: Math.max(step * 1.9, 520),
+              delay: at + index * step,
+              easing: "cubic-bezier(0.22, 1.1, 0.36, 1)",
+              fill: "backwards",
+            },
+          ),
+        );
+      });
+
+      // The ✓ lands as its own phase closes, never before its bar has arrived.
+      const stamp = gate.querySelector<HTMLElement>(".gstamp");
+      if (stamp) {
+        this.#playing.push(
+          stamp.animate(
+            [
+              { transform: "scale(0)", opacity: 0 },
+              { transform: "none", opacity: 1 },
+            ],
+            {
+              duration: 320,
+              delay: at + phase,
+              // Overshoots, because a stamp that lands should look like it landed.
+              easing: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+              fill: "backwards",
+            },
+          ),
+        );
+      }
+      at += phase;
+    }
+
+    if (!this.#rail.element.hidden) this.#playing.push(...this.#rail.play(0, Math.max(at, 1)));
 
     /*
      * Held at the start, then let go on the first painted frame — not at the
@@ -209,12 +294,9 @@ export class DaySheet {
       for (const animation of this.#playing) animation.play();
       this.#countUp(summary.done, summary.total);
       // Last, so the shower arrives on a card that has finished arriving.
-      this.#cheer = setTimeout(
-        () => {
-          this.#celebrate(summary.score);
-        },
-        BARS_MS + bars.length * STAGGER_MS,
-      );
+      this.#cheer = setTimeout(() => {
+        this.#celebrate(summary.score);
+      }, at);
     });
   }
 

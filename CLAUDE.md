@@ -495,6 +495,22 @@ Invariants worth defending in review:
   The _numbers_ are shared; the **words are not** — one card is looking forward ("one more
   clears the bar") and the other is reporting a day that is over ("short of the bar"), so
   each passes in its own note.
+- **The close counts what got done off over the gates, and keeps only the count.** The
+  names used to sit under the gates as a static list, capped at four with a remainder. It
+  was a quarter of the card's height — measured at 84px on a small day and 128px on a big
+  one — and the card overflowed its box on an iPhone because of it. They are now shown one
+  at a time over the bar they belong to, rising and vaporising as it fills, so the bar
+  moving has a name attached to it; and every finished row gets named rather than four of
+  them, because they are sequential rather than stacked and so cost no height at all
+  (17px, and the card no longer scrolls). **What survives is the one line.** That matters
+  more than the flourish: an animation is the only channel a reduced-motion setting, a
+  screen reader, or anyone who glanced away does not have, so the record cannot live
+  inside it. The line is the finished state all three land on.
+- **A gate's phase fills its bar while its own names are counted off, and the next waits.**
+  The marked work first, then everything else — two bars racing would not read as "the
+  important work, and then the rest". The step between names is clamped rather than fixed,
+  so a thirty-item day is a satisfying blur rather than half a minute in front of a
+  destructive button; the run is skippable at any press either way.
 - **The close names what got done, not only how much.** The card reported a bare number,
   named what was still outstanding through the gates, and then wiped the evidence — so
   the one ritual the app exists for was a record of what you missed. `summarise().finished`

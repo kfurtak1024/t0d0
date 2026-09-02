@@ -218,6 +218,15 @@ export interface Gate {
   met: boolean;
   /** Marked work still to do. Only ever non-empty on the Important gate. */
   outstanding: Task[];
+  /**
+   * The work this gate has finished, in the order the list keeps it.
+   *
+   * The closing card counts these off one at a time as the bar fills, so a bar
+   * moving has a name attached to it. Kept beside `outstanding` because they are
+   * the two halves of the same gate and drifting apart would be a card claiming
+   * one thing in its numbers and another in its ceremony.
+   */
+  finished: Task[];
 }
 
 /**
@@ -240,6 +249,7 @@ export function dayGates(state: State, bar: number): Gate[] {
     done: rest.filter(isDone).length,
     total: rest.length,
     fill: rest.length > 0 ? progress(rest) : 1,
+    finished: rest.filter(isDone),
     threshold: bar,
     // Vacuously met when there is nothing but marked work, the same way
     // `scoreDay` reads it.
@@ -255,6 +265,7 @@ export function dayGates(state: State, bar: number): Gate[] {
       done: important.filter(isDone).length,
       total: important.length,
       fill: progress(important),
+      finished: important.filter(isDone),
       threshold: null,
       met: important.every(isDone),
       outstanding: important.filter((task) => !isDone(task)),

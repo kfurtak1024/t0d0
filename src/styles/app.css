@@ -1697,6 +1697,7 @@ body.dragging-row {
 }
 
 .gate {
+  position: relative;
   background: var(--nest);
   border-radius: 14px;
   padding: 0.6rem 0.75rem;
@@ -1787,6 +1788,37 @@ body.dragging-row {
   font-weight: 700;
   line-height: 1;
   color: oklch(var(--ring-l) var(--ring-c) 150);
+}
+
+/*
+  The names counted off over a gate's bar as it fills.
+
+  Out of the flow entirely: a gate is exactly as tall whether it finished
+  nothing or thirty things, because the card has to fit and a ceremony must not
+  be paid for in layout. They rest at opacity 0 and only the closing card's
+  reveal wakes them, which is why the stands card can carry them for free.
+*/
+.gflash {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.gflash span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--ink);
+  text-align: center;
+  padding: 0 0.6rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 6px var(--nest);
 }
 
 .gate .gnote {

@@ -422,13 +422,15 @@ test("the closing card names what held the day back", async ({ page }) => {
  * ticks" below the fold is how someone taps it without reading what it says.
  */
 /**
- * The close names what got done, not only how much of it.
+ * The close counts off what got done, and keeps the count.
  *
- * The card's other list names what is still outstanding, so before this the one
- * ritual the app exists for reported a bare number and a record of what you
- * missed, then wiped the evidence. The count says how much; this says what.
+ * The names used to sit under the gates as a static list. It was a quarter of
+ * the card's height and the card overflowed its box on a phone because of it,
+ * so they are counted off over the gates as the bars fill and then vaporise.
+ * What survives is the one line — which is also all that reduced motion and a
+ * screen reader ever see, so the record does not live only inside a flourish.
  */
-test("the closing card names what actually got done", async ({ page }) => {
+test("the closing card counts what got done and keeps no list of it", async ({ page }) => {
   await seedStorage(page, {
     v: 1,
     openedAt: null,
@@ -442,30 +444,68 @@ test("the closing card names what actually got done", async ({ page }) => {
 
   const did = page.locator("#veil .did");
   await expect(did).toBeVisible();
-  await expect(did.locator(".did-title")).toHaveText("Got done — 2 things");
-  await expect(did.locator(".gitems li")).toHaveText(["eat breakfast", "walk the dog"]);
-  // What is still to do belongs to the gates, not here.
-  await expect(did).not.toContainText("water plants");
+  await expect(did).toHaveText("Got done — 2 things");
+  // No list under it any more; the names are the ceremony, not the record.
+  await expect(did.locator("li")).toHaveCount(0);
 });
 
-test("it caps the list and counts the rest, like the gates above it", async ({ page }) => {
+/*
+ * Every finished row gets its name shown, not the first four and a remainder —
+ * they are sequential rather than stacked, so the count costs no height.
+ */
+test("every finished row is counted off over its own gate", async ({ page }) => {
   await seedStorage(page, {
     v: 1,
     openedAt: null,
-    list: Array.from({ length: 7 }, (_, i) => ({
-      kind: "task",
-      id: `t${String(i)}`,
-      text: `thing ${String(i)}`,
-      target: 1,
-      count: 1,
-    })),
+    list: [
+      { kind: "task", id: "k", text: "call the bank", target: 1, count: 1, important: true },
+      ...Array.from({ length: 6 }, (_, i) => ({
+        kind: "task",
+        id: `r${String(i)}`,
+        text: `finished thing ${String(i)}`,
+        target: 1,
+        count: 1,
+      })),
+    ],
   });
   await page.locator("#closeday").click();
 
-  const rows = page.locator("#veil .did .gitems li");
-  await expect(rows).toHaveCount(5);
-  await expect(rows.nth(4)).toHaveText("and 3 more");
-  await expect(page.locator("#veil .did .did-title")).toHaveText("Got done — 7 things");
+  const gates = page.locator("#veil .gate");
+  // The marked work is named over its own gate, the rest over theirs.
+  await expect(gates.nth(0).locator(".gflash span")).toHaveText(["call the bank"]);
+  await expect(gates.nth(1).locator(".gflash span")).toHaveCount(6);
+
+  // And when it has all played out, nothing of it is left on the card.
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () =>
+          [...document.querySelectorAll("#veil .gflash span")].filter(
+            (el) => Number(getComputedStyle(el).opacity) > 0.05,
+          ).length,
+      ),
+    )
+    .toBe(0);
+  await expect(page.locator("#veil .did")).toHaveText("Got done — 7 things");
+});
+
+/*
+ * The stands card carries the same names and never wakes them: it is a status
+ * check, and a flourish every time you glance at the day would wear out fast.
+ */
+test("the day-stands card shows no ceremony", async ({ page }) => {
+  await seedStorage(page, A_MIXED_DAY);
+  await page.locator("#totalring").click();
+  await expect(page.locator(".stands")).toBeVisible();
+  await page.waitForTimeout(400);
+
+  const showing = await page.evaluate(
+    () =>
+      [...document.querySelectorAll(".stands .gflash span")].filter(
+        (el) => Number(getComputedStyle(el).opacity) > 0.05,
+      ).length,
+  );
+  expect(showing).toBe(0);
 });
 
 /*
@@ -518,17 +558,25 @@ test("the closing card counts up and grows its bars", async ({ page }) => {
     const opened = document.querySelector("#veil .score")?.textContent ?? "";
 
     const bars = [...document.querySelectorAll<HTMLElement>("#veil .gfill")];
-    const runs = bars.flatMap((bar) => bar.getAnimations());
-    for (const run of runs) run.pause();
+    const runs = bars.map((bar) => bar.getAnimations()[0]);
+    for (const run of runs) run?.pause();
 
-    const at = (time: number): number[] => {
-      for (const run of runs) run.currentTime = time;
-      return bars.map((bar) => Math.round(parseFloat(getComputedStyle(bar).width)));
-    };
-    const ends = Math.max(
-      ...runs.map((run) => Number(run.effect?.getComputedTiming().endTime ?? 0)),
-    );
-    return { opened, runs: runs.length, start: at(0), middle: at(ends / 2), finish: at(ends) };
+    /*
+     * Each bar on its own timeline. They run in phases now — the marked work
+     * fills, then everything else — so one clock scrubbed across both would
+     * find the first already finished while the second had not begun.
+     */
+    const at = (fraction: number): number[] =>
+      bars.map((bar, i) => {
+        const timing = runs[i]?.effect?.getComputedTiming();
+        const delay = timing?.delay ?? 0;
+        // `duration` widens to include "auto"; these are all set in milliseconds.
+        const duration = Number(timing?.duration ?? 0);
+        const run = runs[i];
+        if (run) run.currentTime = delay + duration * fraction;
+        return Math.round(parseFloat(getComputedStyle(bar).width));
+      });
+    return { opened, runs: runs.length, start: at(0), middle: at(0.5), finish: at(1) };
   });
 
   // The score is pinned before anything moves, so it cannot flash its answer.
@@ -626,7 +674,12 @@ test("the closing shower is what the day earned, and nothing on a day that earne
     ],
   });
 
-  const draws = async (state: unknown): Promise<number> => {
+  /*
+   * Opened and counted, without assuming when the shower lands. It arrives at
+   * the end of the ceremony, whose length follows how much the day finished —
+   * a fixed wait here goes stale the moment the pacing is tuned, and did.
+   */
+  const open = async (state: unknown): Promise<void> => {
     await seedStorage(page, state);
     await page.evaluate(() => {
       (window as unknown as { draws: number }).draws = 0;
@@ -639,14 +692,22 @@ test("the closing shower is what the day earned, and nothing on a day that earne
       };
     });
     await page.locator("#closeday").click();
-    await page.waitForTimeout(1400);
-    return page.evaluate(() => (window as unknown as { draws: number }).draws);
   };
+  const drawn = (): Promise<number> =>
+    page.evaluate(() => (window as unknown as { draws: number }).draws);
 
-  // Nothing marked done and the bar nowhere near: no moment was reached.
-  expect(await draws(day([0, 0], [1, 0, 0, 0]))).toBe(0);
-  // The marked work landing is worth something.
-  expect(await draws(day([1, 1], [1, 0, 0, 0]))).toBeGreaterThan(0);
+  // The marked work landing is worth something — waited for, not timed.
+  await open(day([1, 1], [1, 0, 0, 0]));
+  await expect.poll(drawn, { timeout: 8000 }).toBeGreaterThan(0);
+
+  /*
+   * Nothing marked done and the bar nowhere near: no moment was reached, so
+   * nothing should ever arrive. Given long enough to have arrived if it were
+   * going to — the whole ceremony, and then some.
+   */
+  await open(day([0, 0], [1, 0, 0, 0]));
+  await page.waitForTimeout(5000);
+  expect(await drawn()).toBe(0);
 });
 
 test("the closing card does not scroll on a roomy window", async ({ page }) => {

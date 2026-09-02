@@ -108,6 +108,17 @@ function render(gate: Gate, note: string): HTMLElement {
   // empty group out of the ring.
   if (gate.total > 0) box.append(bar(gate));
 
+  /*
+   * The names this gate finished, stacked over its bar and invisible until
+   * something animates them. Only the closing card does — the stands card is a
+   * status check, and these cost it nothing while they sit at opacity 0.
+   *
+   * `aria-hidden`, because they are a flourish over a fact the card states in
+   * words: the count under them survives the animation and is what anybody not
+   * watching reads instead.
+   */
+  if (gate.finished.length > 0) box.append(flashes(gate));
+
   if (gate.outstanding.length > 0) {
     box.append(namedList(gate.outstanding.map((task) => task.text)));
   }
@@ -117,6 +128,25 @@ function render(gate: Gate, note: string): HTMLElement {
     line.className = "gnote";
     line.textContent = note;
     box.append(line);
+  }
+  return box;
+}
+
+/**
+ * One name per finished row, stacked in place over the gate's bar.
+ *
+ * Absolutely positioned and out of the flow, so a gate is exactly as tall
+ * whether it finished nothing or thirty things — the ceremony must not be paid
+ * for in layout on a card that already has to fit.
+ */
+function flashes(gate: Gate): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "gflash";
+  box.setAttribute("aria-hidden", "true");
+  for (const task of gate.finished) {
+    const name = document.createElement("span");
+    name.textContent = task.text;
+    box.append(name);
   }
   return box;
 }
