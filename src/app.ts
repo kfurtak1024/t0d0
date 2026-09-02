@@ -66,6 +66,7 @@ export class App {
   #list = el("#list");
   #empty = el("#empty");
   #closer = el("#closeday") as HTMLButtonElement;
+  #ending = el("#ending");
   #endLabel = el("#endlabel");
   #pct = el("#pct");
   #frac = el("#frac");
@@ -771,10 +772,21 @@ export class App {
     const hue = dayHue(score, this.#bar);
 
     this.#empty.hidden = state.list.length > 0;
-    this.#closer.hidden = tasks.length === 0;
+    // The verdict travels with the button: neither has anything to say about a
+    // list with nothing in it.
+    this.#ending.hidden = tasks.length === 0;
     this.#closer.style.setProperty("--end-hue", hue.toFixed(1));
     this.#closer.style.setProperty("--end-tint", dayStroke(hue));
+    /*
+     * Four states, not two. `lit` used to cover everything from the first tick
+     * to almost-done, which left the moment the day actually turns on — the
+     * marked work landing, the minimum plan met — looking exactly like one
+     * tick. `cleared` is that moment, and it is gated on there being marked
+     * work at all: the flag is vacuously true otherwise, the same way
+     * `milestones` reads it.
+     */
     this.#closer.classList.toggle("lit", frame.done > 0);
+    this.#closer.classList.toggle("cleared", score.hasImportant && score.cleared);
     this.#closer.classList.toggle("ripe", score.succeeded);
     const label = endLabel(score);
     // The button carries a live region's worth of meaning; only write changes,

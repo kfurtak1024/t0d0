@@ -130,11 +130,22 @@ test("a day with nothing marked runs red to blue, not green first", async ({ pag
  * that matter most. The closer says the same thing in words, on screen, without
  * having to open the card to read it.
  */
-test("the closer says how the day is going, not only the ring", async ({ page }) => {
+/**
+ * The verdict, in words, on the main screen.
+ *
+ * Hue is not a channel everyone has: red and green come out at dE 4 for a
+ * deuteranope and they are the rainbow's two most meaningful landmarks, so the
+ * ring on its own was a WCAG 1.4.1 failure. This sentence is what answers it,
+ * and it sits beside the button rather than being its label — a statement that
+ * looked like a control, and left "End day" unsaid.
+ */
+test("the day's verdict is said in words, not only in hue", async ({ page }) => {
   await addItem(page, "call the bank!");
   for (const text of ["a", "b", "c", "d"]) await addItem(page, text);
 
-  const closer = page.locator("#closeday");
+  const closer = page.locator("#endlabel");
+  // The button is the action and says so, whatever the day is doing.
+  await expect(page.locator("#closeday")).toHaveText(/End day/);
   await expect(closer).toHaveText(/That's the day/);
 
   await tick(page, "call the bank, important").click();
@@ -150,6 +161,54 @@ test("the closer says how the day is going, not only the ring", async ({ page })
   // And back down again when the day is no longer that.
   await tick(page, "d").click();
   await expect(closer).toHaveText(/That's a good day/);
+});
+
+/**
+ * The four states of the button, and the one that used to be missing.
+ *
+ * `lit` covered everything from the first tick to almost-done, so the moment
+ * the day actually turns on — every marked thing finished, the minimum plan
+ * met — looked exactly like a single tick. That moment is what `cleared` marks.
+ */
+test("the button marks the minimum plan landing, not just any progress", async ({ page }) => {
+  await addItem(page, "call the bank!");
+  for (const text of ["a", "b", "c", "d"]) await addItem(page, text);
+  const closer = page.locator("#closeday");
+
+  await expect(closer).not.toHaveClass(/lit/);
+  await expect(closer).not.toHaveClass(/cleared/);
+
+  // An ordinary tick lights it, and nothing more than that.
+  await tick(page, "a").click();
+  await expect(closer).toHaveClass(/lit/);
+  await expect(closer).not.toHaveClass(/cleared/);
+
+  // The marked work landing is its own state.
+  await tick(page, "call the bank, important").click();
+  await expect(closer).toHaveClass(/cleared/);
+  await expect(closer).not.toHaveClass(/ripe/);
+
+  // And clearing the bar on top of it is another.
+  for (const text of ["b", "c"]) await tick(page, text).click();
+  await expect(closer).toHaveClass(/ripe/);
+
+  // Unticking the marked item takes the state back off.
+  await tick(page, "call the bank, important").click();
+  await expect(closer).not.toHaveClass(/cleared/);
+});
+
+/*
+ * Vacuously cleared is not cleared: with nothing marked there is no minimum
+ * plan to meet, and the ring does not draw its green landmark either.
+ */
+test("a day with nothing marked never reaches the cleared state", async ({ page }) => {
+  for (const text of ["a", "b", "c"]) await addItem(page, text);
+  const closer = page.locator("#closeday");
+
+  await expect(closer).not.toHaveClass(/cleared/);
+  await tick(page, "a").click();
+  await expect(closer).toHaveClass(/lit/);
+  await expect(closer).not.toHaveClass(/cleared/);
 });
 
 test("the day card reports the verdict before it clears anything", async ({ page }) => {

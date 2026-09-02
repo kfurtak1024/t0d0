@@ -858,12 +858,45 @@ body.dragging-row {
 
 /* --------------------------------------------------------------- the end */
 
-.endday {
-  --end-hue: 268;
+/*
+  The verdict and the button beneath it, as one block at the foot of the list.
 
+  The dotted stem leads into the pair rather than into the button, because the
+  first thing it runs into is the sentence about the day.
+*/
+.ending {
   align-self: center;
   position: relative;
   margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ending[hidden] {
+  display: none;
+}
+
+/*
+  The day's verdict, in words.
+
+  Hue is not a channel everyone has — red and green come out at dE 4 for a
+  deuteranope, and they are the rainbow's two most meaningful landmarks — so
+  the ring alone was a WCAG 1.4.1 failure and this is the sentence that fixes
+  it. It reads quietly: the button beside it is the thing to press.
+*/
+.dayverdict {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color 0.3s var(--ease);
+}
+
+.endday {
+  --end-hue: 268;
+
+  position: relative;
   padding: 0.72rem 1.35rem;
   font-size: 0.86rem;
   font-weight: 650;
@@ -888,7 +921,7 @@ body.dragging-row {
 }
 
 /* A dotted stem, so the list visibly runs into its ending. */
-.endday::before {
+.ending::before {
   content: "";
   position: absolute;
   top: -1.15rem;
@@ -901,6 +934,25 @@ body.dragging-row {
 
 .endday.lit {
   border-color: oklch(var(--ring-l) var(--ring-c) var(--end-hue) / 40%);
+}
+
+/*
+  The minimum plan is met: every marked thing is done.
+
+  The state the day actually turns on, and until now it looked exactly like one
+  tick — `lit` covered the whole span from the first tick to almost-done. The
+  border goes solid in the day's own hue, which at this moment is green by
+  construction: `dayHue` reaches its green landmark precisely when the marked
+  work lands. Not filled, because that is what a day that also cleared the bar
+  earns, and the two have to stay tellable apart.
+*/
+.endday.cleared {
+  border-color: oklch(var(--ring-l) var(--ring-c) var(--end-hue));
+  color: var(--ink);
+}
+
+.ending:has(.cleared) .dayverdict {
+  color: var(--ink);
 }
 
 /*

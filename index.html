@@ -48,9 +48,22 @@
 
       <ul class="list" id="list"></ul>
 
-      <button class="endday" id="closeday" type="button" hidden>
-        <span id="endlabel">That's the day</span> <span aria-hidden="true">→</span>
-      </button>
+      <!--
+        The verdict and the action, said separately.
+
+        The label used to be the verdict itself, which made a statement look
+        like a control and left "End day" unsaid. It cannot simply become a
+        static label, though: the words are the day's only verdict channel that
+        is not hue, and red and green are one colour to a deuteranope — so the
+        verdict moves out beside the button rather than away. `aria-describedby`
+        is what keeps it on the button's own announcement.
+      -->
+      <div class="ending" id="ending" hidden>
+        <p class="dayverdict" id="endlabel">That's the day</p>
+        <button class="endday" id="closeday" type="button" aria-describedby="endlabel">
+          End day <span aria-hidden="true">→</span>
+        </button>
+      </div>
 
       <p class="empty" id="empty" hidden>Nothing here yet.<br />Type below to add today's list.</p>
     </main>
