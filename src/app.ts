@@ -11,6 +11,7 @@ import { onExternalChange } from "./storage";
 import type { Store } from "./store";
 import * as T from "./transitions";
 import { isGroupInput, raw } from "./parse";
+import { endLabel } from "./words";
 import type { Group, Node, State, Task } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
@@ -30,7 +31,9 @@ const COLLAPSE_MS = 520;
 /**
  * What each moment looks like: the hue the ring turns as it lands, and how loud
  * the shower is. The hues come from the rainbow's own landmarks so a burst and
- * the ring it bursts from cannot drift apart.
+ * the ring it bursts from cannot drift apart — and the canvas puts them through
+ * the ring's own formula and theme tokens, so what cannot drift is the colour
+ * and not merely the number.
  */
 const FANFARE: Record<Milestone, { hue: number; count: number }> = {
   cleared: { hue: HUE.green, count: 55 },
@@ -51,24 +54,6 @@ interface Frame {
   score: DayScore;
   /** Overall progress: the arc, the percentage, and whether the closer is lit. */
   done: number;
-}
-
-/**
- * What the closer says about the day so far.
- *
- * The ring reports the same thing in hue, and hue is not a channel everyone
- * has — red and green are one colour to a deuteranope, and those are the two
- * landmarks that matter most. This is the verdict in words, on screen, without
- * having to open the card to read it.
- *
- * Ordered by what outranks what, so a finished day is not also told the
- * important things are done.
- */
-function endLabel(score: DayScore): string {
-  if (score.complete) return "Everything done";
-  if (score.succeeded) return "That's a good day";
-  if (score.hasImportant && score.cleared) return "The important work is done";
-  return "That's the day";
 }
 
 /** Query a required element of the page, failing loudly rather than rendering nothing. */

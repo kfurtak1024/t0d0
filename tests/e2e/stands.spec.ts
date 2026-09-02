@@ -108,6 +108,30 @@ test("a list with nothing marked has no green landmark and one gate", async ({ p
   await expect(page.locator("#standsnext")).toHaveText("2 more and it's a good day.");
 });
 
+/*
+ * The line is unit-tested in `tests/stands.test.ts`; what only a browser proves
+ * is that the card hands it both counts. Handed only the marked one it read
+ * "0 things left for a clean sweep" here — the marked work being done is
+ * precisely what puts the day in this branch.
+ */
+test("a day past the bar is told what a clean sweep still costs", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [
+      t("m1", "book the tickets", true, 1),
+      t("r1", "water plants", false, 1),
+      t("r2", "shopping", false, 1),
+      t("r3", "sweep up", false, 1),
+      t("r4", "stretch", false, 0),
+    ],
+  });
+  await open(page);
+
+  await expect(page.locator("#standsscore")).toHaveText("4 of 5");
+  await expect(page.locator("#standsnext")).toHaveText("1 thing left for a clean sweep.");
+});
+
 test("the dot sits where the ring's own hue says it does", async ({ page }) => {
   await seedStorage(page, A_DAY);
   await open(page);

@@ -1,58 +1,11 @@
-import { summarise, type DayScore } from "../progress";
+import { summarise } from "../progress";
 import { departing } from "../transitions";
+import { barAtClose, departingNote, elapsed, verdictOf } from "../words";
 import { need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
 import { dayGates } from "./gates";
 import { Rail } from "./rail";
-
-function formatElapsed(ms: number): string {
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 60) return `${String(minutes)} min`;
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60).padStart(2, "0")}m`;
-}
-
-/**
- * What the day amounted to, in one line.
- *
- * Ordered by what outranks what, so a perfect day is not also told that the
- * important things are done — it says the biggest true thing and stops. An
- * unfinished day says nothing rather than something consoling; the score above
- * it already reports honestly, and a card that praises 2 of 9 is not a card
- * anyone believes twice.
- */
-function verdictOf(score: DayScore): string {
-  if (score.complete) return "Everything done.";
-  if (score.succeeded) return "That's a good day.";
-  if (score.hasImportant && score.cleared) return "The important things are done.";
-  return "";
-}
-
-/**
- * What this close takes away for good, in one line.
- *
- * Ticks come back tomorrow; a removed one-off does not, and undo is a single
- * level that does not survive a reload — so the loss has to be visible at the
- * moment of pressing rather than discovered in the morning.
- *
- * Named while naming them is short, counted once it would not be. One line
- * either way: this is the card that must fit without scrolling, and a list
- * that grows with the day would be the thing that pushed the button under the
- * fold.
- */
-function departingNote(titles: string[]): string {
-  const quoted = titles.map((title) => `“${title}”`);
-  if (quoted.length === 0) return "";
-  if (quoted.length === 1) return `${String(quoted[0])} will be removed.`;
-  if (quoted.length === 2) return `${String(quoted[0])} and ${String(quoted[1])} will be removed.`;
-  return `${String(quoted.length)} finished one-off items will be removed.`;
-}
-
-/** How the rest of the list finished against the bar, for a day that is over. */
-function barNote(steps: number, bar: number): string {
-  const at = `set at ${String(Math.round(bar * 100))}%`;
-  return steps === 0 ? `past the bar, ${at}` : `short of the bar, ${at}`;
-}
 
 /**
  * The end-of-day card. It reports before it resets: an ordinary 7-of-9 day
@@ -118,7 +71,7 @@ export class DaySheet {
     this.#verdict.hidden = verdict === "";
 
     this.#rail.paint(summary.score, bar);
-    this.#gates.replaceChildren(...dayGates(state, bar, (steps) => barNote(steps, bar)));
+    this.#gates.replaceChildren(...dayGates(state, bar, (steps) => barAtClose(steps, bar)));
     // An empty list has no gates to report and no rail worth reading.
     this.#rail.element.hidden = summary.total === 0;
 
@@ -131,7 +84,7 @@ export class DaySheet {
     );
 
     this.#elapsed.textContent =
-      summary.elapsedMs === null ? "" : `${formatElapsed(summary.elapsedMs)} since you started`;
+      summary.elapsedMs === null ? "" : `${elapsed(summary.elapsedMs)} since you started`;
 
     const note = departingNote(departing(state).map((task) => task.text));
     this.#departing.textContent = note;

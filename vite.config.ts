@@ -73,6 +73,12 @@ export default defineConfig({
        * Playwright, where a rendering layer is worth testing. Listing them here
        * keeps the percentage about the code Vitest is actually responsible for,
        * instead of a number diluted into meaninglessness.
+       *
+       * The exclusion is a claim, though, and it only holds for code that
+       * genuinely needs a browser. A pure function that had drifted in here
+       * went unmeasured for exactly that reason — see `src/words.ts`, which is
+       * where the day's sentences live now. Anything decidable without a DOM
+       * belongs outside these paths.
        */
       exclude: [
         "src/main.ts",
@@ -83,7 +89,12 @@ export default defineConfig({
         "src/render/group.ts",
         "src/render/task.ts",
       ],
-      thresholds: { lines: 95, functions: 90, branches: 90, statements: 95 },
+      /*
+       * A ratchet, not a target: set a point or so under what the suite
+       * actually reaches, so coverage lost is coverage noticed. Raise them
+       * when the real number rises; lowering one is a decision to argue for.
+       */
+      thresholds: { lines: 99, functions: 98, branches: 94, statements: 97 },
     },
   },
 });
