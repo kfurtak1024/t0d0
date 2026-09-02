@@ -309,10 +309,17 @@ export class Drawer {
 
   #armErase(): void {
     const state = this.#handlers.current();
-    const items = allTasks(state.list).length;
-    if (items === 0 && state.list.length === 0) return;
+    if (state.list.length === 0) return;
 
-    this.#need(".confirmbar-text").textContent = `Erase ${plural(items, "item")}?`;
+    /*
+     * Whichever there is to erase. A list holding nothing but empty groups has
+     * no items, and asking "Erase 0 items?" about it both understates the
+     * damage and reads as a bug — the groups are what goes.
+     */
+    const items = allTasks(state.list).length;
+    const groups = state.list.filter((node) => node.kind === "group").length;
+    this.#need(".confirmbar-text").textContent =
+      items > 0 ? `Erase ${plural(items, "item")}?` : `Erase ${plural(groups, "group")}?`;
     this.#slot("erase-confirm").hidden = false;
     this.#need('[data-act="erase"]').hidden = true;
     this.#need('[data-act="erase-go"]').focus();
