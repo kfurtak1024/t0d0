@@ -1596,6 +1596,57 @@ body.dragging-row {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+  The proportion behind the tally.
+
+  "3 of 5" and "12 of 20" read the same until you see them, which is the whole
+  reason a number gets a bar. Sized to sit under the head without crowding the
+  rows named below it.
+
+  The fill is a width transition off --fill, so a card that wants the bar to
+  grow on open only has to set the property a frame later; a card that does not
+  sets it once and nothing moves.
+*/
+.gbar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  margin-top: 0.45rem;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.gfill {
+  display: block;
+  height: 100%;
+  width: var(--fill, 0%);
+  border-radius: 999px;
+  /* hueAt's indigo→green, not the day's rainbow — only the day ring wears
+     that, and a gate is a thing that gets finished, so it ends on the same
+     green as a finished row's frame. */
+  background: oklch(var(--ring-l) var(--ring-c) var(--gate-hue, 268));
+  transition:
+    width 0.7s var(--ease),
+    background 0.7s var(--ease);
+}
+
+/*
+  Where this gate is cleared. Drawn over the fill and standing proud of the
+  track at both ends, which is the rail's own lesson: a mark the fill can cover
+  answers "did it get past?" wrongly at exactly the moment you are asking. So
+  the bar does not clip it, and it is one solid line rather than an outlined
+  one — outlined, at 2px, it read as two.
+*/
+.gthreshold {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--muted);
+  transform: translateX(-1px);
+}
+
 .gate .gnote {
   font-size: 0.72rem;
   color: var(--faint);

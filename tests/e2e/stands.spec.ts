@@ -132,6 +132,57 @@ test("a day past the bar is told what a clean sweep still costs", async ({ page 
   await expect(page.locator("#standsnext")).toHaveText("1 thing left for a clean sweep.");
 });
 
+/*
+ * A tally says the number; the bar says the proportion, which is the thing a
+ * number alone does not give you — "3 of 5" and "12 of 20" read the same until
+ * you see them. It fills to the mean the ring uses, so a part-counted item
+ * moves the bar where it does not move the tally.
+ */
+test("each gate carries a bar, filled to the mean rather than the tally", async ({ page }) => {
+  await seedStorage(page, A_DAY);
+  await open(page);
+
+  const fill = (n: number) =>
+    page
+      .locator(".stands .gate")
+      .nth(n)
+      .locator(".gfill")
+      .evaluate((el) => (el as HTMLElement).style.getPropertyValue("--fill"));
+
+  expect(await fill(0)).toBe("33.33%");
+  // 3 of 5 is 60%, but "make calls" sits at 1 of 3 — so the bar reads higher.
+  expect(await fill(1)).toBe("66.67%");
+  await expect(page.locator(".stands .gate").nth(1).locator(".gtally")).toHaveText("3 of 5");
+});
+
+/*
+ * The marked work has no line short of finishing it, so its gate has no notch.
+ * The rest clears at the preference's bar, and the notch is where that sits.
+ */
+test("only the second gate is marked with where it clears", async ({ page }) => {
+  await seedStorage(page, A_DAY);
+  await open(page);
+
+  const gates = page.locator(".stands .gate");
+  await expect(gates.nth(0).locator(".gthreshold")).toHaveCount(0);
+  await expect(gates.nth(1).locator(".gthreshold")).toHaveCount(1);
+  await expect(gates.nth(1).locator(".gthreshold")).toHaveCSS("left", /.+/);
+});
+
+test("a gate with nothing in it draws no bar", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [t("m1", "book the tickets", true), t("m2", "reply to Dana", true, 1)],
+  });
+  await open(page);
+
+  const gates = page.locator(".stands .gate");
+  await expect(gates.nth(1)).toContainText("nothing here but marked work");
+  await expect(gates.nth(1).locator(".gbar")).toHaveCount(0);
+  await expect(gates.nth(0).locator(".gbar")).toHaveCount(1);
+});
+
 test("the dot sits where the ring's own hue says it does", async ({ page }) => {
   await seedStorage(page, A_DAY);
   await open(page);

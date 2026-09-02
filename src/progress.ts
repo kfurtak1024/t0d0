@@ -186,6 +186,79 @@ export function summarise(state: State, now: number, bar: number): DaySummary {
  */
 export const hueMark = (hue: number): number => (hue - HUE.red) / (HUE.violet - HUE.red);
 
+/**
+ * One of the day's two gates, as both cards report it.
+ *
+ * The shape rather than the pixels: which gates exist at all, what each is
+ * called, how full its bar is and where its threshold sits. It lives here
+ * beside the scoring it is derived from, and out of `src/ui`, because every
+ * one of those is decidable without a DOM and the rules are not obvious —
+ * the Important gate is *absent* rather than empty when nothing is marked, and
+ * only the second gate has a threshold short of everything.
+ */
+export interface Gate {
+  /** Which gate this is, for a caller that needs to tell them apart. */
+  key: "important" | "rest";
+  name: string;
+  done: number;
+  total: number;
+  /** How much of it is done, 0 to 1 — the mean the ring uses, not done/total. */
+  fill: number;
+  /**
+   * Where this gate is cleared, as a fraction, or null when there is no line
+   * short of finishing it. The marked work is not negotiable, so its gate has
+   * no threshold; the rest clears at `prefs.successAt`.
+   */
+  threshold: number | null;
+  /** Whether the gate is currently met. */
+  met: boolean;
+  /** Marked work still to do. Only ever non-empty on the Important gate. */
+  outstanding: Task[];
+}
+
+/**
+ * The gates this day actually has.
+ *
+ * Empty for an empty list — no obligations were taken on, so there is nothing
+ * to report and neither card draws anything. The Important gate is dropped
+ * entirely when nothing is marked, rather than shown at "0 of 0": that would
+ * claim an obligation nobody made, and `dayHue` does not draw its landmark
+ * there either.
+ */
+export function dayGates(state: State, bar: number): Gate[] {
+  const { important, rest } = partition(state.list);
+  if (important.length === 0 && rest.length === 0) return [];
+
+  const restGate: Gate = {
+    key: "rest",
+    // It is only "everything else" when there is something else to be beside.
+    name: important.length > 0 ? "Everything else" : "Everything",
+    done: rest.filter(isDone).length,
+    total: rest.length,
+    fill: rest.length > 0 ? progress(rest) : 1,
+    threshold: bar,
+    // Vacuously met when there is nothing but marked work, the same way
+    // `scoreDay` reads it.
+    met: rest.length === 0 || progress(rest) >= bar,
+    outstanding: [],
+  };
+  if (important.length === 0) return [restGate];
+
+  return [
+    {
+      key: "important",
+      name: "Important",
+      done: important.filter(isDone).length,
+      total: important.length,
+      fill: progress(important),
+      threshold: null,
+      met: important.every(isDone),
+      outstanding: important.filter((task) => !isDone(task)),
+    },
+    restGate,
+  ];
+}
+
 /** Every marked thing still to do, in the order the list keeps them. */
 export function outstandingImportant(list: Node[]): Task[] {
   return partition(list).important.filter((task) => !isDone(task));

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allTasks,
+  dayGates,
   dayHue,
   hueMark,
   HUE,
@@ -349,5 +350,82 @@ describe("stepsToBar", () => {
     const s = state([key("ship"), key("call"), task("a", 1), task("b")]);
     // The rest is a-done and b-undone: half, and the bar wants all of it.
     expect(stepsToBar(s, 1)).toBe(1);
+  });
+});
+
+/**
+ * Which gates a day has, and how full each one is.
+ *
+ * The rules are not obvious and they used to live in `src/ui/gates.ts`, where
+ * coverage does not reach: the Important gate is *absent* rather than empty
+ * when nothing is marked, only the second gate has a line short of everything,
+ * and the fill is the mean the ring uses rather than done/total — so a
+ * part-counted item moves the bar where it does not move the tally.
+ */
+describe("dayGates", () => {
+  it("has nothing to report on an empty list", () => {
+    expect(dayGates(state([]), 0.7)).toEqual([]);
+  });
+
+  /*
+   * A gate at "0 of 0" claims an obligation nobody took on, which is why
+   * `dayHue` does not draw its landmark there either.
+   */
+  it("drops the Important gate entirely when nothing is marked", () => {
+    const gates = dayGates(state([task("a", 1), task("b")]), 0.7);
+    expect(gates).toHaveLength(1);
+    expect(gates[0]).toMatchObject({ key: "rest", name: "Everything", done: 1, total: 2 });
+  });
+
+  it("names the second gate for what it sits beside", () => {
+    const gates = dayGates(state([key("m"), task("a")]), 0.7);
+    expect(gates.map((gate) => gate.name)).toEqual(["Important", "Everything else"]);
+  });
+
+  /* The marked work has no bar to clear — it simply has to be done. */
+  it("gives only the second gate a threshold", () => {
+    const gates = dayGates(state([key("m"), task("a")]), 0.7);
+    expect(gates[0]?.threshold).toBeNull();
+    expect(gates[1]?.threshold).toBe(0.7);
+  });
+
+  it("fills to the mean, not to done over total", () => {
+    // One whole item and one third of a [3], over two tasks: 2/3, not 1/2.
+    const gates = dayGates(state([task("a", 1), task("b", 1, 3)]), 0.7);
+    expect(gates[0]?.fill).toBeCloseTo(2 / 3, 6);
+    expect(gates[0]?.done).toBe(1);
+    expect(gates[0]?.total).toBe(2);
+  });
+
+  it("meets the Important gate only when all of it is done", () => {
+    expect(dayGates(state([key("m"), task("a")]), 0.7)[0]?.met).toBe(false);
+    expect(dayGates(state([key("m", 1), task("a")]), 0.7)[0]?.met).toBe(true);
+  });
+
+  it("meets the second gate at the bar the preference names", () => {
+    const list = [key("m"), task("a", 1), task("b", 1), task("c")];
+    expect(dayGates(state(list), 0.6)[1]?.met).toBe(true);
+    expect(dayGates(state(list), 0.7)[1]?.met).toBe(false);
+  });
+
+  /* Vacuously met, the same way `scoreDay` reads an empty set. */
+  it("meets a second gate that has nothing in it", () => {
+    const gates = dayGates(state([key("m")]), 0.7);
+    expect(gates[1]).toMatchObject({ total: 0, met: true, fill: 1 });
+  });
+
+  it("names the marked work still to do, and only that", () => {
+    const gates = dayGates(state([key("m1"), key("m2", 1), task("a")]), 0.7);
+    expect(gates[0]?.outstanding.map((row) => row.text)).toEqual(["m1"]);
+    expect(gates[1]?.outstanding).toEqual([]);
+  });
+
+  it("counts a task in an important group as marked work", () => {
+    const held = group("Work", [task("a"), task("b")]);
+    held.important = true;
+    for (const item of held.items) item.important = true;
+    const gates = dayGates(state([held, task("c")]), 0.7);
+    expect(gates[0]).toMatchObject({ key: "important", total: 2 });
+    expect(gates[1]).toMatchObject({ key: "rest", total: 1 });
   });
 });

@@ -3,7 +3,7 @@ import type { State } from "../types";
 import { barSoFar, elapsed, nextLine } from "../words";
 import { keyboardScrollable, need } from "./dom";
 import { trapFocus } from "./focus";
-import { dayGates } from "./gates";
+import { renderGates } from "./gates";
 import { Rail } from "./rail";
 
 /**
@@ -64,7 +64,7 @@ export class StandsSheet {
       },
       stepsToBar(state, bar),
     );
-    this.#gates.replaceChildren(...dayGates(state, bar, (steps) => barSoFar(steps, bar)));
+    this.#gates.replaceChildren(...renderGates(state, bar, (steps) => barSoFar(steps, bar)));
 
     this.#dur.textContent = summary.elapsedMs === null ? "" : `${elapsed(summary.elapsedMs)} in`;
     this.#dur.hidden = summary.elapsedMs === null;

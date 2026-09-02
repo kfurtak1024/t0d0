@@ -4,7 +4,7 @@ import { barAtClose, departingNote, didHeading, elapsed, verdictOf } from "../wo
 import { keyboardScrollable, need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
-import { dayGates, namedList } from "./gates";
+import { namedList, renderGates } from "./gates";
 import { Rail } from "./rail";
 
 /**
@@ -73,7 +73,7 @@ export class DaySheet {
     this.#verdict.hidden = verdict === "";
 
     this.#rail.paint(summary.score, bar);
-    this.#gates.replaceChildren(...dayGates(state, bar, (steps) => barAtClose(steps, bar)));
+    this.#gates.replaceChildren(...renderGates(state, bar, (steps) => barAtClose(steps, bar)));
     // An empty list has no gates to report and no rail worth reading.
     this.#rail.element.hidden = summary.total === 0;
 

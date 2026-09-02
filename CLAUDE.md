@@ -387,6 +387,29 @@ Invariants worth defending in review:
   `progress.ts` and the **words are not** — `barSoFar` and `barAtClose` are the
   same figure in two voices, one looking forward and one reporting a day that
   is over, and keeping both in one file is what makes that contrast visible.
+- **A gate carries a bar, and the bar fills to the mean rather than the tally.**
+  "3 of 5" and "12 of 20" read the same until you see them, which is the whole reason a
+  number gets a bar. It fills to `progress()` — the measure the ring uses — so a
+  part-counted item moves the bar where it does not move the tally: a gate can read
+  "3 of 5" and sit at 67%. That is the first place partial progress is visible anywhere
+  in the summary. It wears `hueAt`'s indigo→green and **not** the rainbow, because only
+  the day ring wears that and a gate is a thing that gets finished, so it ends on the
+  green a finished row's frame already wears. It is `aria-hidden`: the tally beside it
+  says the number and the outstanding rows are named underneath, so the bar is the same
+  fact a third time in the one channel not everyone has.
+- **Only the second gate is marked with where it clears.** The marked work has no line
+  short of finishing it — it simply has to be done — so `Gate.threshold` is null there
+  and the notch is not drawn. The notch stands proud of the track at both ends and is one
+  solid `--muted` line: the bar must not clip it, because a mark the fill can cover
+  answers "did it get past?" wrongly at exactly the moment you are asking, which is the
+  rail's own lesson. Outlined at 2px it read as two lines rather than one.
+- **Which gates a day has is decided in `progress.ts`, not in the renderer.** `dayGates()`
+  returns the model — which gates exist, their names, fills, thresholds and what is
+  outstanding — and `src/ui/gates.ts` only draws it. The rules are not obvious (the
+  Important gate is _absent_ rather than empty when nothing is marked; the second gate's
+  name changes to "Everything" when it stands alone; an empty second gate is vacuously
+  met) and every one of them is decidable without a DOM, so they belong where coverage
+  reaches. `tests/progress.test.ts` pins them.
 - **Both day cards wear the same rail and the same gates**, from `src/ui/rail.ts` and
   `src/ui/gates.ts`. Two copies would be two rainbows able to drift from `dayStroke` and
   from each other, and the rail's whole claim is that it cannot disagree with the ring.
