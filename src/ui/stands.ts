@@ -1,7 +1,7 @@
 import { allTasks, outstandingImportant, stepsToBar, summarise } from "../progress";
 import type { State } from "../types";
 import { barSoFar, elapsed, nextLine } from "../words";
-import { need } from "./dom";
+import { keyboardScrollable, need } from "./dom";
 import { trapFocus } from "./focus";
 import { dayGates } from "./gates";
 import { Rail } from "./rail";
@@ -22,6 +22,7 @@ export class StandsSheet {
   #next: HTMLElement;
   #gates: HTMLElement;
   #dur: HTMLElement;
+  #body: HTMLElement;
   #release: (() => void) | null = null;
 
   constructor(veil: HTMLElement) {
@@ -32,7 +33,8 @@ export class StandsSheet {
     this.#next = need(veil, "#standsnext");
     this.#gates = need(veil, "#standsgates");
     this.#dur = need(veil, "#standsdur");
-    this.#panel.insertBefore(this.#rail.element, this.#next);
+    this.#body = need(veil, ".sheet-body");
+    this.#body.insertBefore(this.#rail.element, this.#next);
 
     need(veil, ".dismiss").addEventListener("click", () => {
       this.hide();
@@ -68,6 +70,8 @@ export class StandsSheet {
     this.#dur.hidden = summary.elapsedMs === null;
 
     this.#veil.hidden = false;
+    // After the content is in and the box has a height to measure.
+    keyboardScrollable(this.#body);
     this.#release = trapFocus(this.#veil, this.#panel);
   }
 

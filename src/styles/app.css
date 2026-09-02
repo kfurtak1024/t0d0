@@ -1206,6 +1206,39 @@ body.dragging-row {
   align-items: center;
   gap: 0.35rem;
   animation: rise 0.5s var(--spring);
+  /*
+    Bounded by the window, minus the veil's own padding either side.
+
+    Without this the card simply grew, and on a short screen it grew past the
+    bottom of it: at 360x640 a full day put "Clear the ticks" three pixels
+    below the fold, and at 320x568 an ordinary one did. The guard could not
+    see it — with nothing capping the height, scrollHeight and clientHeight
+    are the same number by construction, so the fit assertion passed on every
+    day it was ever given.
+  */
+  max-height: calc(100dvh - 2.5rem);
+}
+
+/*
+  The part of the card that reports, and the only part allowed to scroll.
+
+  "Fits without scrolling" cannot be promised for every day at every window
+  size — a long day on a small phone simply does not fit — so what is promised
+  instead is the thing that rule was protecting: the note naming what will be
+  destroyed and the button that destroys it are outside this box and therefore
+  never below the fold. On any day that does fit, nothing scrolls and the card
+  is exactly as it was.
+*/
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  /* A card that has run out of room must not scroll the list behind it. */
+  overscroll-behavior: contain;
 }
 
 @keyframes rise {

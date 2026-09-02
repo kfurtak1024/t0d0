@@ -362,24 +362,134 @@ test("the closing card names what held the day back", async ({ page }) => {
  * The card grew, and it is the one card with a destructive button. "Clear the
  * ticks" below the fold is how someone taps it without reading what it says.
  */
-test("the closing card fits a roomy window, so the confirm is never below the fold", async ({
-  page,
-}) => {
+test("the closing card does not scroll on a roomy window", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await addItem(page, "call the bank!");
   await addItem(page, "water plants");
   await addItem(page, "shopping");
   await page.locator("#closeday").click();
 
-  const fit = await page.evaluate(() => {
-    const sheet = document.querySelector("#veil .sheet");
-    return sheet ? { content: sheet.scrollHeight, box: sheet.clientHeight } : null;
-  });
-  expect(fit?.content).toBeLessThanOrEqual(fit?.box ?? 0);
-
-  const confirm = await page.locator("#veil .confirm").boundingBox();
-  expect(confirm?.y).toBeLessThan(900 - (confirm?.height ?? 0));
+  // Measured on `.sheet-body`, which is the box that actually scrolls. `.sheet`
+  // is capped and holds a scroller, so asking *it* whether it overflows is a
+  // question whose answer is always no — which is what the previous version of
+  // this test was doing, on a card that had no cap at all and could not
+  // overflow itself either.
+  const fit = await page.locator("#veil .sheet-body").evaluate((el) => ({
+    content: el.scrollHeight,
+    box: el.clientHeight,
+  }));
+  expect(fit.content).toBeLessThanOrEqual(fit.box);
 });
+
+/**
+ * The one card with a destructive button, at the sizes where it used to break.
+ *
+ * "Clear the ticks" below the fold is how someone taps it without reading what
+ * it takes away — so the button and the note naming the loss sit outside the
+ * scroller and have to be wholly on screen whatever the day looks like. At
+ * 360x640 a full day used to put the confirm three pixels under the bottom
+ * edge, and at 320x568 an ordinary one did.
+ */
+const HEAVY = {
+  v: 1,
+  openedAt: Date.now() - 6 * 60 * 60 * 1000,
+  list: [
+    {
+      kind: "group",
+      id: "g",
+      title: "Morning",
+      collapsed: false,
+      important: false,
+      items: [1, 2, 3].map((i) => ({
+        kind: "task",
+        id: `m${String(i)}`,
+        text: `morning thing ${String(i)}`,
+        target: 1,
+        count: 1,
+      })),
+    },
+    {
+      kind: "group",
+      id: "g2",
+      title: "Work",
+      collapsed: false,
+      important: false,
+      items: [1, 2].map((i) => ({
+        kind: "task",
+        id: `w${String(i)}`,
+        text: `work thing ${String(i)}`,
+        target: 1,
+        count: 1,
+      })),
+    },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      kind: "task",
+      id: `r${String(i)}`,
+      text: `loose thing ${String(i)}`,
+      target: 1,
+      count: i < 9 ? 1 : 0,
+      important: i === 11,
+    })),
+    ...Array.from({ length: 3 }, (_, i) => ({
+      kind: "task",
+      id: `o${String(i)}`,
+      text: `errand ${String(i)}`,
+      target: 1,
+      count: 1,
+      once: true,
+    })),
+  ],
+};
+
+/*
+ * A scroller with nothing focusable inside it is reachable by mouse and by
+ * nobody else — the card's buttons sit outside it on purpose, so there is
+ * nothing in there to tab to. It earns a tab stop only on the days it actually
+ * scrolls; a permanent one would lead nowhere on almost every day.
+ */
+test("the summary takes a tab stop only when it has something to scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await seedStorage(page, HEAVY);
+  await page.locator("#closeday").click();
+  const body = page.locator("#veil .sheet-body");
+  await expect(body).toHaveAttribute("tabindex", "0");
+  await page.keyboard.press("Escape");
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator("#closeday").click();
+  await expect(body).not.toHaveAttribute("tabindex", "0");
+});
+
+for (const [width, height] of [
+  [1280, 900],
+  [390, 844],
+  [360, 640],
+  [320, 568],
+  [740, 360],
+] as const) {
+  test(`the confirm and its warning stay on screen at ${String(width)}x${String(height)}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height });
+    await seedStorage(page, HEAVY);
+    await page.locator("#closeday").click();
+    await expect(page.locator("#veil .departing")).toBeVisible();
+
+    for (const selector of ["#veil .confirm", "#veil .departing"]) {
+      const box = await page.locator(selector).boundingBox();
+      expect(box, selector).not.toBeNull();
+      expect(box?.y ?? -1, `${selector} above the top`).toBeGreaterThanOrEqual(0);
+      expect((box?.y ?? 0) + (box?.height ?? 0), `${selector} below the fold`).toBeLessThanOrEqual(
+        height,
+      );
+    }
+
+    // The card itself never leaves the window either, so nothing above the
+    // scroller is stranded off the top.
+    const sheet = await page.locator("#veil .sheet").boundingBox();
+    expect(sheet?.y ?? -1).toBeGreaterThanOrEqual(0);
+  });
+}
 
 /*
  * A day left open overnight opens on its own card. With the list emptied since,

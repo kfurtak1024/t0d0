@@ -217,6 +217,16 @@ test("the card still fits without scrolling once it has a removal to report", as
   const panel = page.locator("#veil .sheet");
   await expect(panel.locator(".departing")).toBeVisible();
 
-  const fits = await panel.evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
+  // `.sheet-body` is the box that scrolls; `.sheet` is capped and holds it, so
+  // asking the panel whether it overflows is a question that answers itself.
+  const fits = await panel
+    .locator(".sheet-body")
+    .evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
   expect(fits).toBe(true);
+
+  // And the button it is warning about is on screen, which is the point of the
+  // measurement rather than a property of the box around it.
+  const box = await panel.locator(".confirm").boundingBox();
+  const height = page.viewportSize()?.height ?? 0;
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(height);
 });

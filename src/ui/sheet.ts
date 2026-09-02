@@ -1,7 +1,7 @@
 import { summarise } from "../progress";
 import { departing } from "../transitions";
 import { barAtClose, departingNote, elapsed, verdictOf } from "../words";
-import { need } from "./dom";
+import { keyboardScrollable, need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
 import { dayGates } from "./gates";
@@ -30,6 +30,7 @@ export class DaySheet {
   #departing: HTMLElement;
   #elapsed: HTMLElement;
   #panel: HTMLElement;
+  #body: HTMLElement;
   #release: (() => void) | null = null;
 
   constructor(veil: HTMLElement, onConfirm: () => void) {
@@ -42,7 +43,8 @@ export class DaySheet {
     this.#cleared = need(veil, ".cleared");
     this.#departing = need(veil, ".departing");
     this.#elapsed = need(veil, ".dur");
-    this.#panel.insertBefore(this.#rail.element, this.#gates);
+    this.#body = need(veil, ".sheet-body");
+    this.#body.insertBefore(this.#rail.element, this.#gates);
 
     need(veil, ".confirm").addEventListener("click", () => {
       onConfirm();
@@ -91,6 +93,8 @@ export class DaySheet {
     this.#departing.hidden = note === "";
 
     this.#veil.hidden = false;
+    // After the content is in and the box has a height to measure.
+    keyboardScrollable(this.#body);
     // Not the confirm button: Enter would clear the day on sight.
     this.#release = trapFocus(this.#veil, this.#panel);
   }
