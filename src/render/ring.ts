@@ -36,6 +36,78 @@ export const dayStroke = (hue: number, alpha?: number): string => {
 const strokeAt = (progress: number): string =>
   `oklch(var(--ring-l) var(--ring-c) ${hueAt(progress).toFixed(1)})`;
 
+/**
+ * The three tokens a ring's colour is built from, resolved to numbers.
+ *
+ * Percentages arrive here as fractions. They differ per theme — dark starts
+ * lighter and needs much less of a warm-band lift — so anything painting a
+ * ring's colour outside CSS has to read them rather than assume light.
+ */
+export interface RingTokens {
+  /** `--ring-l`. */
+  l: number;
+  /** `--ring-c`. */
+  c: number;
+  /** `--ring-lift`. */
+  lift: number;
+}
+
+/**
+ * Where a hue actually lands in OKLCH, warm-band lift included.
+ *
+ * The seam. {@link dayStroke} spells this out as a `calc()` for CSS to work
+ * out, and the confetti has to arrive at the same three numbers without CSS —
+ * so both are this one formula rather than two that agree today.
+ */
+export const ringOklch = (hue: number, tokens: RingTokens): [number, number, number] => [
+  tokens.l + tokens.lift * warmth(hue),
+  tokens.c,
+  hue,
+];
+
+/** One linear-light channel, gamma-encoded and clipped into 0-255. */
+const channel = (value: number): number => {
+  const encoded = value <= 0.0031308 ? 12.92 * value : 1.055 * Math.pow(value, 1 / 2.4) - 0.055;
+  return Math.round(255 * Math.min(1, Math.max(0, encoded)));
+};
+
+/**
+ * OKLCH to an sRGB `rgb()` string, so a canvas can paint the colour CSS would.
+ *
+ * Canvas2D takes a CSS colour, but its parser lagged CSS by years in Safari and
+ * `oklch()` is exactly the kind of thing it dropped — silently, leaving the
+ * shower black. Converting here means the burst is the ring's own colour on
+ * every engine instead of an approximation that happened to be close.
+ *
+ * The naive spelling was `hsl()` fed the ring's OKLCH hue number. Those are
+ * different colour spaces: the blue milestone showered `rgb(124, 75, 221)`, a
+ * purple, while the ring beside it turned `rgb(60, 114, 203)` — and neither
+ * the theme's lightness nor its chroma reached the canvas at all.
+ *
+ * Out-of-gamut colours are clipped per channel, which is what a browser does
+ * displaying an `oklch()` it cannot reach — so the clip is the ring's own clip
+ * rather than a second approximation on top of it.
+ */
+export function oklchToRgb(l: number, c: number, h: number): string {
+  const radians = (h * Math.PI) / 180;
+  const a = c * Math.cos(radians);
+  const b = c * Math.sin(radians);
+
+  // OKLab to cone responses, then cubed — the inverse of the space's own step.
+  const long = Math.pow(l + 0.3963377774 * a + 0.2158037573 * b, 3);
+  const medium = Math.pow(l - 0.1055613458 * a - 0.0638541728 * b, 3);
+  const short = Math.pow(l - 0.0894841775 * a - 1.291485548 * b, 3);
+
+  const red = channel(4.0767416621 * long - 3.3077115913 * medium + 0.2309699292 * short);
+  const green = channel(-1.2684380046 * long + 2.6097574011 * medium - 0.3413193965 * short);
+  const blue = channel(-0.0041960863 * long - 0.7034186147 * medium + 1.707614701 * short);
+  return `rgb(${String(red)}, ${String(green)}, ${String(blue)})`;
+}
+
+/** A ring hue as the canvas wants it: the theme's own tokens, in sRGB. */
+export const ringRgb = (hue: number, tokens: RingTokens): string =>
+  oklchToRgb(...ringOklch(hue, tokens));
+
 export interface Ring extends SVGSVGElement {
   segments: SVGCircleElement[];
   continuous: boolean;

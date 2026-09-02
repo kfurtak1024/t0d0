@@ -1,4 +1,4 @@
-import { hueAt } from "../render/ring";
+import { hueAt, ringRgb, type RingTokens } from "../render/ring";
 
 interface Bit {
   x: number;
@@ -9,7 +9,12 @@ interface Bit {
   vr: number;
   w: number;
   h: number;
-  hue: number;
+  /*
+   * Resolved at the burst rather than kept as a hue and converted per frame:
+   * the theme cannot change under a shower that is already in the air, and a
+   * hundred colour conversions a frame is work for an answer that never moves.
+   */
+  fill: string;
   life: number;
 }
 
@@ -27,6 +32,28 @@ export interface Burst {
    */
   hue?: number;
   spread?: number;
+}
+
+/**
+ * The ring tokens as they stand in this theme, read off the document.
+ *
+ * The canvas cannot resolve a `var()`, and the two themes genuinely differ —
+ * dark starts lighter and lifts the warm band far less. Read per burst, so a
+ * theme changed in Settings is honoured by the next shower.
+ *
+ * The fallbacks are light mode's, for the one case that can reach here without
+ * a stylesheet: a burst fired before the CSS has landed.
+ */
+function ringTokens(): RingTokens {
+  const style = getComputedStyle(document.documentElement);
+  const read = (name: string, fallback: number): number => {
+    const raw = style.getPropertyValue(name).trim();
+    const value = Number.parseFloat(raw);
+    if (!Number.isFinite(value)) return fallback;
+    // `--ring-l` and `--ring-lift` are percentages; `--ring-c` is not.
+    return raw.endsWith("%") ? value / 100 : value;
+  };
+  return { l: read("--ring-l", 0.56), c: read("--ring-c", 0.15), lift: read("--ring-lift", 0.1) };
 }
 
 /** Hand-rolled so the app keeps its zero runtime dependencies. */
@@ -55,6 +82,7 @@ export class Confetti {
   burst(origin: { x: number; y: number }, options: Burst = {}): void {
     const count = options.count ?? COUNT;
     const spread = options.spread ?? 26;
+    const tokens = ringTokens();
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 3 + Math.random() * 8;
@@ -68,11 +96,15 @@ export class Confetti {
         w: 5 + Math.random() * 5,
         h: 3 + Math.random() * 4,
         // Same hue range as the rings, so the celebration belongs to the same
-        // system — narrowed around the milestone's own colour when it has one.
-        hue:
+        // system — narrowed around the milestone's own colour when it has one,
+        // and put through the ring's own formula so it is that colour rather
+        // than one that resembles it.
+        fill: ringRgb(
           options.hue === undefined
             ? hueAt(Math.random())
             : options.hue + (Math.random() - 0.5) * 2 * spread,
+          tokens,
+        ),
         life: 1,
       });
     }
@@ -100,8 +132,7 @@ export class Confetti {
       ctx.translate(bit.x, bit.y);
       ctx.rotate(bit.rot);
       ctx.globalAlpha = Math.max(0, Math.min(1, bit.life));
-      // hsl rather than oklch: Canvas2D colour support lags CSS in older Safari.
-      ctx.fillStyle = `hsl(${bit.hue.toFixed(0)} 68% 58%)`;
+      ctx.fillStyle = bit.fill;
       ctx.fillRect(-bit.w / 2, -bit.h / 2, bit.w, bit.h);
       ctx.restore();
     }
