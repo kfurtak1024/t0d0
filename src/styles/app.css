@@ -1732,6 +1732,22 @@ body.dragging-row {
   transform: translateX(-1px);
 }
 
+/*
+  A gate that has been met, marked once at the end of its own row.
+
+  Green, at the hue the ring and a finished frame already end on, so a met gate
+  says the same thing here as a done row says in the list. Decorative — the
+  tally and the note carry it — which is what lets the closing card stamp it in
+  without a screen reader hearing a flourish.
+*/
+.gstamp {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  color: oklch(var(--ring-l) var(--ring-c) 150);
+}
+
 .gate .gnote {
   font-size: 0.72rem;
   color: var(--faint);

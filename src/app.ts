@@ -1,5 +1,5 @@
 import { allTasks, dayHue, HUE, isDone, progress, scoreDay, type DayScore } from "./progress";
-import { cross, spend, type Arming, type Milestone } from "./milestones";
+import { cross, highest, spend, type Arming, type Milestone } from "./milestones";
 import { createGroup } from "./render/group";
 import { flip } from "./render/flip";
 import { KeyedList } from "./render/list";
@@ -117,10 +117,16 @@ export class App {
     this.#toast = new Toast(el("#toast"), () => {
       this.#undo();
     });
-    this.#sheet = new DaySheet(el("#veil"), () => {
-      this.#store.apply(T.clearTicks(this.#state), { undoable: true });
-      this.#toast.show("Ticks cleared");
-    });
+    this.#sheet = new DaySheet(
+      el("#veil"),
+      () => {
+        this.#store.apply(T.clearTicks(this.#state), { undoable: true });
+        this.#toast.show("Ticks cleared");
+      },
+      (score) => {
+        this.#cheer(score);
+      },
+    );
     this.#stands = new StandsSheet(el("#standsveil"));
     this.#drawer = new Drawer(el("#dataveil"), {
       current: () => this.#state,
@@ -726,6 +732,29 @@ export class App {
         { hue, count },
       );
     }
+    this.#vibrate(HAPTICS[fired]);
+  }
+
+  /**
+   * The closing card's own shower, scaled by what the day actually earned.
+   *
+   * Proportional rather than unconditional. `highest` is null for a day that
+   * reached none of the three moments, and that day gets nothing — the same
+   * rule that keeps the card's verdict line silent on an unfinished day, and
+   * the reason this is not simply confetti every time the card opens. It bursts
+   * from the card, because that is what you are looking at.
+   */
+  #cheer(score: DayScore): void {
+    if (this.#motion.matches) return;
+    const fired = highest(score);
+    if (!fired) return;
+
+    const box = el("#veil .sheet").getBoundingClientRect();
+    const { hue, count } = FANFARE[fired];
+    this.#confetti.burst(
+      { x: box.left + box.width / 2, y: box.top + box.height / 3 },
+      { hue, count },
+    );
     this.#vibrate(HAPTICS[fired]);
   }
 

@@ -481,6 +481,172 @@ test("it says nothing at all on a day with nothing done", async ({ page }) => {
   await expect(page.locator("#veil .did")).toBeHidden();
 });
 
+/**
+ * The closing card's numbers arrive rather than simply being there.
+ *
+ * Everything only ever travels *to* a value already written into the DOM, which
+ * is what makes reduced motion the same path skipped rather than a second one,
+ * and what makes a run that is cut short land on the finished card.
+ */
+const A_MIXED_DAY = {
+  v: 1,
+  openedAt: Date.now() - 6 * 60 * 60 * 1000,
+  list: [
+    { kind: "task", id: "k1", text: "call the bank", target: 1, count: 1, important: true },
+    { kind: "task", id: "k2", text: "book the tickets", target: 1, count: 1, important: true },
+    { kind: "task", id: "r1", text: "water plants", target: 1, count: 1 },
+    { kind: "task", id: "r2", text: "shopping", target: 1, count: 1 },
+    { kind: "task", id: "r3", text: "sweep up", target: 1, count: 1 },
+    { kind: "task", id: "r4", text: "stretch", target: 1, count: 0 },
+  ],
+};
+
+test("the closing card counts up and grows its bars", async ({ page }) => {
+  await seedStorage(page, A_MIXED_DAY);
+
+  // Sampled inside the page: a screenshot or a round trip eats the timeline.
+  const trace = await page.evaluate(async () => {
+    const frames: { score: string; bars: number[] }[] = [];
+    document.getElementById("closeday")?.click();
+    const started = performance.now();
+    await new Promise<void>((done) => {
+      const tick = (): void => {
+        frames.push({
+          score: document.querySelector("#veil .score")?.textContent ?? "",
+          bars: [...document.querySelectorAll("#veil .gfill")].map((el) =>
+            Math.round(parseFloat(getComputedStyle(el).width)),
+          ),
+        });
+        if (performance.now() - started < 1200) requestAnimationFrame(tick);
+        else done();
+      };
+      requestAnimationFrame(tick);
+    });
+    return frames;
+  });
+
+  const first = trace[0];
+  const last = trace[trace.length - 1];
+
+  /*
+   * The property is that the numbers travel, not that any one frame holds a
+   * particular value: a loaded runner can drop the first frame, and asserting
+   * the animation had not moved by then would be a test that fails on a busy
+   * machine rather than on a broken card.
+   */
+  expect(last?.score).toBe("5 of 6");
+  for (const width of last?.bars ?? []) expect(width).toBeGreaterThan(0);
+
+  // It begins well short of where it ends...
+  const grew = (first?.bars ?? []).every((width, i) => width < (last?.bars[i] ?? 0) / 2);
+  expect(grew, `first frame ${JSON.stringify(first)} vs last ${JSON.stringify(last)}`).toBe(true);
+
+  // ...and genuinely passes through the middle rather than jumping.
+  expect(trace.some((f) => f.score !== first?.score && f.score !== last?.score)).toBe(true);
+});
+
+/*
+ * This is the one card with a destructive button. An animation you have to sit
+ * through before you can read what "Clear the ticks" takes away is a worse
+ * problem than a card that does not move, so any press lands the whole run.
+ */
+test("a press lands the reveal at once", async ({ page }) => {
+  await seedStorage(page, A_MIXED_DAY);
+
+  const landed = await page.evaluate(async () => {
+    document.getElementById("closeday")?.click();
+    await new Promise((done) => setTimeout(done, 120));
+    const midway = document.querySelector("#veil .score")?.textContent ?? "";
+    document
+      .querySelector("#veil")
+      ?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await new Promise((done) => requestAnimationFrame(done));
+    return {
+      midway,
+      score: document.querySelector("#veil .score")?.textContent ?? "",
+      bars: [...document.querySelectorAll("#veil .gfill")].map((el) =>
+        Math.round(parseFloat(getComputedStyle(el).width)),
+      ),
+    };
+  });
+
+  expect(landed.midway).not.toBe("5 of 6");
+  expect(landed.score).toBe("5 of 6");
+  for (const width of landed.bars) expect(width).toBeGreaterThan(0);
+});
+
+test("with motion turned off the card is finished on arrival", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await seedStorage(page, A_MIXED_DAY);
+
+  const shown = await page.evaluate(async () => {
+    document.getElementById("closeday")?.click();
+    await new Promise((done) => requestAnimationFrame(done));
+    return {
+      score: document.querySelector("#veil .score")?.textContent ?? "",
+      bars: [...document.querySelectorAll("#veil .gfill")].map((el) =>
+        Math.round(parseFloat(getComputedStyle(el).width)),
+      ),
+    };
+  });
+
+  expect(shown.score).toBe("5 of 6");
+  for (const width of shown.bars) expect(width).toBeGreaterThan(0);
+});
+
+/*
+ * Proportional, not unconditional. The closing card is silent on a day that
+ * earned nothing — the same rule that keeps `verdictOf` from consoling one —
+ * so the shower has to be too, or it is praise for 2 of 9 in another channel.
+ */
+test("the closing shower is what the day earned, and nothing on a day that earned none", async ({
+  page,
+}) => {
+  const day = (marked: number[], rest: number[]) => ({
+    v: 1,
+    openedAt: Date.now() - 6 * 60 * 60 * 1000,
+    list: [
+      ...marked.map((count, i) => ({
+        kind: "task",
+        id: `k${String(i)}`,
+        text: `marked ${String(i)}`,
+        target: 1,
+        count,
+        important: true,
+      })),
+      ...rest.map((count, i) => ({
+        kind: "task",
+        id: `r${String(i)}`,
+        text: `plain ${String(i)}`,
+        target: 1,
+        count,
+      })),
+    ],
+  });
+
+  const draws = async (state: unknown): Promise<number> => {
+    await seedStorage(page, state);
+    await page.evaluate(() => {
+      (window as unknown as { draws: number }).draws = 0;
+      const ctx = (document.getElementById("confetti") as HTMLCanvasElement).getContext("2d");
+      if (!ctx) return;
+      const original = ctx.fillRect.bind(ctx);
+      ctx.fillRect = (...args: Parameters<typeof original>) => {
+        (window as unknown as { draws: number }).draws++;
+        original(...args);
+      };
+    });
+    await page.locator("#closeday").click();
+    await page.waitForTimeout(1400);
+    return page.evaluate(() => (window as unknown as { draws: number }).draws);
+  };
+
+  // Nothing marked done and the bar nowhere near: no moment was reached.
+  expect(await draws(day([0, 0], [1, 0, 0, 0]))).toBe(0);
+  // The marked work landing is worth something.
+  expect(await draws(day([1, 1], [1, 0, 0, 0]))).toBeGreaterThan(0);
+});
+
 test("the closing card does not scroll on a roomy window", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await addItem(page, "call the bank!");

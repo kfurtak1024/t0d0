@@ -84,7 +84,40 @@ export class Rail {
       label(HUE.blue, "the bar"),
     );
   }
+  /**
+   * Send the dot from nothing to where the day actually is.
+   *
+   * Run *after* {@link paint}, so the resting values are already on the element
+   * and the animation only has to travel to them — nothing is left holding the
+   * end state afterwards, and a cancelled run lands where it was going anyway.
+   *
+   * It sweeps the hue as it goes, which is the rail's whole claim made visible:
+   * the day's colour is a journey along this axis, not a label on it.
+   */
+  play(delay: number, duration: number): Animation[] {
+    const to = this.#you.style.left;
+    const tint = this.#you.style.background;
+    const options: KeyframeAnimationOptions = {
+      duration,
+      delay,
+      easing: EASE,
+      fill: "backwards",
+    };
+    return [
+      this.#you.animate(
+        [
+          { left: at(0), background: dayStroke(HUE.red) },
+          { left: to, background: tint },
+        ],
+        options,
+      ),
+      this.#spent.animate([{ left: at(0) }, { left: to }], options),
+    ];
+  }
 }
+
+/** The card's own curve, shared so the dot and the bars travel together. */
+const EASE = "cubic-bezier(0.22, 0.68, 0.36, 1)";
 
 const at = (fraction: number): string => `${(fraction * 100).toFixed(2)}%`;
 

@@ -450,6 +450,25 @@ Invariants worth defending in review:
   and counts the rest, for the gates and for the close alike — the card is bounded, so a
   list that grew with the day is exactly what would push the confirm off it, and two
   different caps would be the same kind of statement made in two voices.
+- **The closing card's numbers arrive; they are not simply there.** The score counts up,
+  the gate bars grow in turn, the rail's dot travels from nothing to where the day sits,
+  and a ✓ stamps onto each gate that was met. **Everything only ever travels _to_ a value
+  already written into the DOM**, which is the whole trick: reduced motion is not a second
+  path but this one skipped, and cutting the run short is `finish()` on a list of
+  animations rather than a re-render. Only this card plays it — the stands card is a
+  status check, and a flourish every time you glance at the day would wear out in a week.
+- **Any press lands the reveal at once.** This is the one card with a destructive button,
+  and an animation you have to sit through before you can read what "Clear the ticks"
+  takes away is a worse problem than a card that does not move. The listener is on the
+  veil in the **capture** phase, so it fires before the button underneath acts on the same
+  press: someone reaching straight for the confirm sees the finished numbers on the way
+  past rather than being made to wait. The whole run is ~800ms even when watched.
+- **The shower is what the day earned, and a day that earned nothing gets none.**
+  `highest()` in `src/milestones.ts` names the top moment reached, and is null for a day
+  that reached none — so the card is silent there in confetti for the same reason
+  `verdictOf` is silent in words. Praise for 2 of 9 is not believed twice in either
+  channel. It is shared with `cross()` rather than written out again: two definitions of
+  "which moment" is how a card comes to celebrate something the ring never did.
 - **The closing card carries them because it is the one card that erases something.** A
   day that finished 5 of 6 with the marked item outstanding used to read as a good day and
   then clear the evidence: the number is honest and says nothing about _which_ thing was

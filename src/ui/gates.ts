@@ -88,6 +88,20 @@ function render(gate: Gate, note: string): HTMLElement {
   number.className = "gtally";
   number.textContent = `${String(gate.done)} of ${String(gate.total)}`;
   head.append(title, number);
+
+  /*
+   * A gate that has been met says so, once, at the end of its own row.
+   * Decorative: the tally beside it and the note beneath already carry it, and
+   * on the closing card this is the thing that stamps in — a mark arriving is
+   * worth more than a colour changing.
+   */
+  if (gate.met) {
+    const stamp = document.createElement("span");
+    stamp.className = "gstamp";
+    stamp.textContent = "✓";
+    stamp.setAttribute("aria-hidden", "true");
+    head.append(stamp);
+  }
   box.append(head);
 
   // Nothing to show the proportion of, so no bar — the same rule that keeps an
