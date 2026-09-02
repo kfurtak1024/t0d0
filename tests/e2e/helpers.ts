@@ -44,7 +44,9 @@ export async function addItem(page: Page, text: string): Promise<void> {
  */
 export const shape = (page: Page): Promise<string[]> =>
   page.evaluate(() =>
-    [...document.querySelectorAll("#list > li")].flatMap((row) =>
+    // Both lists, in the order they read: the day's work, then the pile of
+    // finished rows below the ending. One list to the eye, two containers.
+    [...document.querySelectorAll("#list > li, #donelist > li")].flatMap((row) =>
       row.classList.contains("group")
         ? [
             `# ${row.querySelector(".gtitle")?.textContent ?? ""}`,

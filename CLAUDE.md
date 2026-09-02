@@ -148,6 +148,48 @@ Invariants worth defending in review:
   finished there is nothing to go in front of, so it appends, which is where it always
   landed. Root tasks still append: the composer aims at a new group, so an item you add
   next goes inside it rather than needing a place of its own.
+- **The day's work sits above the ending; what is finished with sits below it.** On a
+  good day the pile put the whole of itself between your last piece of work and the button
+  that closes the day — measured, 593px, and "End day" off screen on a phone _and_ on an
+  800px desktop window. So `#donelist` is a second `<ul>` after the ending block. A second
+  list rather than a divider inside the first, because a `<ul>` may hold only `<li>` and
+  the ending is neither; `KeyedList` therefore patches across two containers, sharing one
+  entry map so a row crossing between them is `insertBefore`d and keeps its element. That
+  identity is the whole point — it is what lets FLIP carry the row over instead of
+  rebuilding it. Focus is _not_ part of the promise: moving a node between parents is a
+  removal and an insertion, and a browser blurs what it removes.
+- **The split is positional — `pileFrom` — and never `isFinished` over the list.** A row
+  stays finished-but-in-place for the length of the tidy's delay, because the tick landing
+  is the reward and nothing moves over it until it has played out. Splitting on "is this
+  row done?" would drop it into the pile the instant it was ticked, straight over the top
+  of that. Measured: ticked at +0, still in the work at +300ms, in the pile at +700ms.
+  It also keeps `groupAbove()` honest, since array order and visual order then agree.
+- **Only while the tidy is on.** With `autoCollapseDone` off the list is deliberately
+  unsorted — `alpha | ✓beta | gamma | ✓delta` — so there is no run at the foot to be a
+  boundary, the split is the list's length, and everything stays in one list as before.
+- **Nothing in the pile is arranged by hand.** It is in the order the rows were finished
+  in, which nobody chose, so `inPile()` refuses every reorder: the ⋯ menu omits its move
+  and nest entries rather than disabling them (a spent move stays as a dead row because it
+  may come back; these never will), Alt+arrows and Tab return without swallowing the key
+  so focus still moves normally, and the dragger is wired to the work list alone. The
+  grips down there are `visibility: hidden` — kept, so a settled row stays in line with
+  the work on touch where the grip is in the flow, but not shown, because a handle that
+  looks draggable and is not is worse than no handle. Marking, tagging and deleting all
+  still work: they say something about the row rather than about where it sits. It reads
+  through the _owning_ row, so a task in a finished group is settled with it while a
+  finished task in an unfinished group is not — its group is still work and moves as one
+  block.
+- **Show the pile before the patch; hide it only after.** FLIP measures where a row landed
+  the moment the patch returns, and a `display: none` container has no box — so the first
+  row to sink into an empty pile was handed its own position minus a zero rect and told to
+  start 76px across and 94px down from where it belonged, flying in from the corner of the
+  page. Hiding afterwards is the mirror: a pile emptying has to keep its box until the rows
+  leaving it have been measured.
+- **A moved boundary is a rearrangement even when the list is unchanged.** Unticking the
+  only finished row leaves the array exactly as it was — `rise` has nowhere to lift it to —
+  while the split returns to the end and the row travels from the pile back into the work.
+  Keyed on the list alone, that journey happened instantly. `#render` compares the split
+  with the last one and animates on its own account.
 - **A finished row sinks to the foot of the unfinished list**, stopping above
   the run of finished rows already resting there — the pile keeps the order it
   was earned rather than each arrival burying the last. A ticked root item and a

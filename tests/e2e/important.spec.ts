@@ -375,8 +375,12 @@ test("a marked item still sinks when it is finished", async ({ page }) => {
 
   await expect
     .poll(() =>
+      // Both lists: a finished row now rests in the pile below the ending, and
+      // the point here is the order it reads in, not which container holds it.
       page.evaluate(() =>
-        [...document.querySelectorAll("#list > li .label")].map((el) => el.textContent),
+        [...document.querySelectorAll("#list > li .label, #donelist > li .label")].map(
+          (el) => el.textContent,
+        ),
       ),
     )
     .toEqual(["water plants", "call the bank"]);

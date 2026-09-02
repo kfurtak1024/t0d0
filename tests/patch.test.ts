@@ -137,3 +137,100 @@ describe("KeyedList", () => {
     expect(list.get("a")).toBeUndefined();
   });
 });
+
+/**
+ * One list drawn across two containers: the day's work above the ending, the
+ * pile of finished rows below it.
+ *
+ * The reason this is a patch and not two lists is node identity — a row that
+ * crosses between them has to keep its element, or FLIP has nothing to carry
+ * over and any transition it was in the middle of is cancelled.
+ */
+describe("patching across two containers", () => {
+  let work: HTMLElement;
+  let pile: HTMLElement;
+  let split: KeyedList<Row>;
+
+  const shape = (): string[][] =>
+    [work, pile].map((box) =>
+      [...box.children].map((el) => (el as HTMLElement).dataset["id"] ?? ""),
+    );
+
+  beforeEach(() => {
+    // Attached, because focus does not land on a detached tree — and focus
+    // surviving a crossing is one of the things being asserted here.
+    document.body.replaceChildren();
+    work = document.createElement("div");
+    pile = document.createElement("div");
+    document.body.append(work, pile);
+    created = 0;
+    split = new KeyedList<Row>([work, pile], create);
+  });
+
+  const rows = (...ids: string[]): Row[] => ids.map((id) => ({ id, text: id }));
+
+  it("sends everything to the first container when nothing is split off", () => {
+    split.patch(rows("a", "b", "c"));
+    expect(shape()).toEqual([["a", "b", "c"], []]);
+  });
+
+  it("draws the tail into the second container", () => {
+    split.patch(rows("a", "b", "c", "d"), 2);
+    expect(shape()).toEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+  });
+
+  /* The whole reason for one patch rather than two lists. */
+  it("keeps a row's element when it crosses between containers", () => {
+    split.patch(rows("a", "b", "c"), 3);
+    const travelling = work.children[2] as HTMLElement;
+    const madeSoFar = created;
+
+    split.patch(rows("a", "b", "c"), 2);
+
+    expect(shape()).toEqual([["a", "b"], ["c"]]);
+    expect(pile.children[0]).toBe(travelling);
+    expect(created).toBe(madeSoFar);
+  });
+
+  /*
+   * Identity, not focus. Moving a node to another parent is a removal and an
+   * insertion, and a browser blurs what it removes — so focus is not something
+   * a crossing can promise. What it does promise is the same element, which is
+   * what FLIP needs to carry the row over and what stops the row being rebuilt
+   * from scratch mid-tick.
+   */
+  it("keeps the row's own children through a crossing", () => {
+    split.patch(rows("a", "b"), 2);
+    const input = (work.children[1] as HTMLElement).querySelector("input");
+
+    split.patch(rows("a", "b"), 1);
+    expect(pile.children[0]?.contains(input as Node)).toBe(true);
+  });
+
+  it("carries a row back the other way", () => {
+    split.patch(rows("a", "b", "c"), 1);
+    const returning = pile.children[1] as HTMLElement;
+
+    split.patch(rows("a", "b", "c"), 3);
+    expect(shape()).toEqual([["a", "b", "c"], []]);
+    expect(work.children[2]).toBe(returning);
+  });
+
+  it("drops a row that has left the list from whichever container held it", () => {
+    split.patch(rows("a", "b", "c"), 1);
+    split.patch(rows("a", "c"), 1);
+    expect(shape()).toEqual([["a"], ["c"]]);
+
+    split.patch(rows("a"), 1);
+    expect(shape()).toEqual([["a"], []]);
+  });
+
+  it("empties both containers when cleared", () => {
+    split.patch(rows("a", "b", "c"), 1);
+    split.clear();
+    expect(shape()).toEqual([[], []]);
+  });
+});

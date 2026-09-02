@@ -64,6 +64,7 @@ export class App {
   #motion = matchMedia("(prefers-reduced-motion: reduce)");
 
   #list = el("#list");
+  #doneList = el("#donelist");
   #empty = el("#empty");
   #closer = el("#closeday") as HTMLButtonElement;
   #ending = el("#ending");
@@ -99,6 +100,8 @@ export class App {
   #tidyTimer: ReturnType<typeof setTimeout> | undefined;
   /** Set by the moves, so only a rearrangement animates as one. */
   #animateNext = false;
+  /** Where the pile began last render — a moved boundary is a rearrangement. */
+  #lastSplit = -1;
   /** The list as it stood before the current drag, for undo and for Escape. */
   #beforeDrag: State | null = null;
   /** A delete waiting out its exit animation, cancellable until it lands. */
@@ -187,9 +190,9 @@ export class App {
           anchor,
           () => this.#menuItems(id),
           () =>
-            this.#list.querySelector<HTMLElement>(
-              `[data-id="${id}"] > .dots, [data-id="${id}"] > .ghead > .dots`,
-            ),
+            this.#rowNode(id)?.querySelector<HTMLElement>(
+              `:scope > .dots, :scope > .ghead > .dots`,
+            ) ?? null,
         );
       },
       aim: (id) => {
@@ -209,7 +212,7 @@ export class App {
    * ever handed the other's shape.
    */
   #makeRows(actions: RowActions): KeyedList<Node> {
-    return new KeyedList<Node>(this.#list, (node) => {
+    return new KeyedList<Node>([this.#list, this.#doneList], (node) => {
       if (node.kind === "group") {
         const entry = createGroup(node, actions);
         return {
@@ -299,6 +302,17 @@ export class App {
     return this.#store.state;
   }
 
+  /**
+   * Where the pile begins, or the end of the list when the tidy is off.
+   *
+   * With the tidy off the list is deliberately unsorted, so there is no run at
+   * the foot to be a boundary: everything is the day's work and everything can
+   * still be moved.
+   */
+  get #pileFrom(): number {
+    return this.#prefs.autoCollapseDone ? T.pileFrom(this.#state.list) : this.#state.list.length;
+  }
+
   /** The success bar as a fraction, which is what the scoring speaks in. */
   get #bar(): number {
     return this.#prefs.successAt / 100;
@@ -370,8 +384,7 @@ export class App {
     this.#store.apply(next);
 
     if (justFinished) {
-      const row =
-        this.#rows.get(id)?.element ?? this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
+      const row = this.#rowNode(id);
       if (row && !this.#motion.matches) popRing(row);
       this.#tidy(id);
     }
@@ -473,8 +486,7 @@ export class App {
      * vanished where a root row faded. The CSS had always dressed it for the
      * exit (`.items > .task.leaving`); nothing ever gave it the class.
      */
-    const element =
-      this.#rows.get(id)?.element ?? this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
+    const element = this.#rowNode(id);
     if (element && !this.#motion.matches) {
       element.classList.add("leaving");
       this.#pendingDelete = {
@@ -501,6 +513,8 @@ export class App {
    * because there the pointer is already saying where the row should land.
    */
   #reorder(id: string, dir: T.ReorderDirection): void {
+    // Settled rows keep the order they were finished in; see `inPile`.
+    if (this.#settled(id)) return;
     if (!T.canReorder(this.#state, id, dir, "level")) return;
     this.#animateNext = true;
     this.#store.apply(T.reorder(this.#state, id, dir, "level"), { undoable: true });
@@ -508,34 +522,49 @@ export class App {
   }
 
   #move(id: string, dir: T.MoveDirection): void {
+    if (this.#settled(id)) return;
     if (!T.canMove(this.#state, id, dir)) return;
     this.#animateNext = true;
     this.#store.apply(T.move(this.#state, id, dir), { undoable: true });
     this.#reveal(id);
   }
 
+  /** Whether this row has settled into the pile, where its place is fixed. */
+  #settled(id: string): boolean {
+    return T.inPile(this.#state, id, this.#pileFrom);
+  }
+
   /** What the ⋯ menu offers for one row, read fresh each time it repaints. */
   #menuItems(id: string): MenuItem[] {
-    const items: MenuItem[] = [
-      {
-        label: "Move up",
-        hint: "Alt+↑",
-        disabled: !T.canReorder(this.#state, id, "up", "level"),
-        keepOpen: true,
-        onSelect: () => {
-          this.#reorder(id, "up");
-        },
-      },
-      {
-        label: "Move down",
-        hint: "Alt+↓",
-        disabled: !T.canReorder(this.#state, id, "down", "level"),
-        keepOpen: true,
-        onSelect: () => {
-          this.#reorder(id, "down");
-        },
-      },
-    ];
+    /*
+     * A settled row is in the order it was finished in, which is not an order
+     * anyone arranged — so the entries that would rearrange it are absent
+     * rather than disabled. A spent move stays as a dead row because it may come
+     * back on the next press; this one never will while the row is down there.
+     */
+    const settled = this.#settled(id);
+    const items: MenuItem[] = settled
+      ? []
+      : [
+          {
+            label: "Move up",
+            hint: "Alt+↑",
+            disabled: !T.canReorder(this.#state, id, "up", "level"),
+            keepOpen: true,
+            onSelect: () => {
+              this.#reorder(id, "up");
+            },
+          },
+          {
+            label: "Move down",
+            hint: "Alt+↓",
+            disabled: !T.canReorder(this.#state, id, "down", "level"),
+            keepOpen: true,
+            onSelect: () => {
+              this.#reorder(id, "down");
+            },
+          },
+        ];
 
     // A counted item cannot toggle the way a plain one does — tapping up is the
     // point of it — so its way back to zero lives here.
@@ -576,8 +605,8 @@ export class App {
 
     // Nesting is reachable by stepping, but only one row at a time; on a phone
     // that is a lot of taps to cross a long group, so it gets its own entry.
-    const owner = T.ownerOf(this.#state, id);
-    const above = T.groupAbove(this.#state, id);
+    const owner = settled ? undefined : T.ownerOf(this.#state, id);
+    const above = settled ? undefined : T.groupAbove(this.#state, id);
     if (owner) {
       items.push({
         label: `Out of “${owner.title}”`,
@@ -635,7 +664,7 @@ export class App {
    * when you added something you could already see.
    */
   #reveal(id: string): void {
-    const row = this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
+    const row = this.#rowNode(id);
     row?.scrollIntoView({
       block: "nearest",
       behavior: this.#motion.matches ? "auto" : "smooth",
@@ -783,21 +812,63 @@ export class App {
     const { state, tasks, score } = frame;
     if (this.#destId !== null && !T.findGroup(state, this.#destId)) this.#destId = null;
 
+    /*
+     * Where the finished pile starts, and so where the ending block sits in the
+     * middle of the list rather than after it.
+     *
+     * Positional — `pileFrom` reads the trailing run — because a row stays
+     * finished-but-in-place for the length of the tidy's delay, and splitting on
+     * "is this done?" would drop it into the pile the instant it was ticked,
+     * over the top of the reward that delay exists to protect.
+     *
+     * Only while the tidy is on. With it off the list is deliberately unsorted —
+     * finished rows sit wherever they were ticked — so there is no run at the
+     * foot to be the boundary, and everything stays in one list as before.
+     */
+    const split = this.#pileFrom;
+
+    /*
+     * A moved boundary is a rearrangement even when the list itself is
+     * unchanged. Unticking the only finished row leaves the array exactly as it
+     * was — `rise` has nowhere to lift it to — while the split moves back to the
+     * end and the row travels from the pile up into the work. Without this it
+     * made that journey instantly, which is the teleport FLIP exists to prevent.
+     */
+    if (split !== this.#lastSplit) this.#animateNext = true;
+    this.#lastSplit = split;
+
     // Only reorders pay for the FLIP measurement — reading every row's box on
     // every tick would be layout thrash for an animation nothing asked for.
     const animate = this.#animateNext && !this.#motion.matches;
     this.#animateNext = false;
+
+    /*
+     * Shown *before* the patch, hidden only after it.
+     *
+     * FLIP measures where each row ended up as soon as the patch returns, and a
+     * `display: none` container has no box to measure — the first row to sink
+     * into an empty pile was handed its own position minus a zero rect, so it
+     * flew in from the corner of the page (76px across and 94px down, measured)
+     * instead of travelling to its place. Hiding afterwards is the mirror: the
+     * pile emptying has to keep its box until the rows leaving it are measured.
+     */
+    const pile = split < state.list.length;
+    if (pile) this.#doneList.hidden = false;
+
     flip(
       // The dragged row is glued to the pointer; animating it to its new layout
       // box would be a second owner of its transform, fighting the finger.
-      [...this.#list.querySelectorAll<HTMLElement>(".task, .group")].filter(
-        (row) => !row.classList.contains("dragging"),
-      ),
+      [
+        ...this.#list.querySelectorAll<HTMLElement>(".task, .group"),
+        ...this.#doneList.querySelectorAll<HTMLElement>(".task, .group"),
+      ].filter((row) => !row.classList.contains("dragging")),
       () => {
-        this.#rows.patch(state.list);
+        this.#rows.patch(state.list, split);
       },
       { instant: !animate },
     );
+    // No pile, no list: an empty one would leave a gap under the ending.
+    this.#doneList.hidden = !pile;
     this.#renderDest();
 
     /*
@@ -987,6 +1058,13 @@ export class App {
     if (id === undefined) return;
     const handle = row.classList.contains("group") ? "chev" : "tick";
 
+    /*
+     * Nothing in the pile is arranged by hand, whichever route asks for it.
+     * Returned without swallowing the key, so Tab still moves focus down there
+     * the way it does anywhere else — it just stops being a structural edit.
+     */
+    if (this.#settled(id)) return;
+
     // Alt is free on a row, so any control on it can start a move; the row's own
     // handle takes the focus back afterwards.
     if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
@@ -1015,10 +1093,25 @@ export class App {
     }
   }
 
+  /**
+   * The node a row is drawn as, in whichever list it is currently in.
+   *
+   * Root rows are in the patch's own map whichever container holds them; a
+   * nested task is inside its group's list, so it takes a query — and the query
+   * has to reach the pile as well as the work.
+   */
+  #rowNode(id: string): HTMLElement | null {
+    return (
+      this.#rows.get(id)?.element ??
+      this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`) ??
+      this.#doneList.querySelector<HTMLElement>(`[data-id="${id}"]`)
+    );
+  }
+
   /** Put focus back on the row's own handle once it has been re-rendered. */
   #refocus(id: string, handle = "tick"): void {
     requestAnimationFrame(() => {
-      const row = this.#list.querySelector(`[data-id="${id}"]`);
+      const row = this.#rowNode(id);
       const control =
         handle === "tick" && row instanceof HTMLElement
           ? tickOf(row)

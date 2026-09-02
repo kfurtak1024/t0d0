@@ -296,3 +296,76 @@ test("a new item is brought into view above the composer", async ({ page }) => {
     })
     .toBe(true);
 });
+
+/**
+ * The pile below the ending is in the order the rows were finished in, and that
+ * order is nobody's arrangement — so nothing down there can be moved, dragged
+ * or re-nested. What it can still be is marked, tagged and deleted: those say
+ * something about the row rather than about where it sits.
+ */
+test.describe("a row that has settled into the pile", () => {
+  const aSettledDay = async (page: Page): Promise<void> => {
+    await seedStorage(page, {
+      v: 1,
+      openedAt: null,
+      list: [
+        { kind: "task", id: "w1", text: "still to do", target: 1, count: 0 },
+        {
+          kind: "group",
+          id: "gw",
+          title: "Errands",
+          collapsed: false,
+          items: [
+            { kind: "task", id: "e1", text: "posted", target: 1, count: 1 },
+            { kind: "task", id: "e2", text: "buy milk", target: 1, count: 0 },
+          ],
+        },
+        { kind: "task", id: "d1", text: "water plants", target: 1, count: 1 },
+      ],
+    });
+  };
+
+  test("offers no way to move or re-nest it, but still marks and deletes", async ({ page }) => {
+    await aSettledDay(page);
+    await page.locator('#donelist > .task[data-id="d1"] > .dots').click();
+
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Mark important",
+      "One-off, remove tonight",
+      "Delete",
+    ]);
+  });
+
+  test("keeps the full menu for a finished row whose group is still work", async ({ page }) => {
+    await aSettledDay(page);
+    await page.locator('#list .items > .task[data-id="e1"] > .dots').click();
+
+    // Its group is up in the day's work and moves as one block, so it moves too.
+    await expect(page.getByRole("menuitem", { name: "Move up" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /^Out of/ })).toBeVisible();
+  });
+
+  test("does not answer Alt+Arrow either", async ({ page }) => {
+    await aSettledDay(page);
+    const before = await shape(page);
+
+    await page.locator('#donelist > .task[data-id="d1"] .tick').focus();
+    await page.keyboard.press("Alt+ArrowUp");
+    await page.waitForTimeout(120);
+
+    expect(await shape(page)).toEqual(before);
+  });
+
+  test("is not draggable, because the pile is not arranged by hand", async ({ page }) => {
+    await aSettledDay(page);
+    /*
+     * The dragger is wired to the work list alone, so a grip down here would be
+     * a handle that does nothing. It keeps its space — on touch the grip is in
+     * the flow, and removing it would set every settled row out of line with the
+     * work above — but it is not shown.
+     */
+    await expect(page.locator("#donelist > .task .grip").first()).toBeHidden();
+    // And the work above still has one.
+    await expect(page.locator("#list > .task .grip").first()).toBeAttached();
+  });
+});

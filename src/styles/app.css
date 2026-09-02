@@ -121,6 +121,35 @@
   padding: 0;
 }
 
+/*
+  The pile of finished rows, below the ending rather than in front of it.
+
+  It reads as an afterword: the same rows, set a little apart from the day's
+  work by the ending that now sits between them. No heading of its own — the
+  button above it is the divider, and a second label would be saying what the
+  green frames already say.
+*/
+.donelist {
+  margin-top: 1.6rem;
+}
+
+.donelist[hidden] {
+  display: none;
+}
+
+/*
+  No grip down here: the pile is in the order the rows were finished in, the
+  dragger is wired to the work list alone, and a handle that looks draggable and
+  is not is worse than no handle at all.
+
+  Hidden rather than removed, because on a touch device the grip stays in the
+  flow and takes real width — dropping it would set every settled row a grip's
+  width out of line with the work above it.
+*/
+.donelist .grip {
+  visibility: hidden;
+}
+
 .list > .task,
 .list > .group,
 .items > .task {

@@ -117,6 +117,9 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
 
   // Locks roles, names and states. A row that stops being a checkbox, or loses
   // aria-checked, fails here rather than in someone's screen reader.
+  //
+  // The day's work; what is finished with sits in its own list below the
+  // ending and is pinned separately, just under this.
   await expect(page.locator("#list")).toMatchAriaSnapshot(`
     - list:
       - listitem:
@@ -152,6 +155,12 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
         - checkbox "call the bank, important"
         - text: call the bank
         - button "More for call the bank": ⋯
+  `);
+
+  // And the pile below the ending, which is a list in its own right and needs a
+  // name of its own — nothing else on the page says what it is.
+  await expect(page.locator("#donelist")).toMatchAriaSnapshot(`
+    - list "Finished today":
       - listitem:
         - checkbox "post the parcel, one-off" [checked]
         - text: post the parcel
