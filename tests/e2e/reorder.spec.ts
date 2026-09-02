@@ -45,6 +45,9 @@ test("the ⋯ menu moves focus with the arrow keys, and wraps", async ({ page })
   const down = page.getByRole("menuitem", { name: "Move down" });
   const mark = page.getByRole("menuitem", { name: "Mark important" });
   const once = page.getByRole("menuitem", { name: "One-off, remove tonight" });
+  // Last, and the reason these three tests have to be re-run whenever the menu
+  // grows: they each name whichever entry is on the end.
+  const kill = page.getByRole("menuitem", { name: "Delete", exact: true });
 
   await expect(up).toBeFocused();
   await page.keyboard.press("ArrowDown");
@@ -53,12 +56,14 @@ test("the ⋯ menu moves focus with the arrow keys, and wraps", async ({ page })
   await expect(mark).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(once).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(kill).toBeFocused();
 
   // Off the end and round, in both directions.
   await page.keyboard.press("ArrowDown");
   await expect(up).toBeFocused();
   await page.keyboard.press("ArrowUp");
-  await expect(once).toBeFocused();
+  await expect(kill).toBeFocused();
 });
 
 test("Home and End reach the ends of the ⋯ menu", async ({ page }) => {
@@ -68,7 +73,7 @@ test("Home and End reach the ends of the ⋯ menu", async ({ page }) => {
 
   await menuOf(page, "beta").click();
   await page.keyboard.press("End");
-  await expect(page.getByRole("menuitem", { name: "One-off, remove tonight" })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Delete", exact: true })).toBeFocused();
   await page.keyboard.press("Home");
   await expect(page.getByRole("menuitem", { name: "Move up" })).toBeFocused();
 });
@@ -85,14 +90,14 @@ test("the arrow keys skip a spent move rather than landing on it", async ({ page
   await menuOf(page, "alpha").click();
   const up = page.getByRole("menuitem", { name: "Move up" });
   const down = page.getByRole("menuitem", { name: "Move down" });
-  const once = page.getByRole("menuitem", { name: "One-off, remove tonight" });
+  const kill = page.getByRole("menuitem", { name: "Delete", exact: true });
   await expect(up).toBeDisabled();
 
   // Opening lands on the first entry that can actually be used.
   await expect(down).toBeFocused();
   // Backwards off the top wraps past the spent move to the last live entry.
   await page.keyboard.press("ArrowUp");
-  await expect(once).toBeFocused();
+  await expect(kill).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(down).toBeFocused();
 });

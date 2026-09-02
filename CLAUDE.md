@@ -448,6 +448,18 @@ Invariants worth defending in review:
   its own command — `Tab` / `Shift-Tab`, or the menu's "Into" / "Out of". The `⋯` menu
   prints `Alt+↑` beside "Move up", so **those two must stay the same command**; scoping
   one and not the other makes the hint a lie.
+- **Deleting a row lives in the `⋯` menu, not on the row.** A ✕ beside the `⋯` held a
+  25.6px column open on every row for an action taken in bursts and then not again:
+  `opacity: 0` hides a control on a pointer device, it does not un-reserve its space, and
+  on touch it was simply always there. Measured, giving it back is a fifth of a nested
+  row's label on a phone (156.7px → 191.9px) and nearly a third of a counted one's
+  (114.5 → 149.7). It was also the last row control that had not moved into the menu.
+  **It deletes on the press.** The "destructive actions confirm in place" rule below is
+  about the settings sheet; a confirm step inside a menu is the dialog-on-a-dialog that
+  rule exists to prevent, and one level of undo — toast, plus the exit animation, which
+  `Ctrl-Z` cancels outright — is what makes one press safe enough. A group's entry names
+  what it takes with it, for the reason the one-off entry names its consequence: the
+  items do not come back on their own.
 - **Three routes reach the `important` field, and they must stay one meaning**: a
   trailing `!` in the composer, the same when editing the text, and the `⋯` menu's
   "Mark important" / "Unmark important". The menu exists because the other two mean

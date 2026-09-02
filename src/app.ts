@@ -581,6 +581,34 @@ export class App {
       });
     }
 
+    /*
+     * Last, and the only destructive entry.
+     *
+     * It used to be a ✕ on the row itself, which held a 25.6px column open on
+     * every row whether or not it was visible — a fifth of a nested row's label
+     * on a phone, a third of a counted one's. The action is a morning's pruning
+     * rather than something done all day, and it was the last row control that
+     * had not moved in here; undo covers the mis-tap, which is why it deletes
+     * on the press rather than growing a confirm step inside a menu.
+     *
+     * A group says what it is taking with it. "Delete" alone does not mention
+     * the items, and they do not come back on their own — the same reason the
+     * one-off entry names the consequence rather than the mark.
+     */
+    const group = T.findGroup(this.#state, id);
+    const held = group?.items.length ?? 0;
+    items.push({
+      label: !group
+        ? "Delete"
+        : held === 0
+          ? "Delete group"
+          : `Delete group and ${String(held)} item${held === 1 ? "" : "s"}`,
+      danger: true,
+      onSelect: () => {
+        this.#remove(id);
+      },
+    });
+
     return items;
   }
 

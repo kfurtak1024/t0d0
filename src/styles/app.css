@@ -441,7 +441,6 @@ body.dragging-row {
   visual weight changing.
 */
 .tick::after,
-.kill::after,
 .plus::after,
 .dots::after,
 .count::after,
@@ -631,7 +630,6 @@ body.dragging-row {
   margin-left: auto;
 }
 
-.kill,
 .plus,
 .dots {
   flex: none;
@@ -654,7 +652,6 @@ body.dragging-row {
   line-height: 1;
 }
 
-.kill:hover,
 .dots:hover,
 .dots[aria-expanded="true"] {
   color: var(--ink);
@@ -670,7 +667,6 @@ body.dragging-row {
 
 /* Hover is the right fork, not width: it asks whether a control can hide. */
 @media (hover: hover) {
-  .kill,
   .plus,
   .dots,
   .grip {
@@ -709,16 +705,13 @@ body.dragging-row {
     left: -1.6rem;
   }
 
-  .task:hover .kill,
   .task:hover .dots,
   .task:hover .grip,
-  .ghead:hover .kill,
   .ghead:hover .plus,
   .ghead:hover .dots,
   .ghead:hover .grip,
   .task.dragging .grip,
   .group.dragging .grip,
-  .kill:focus-visible,
   .plus:focus-visible,
   .dots:focus-visible,
   /* An open menu has to keep its own handle on screen. */
@@ -1161,6 +1154,19 @@ body.dragging-row {
 
 /* Spent moves stay in place rather than unmounting: a menu that reflows under
    a finger mid-tap is worse than one with a dead row in it. */
+/*
+  The only destructive entry in the menu, in the colour the settings sheet
+  already uses for one. --danger is measured against --card, which is what the
+  menu is painted on, so the a11y spec's floor covers it here too.
+*/
+.rowmenu button.danger {
+  color: var(--danger);
+}
+
+.rowmenu button.danger:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+}
+
 .rowmenu button:disabled {
   color: var(--faint);
   cursor: default;

@@ -23,9 +23,6 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
 
   const dots = menuButton("More");
 
-  const kill = button("kill", "Delete group");
-  kill.append(icon("x"));
-
   const count = document.createElement("div");
   count.className = "gcount";
 
@@ -55,7 +52,7 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
   // The tally belongs to the title, so it sits with it; the actions go right,
   // where a task row keeps its own. They fade rather than unmount, so arriving
   // on hover shifts nothing.
-  head.append(grip(), chevron, title, count, mark, plus, dots, kill);
+  head.append(grip(), chevron, title, count, mark, plus, dots);
 
   const body = document.createElement("div");
   body.className = "gbody";
@@ -71,9 +68,6 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
 
   chevron.addEventListener("click", () => {
     actions.toggleCollapse(group.id);
-  });
-  kill.addEventListener("click", () => {
-    actions.remove(group.id);
   });
   plus.addEventListener("click", () => {
     actions.aim(group.id);
@@ -125,7 +119,6 @@ export function createGroup(group: Group, actions: RowActions): Keyed<Group> {
       next.collapsed ? `Expand ${name}${owing}` : `Collapse ${name}`,
     );
     dots.setAttribute("aria-label", `More for ${next.title}`);
-    kill.setAttribute("aria-label", `Delete ${next.title}`);
 
     list.patch(next.items);
   };

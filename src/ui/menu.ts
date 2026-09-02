@@ -7,6 +7,12 @@ export interface MenuItem {
   disabled?: boolean;
   /** Stay open afterwards, for actions worth repeating (move up, move down). */
   keepOpen?: boolean;
+  /**
+   * Reads as destructive. The row's ✕ used to carry this on its own, in its own
+   * colour; moved in here it would otherwise sit in a list of benign commands
+   * looking like one of them.
+   */
+  danger?: boolean;
   onSelect: () => void;
 }
 
@@ -155,6 +161,7 @@ export class RowMenu {
         button.type = "button";
         button.setAttribute("role", "menuitem");
         button.disabled = item.disabled ?? false;
+        if (item.danger) button.classList.add("danger");
 
         const label = document.createElement("span");
         label.textContent = item.label;

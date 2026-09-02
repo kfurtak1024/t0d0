@@ -64,20 +64,20 @@ that rather than merely promising it.
 | `post parcel~`    | a one-off: removed at the close, once it is ticked    |
 | `call back!~`     | both marks; `call back~!` reads the same              |
 
-| Do this                                             | To                                                                                    |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Click a row's ring                                  | tick it, or untick it — a counted item counts up instead                              |
-| Shift-click a row's ring                            | count back down — on touch, tap the `1/3` label                                       |
-| Click the day ring                                  | open where the day stands: the gates, the rail, and what the next tick buys           |
-| Drag the `⠿` grip                                   | move a row, in and out of groups as it travels; `Escape` calls it off                 |
-| Click any text                                      | edit in place, `[3]`, `!` and `~` included; `Enter` commits, `Escape` reverts         |
-| <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>            | move the focused row up or down among its siblings                                    |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd>    | with a tick focused, move that item into the group above or back out                  |
-| <kbd>Space</kbd> / <kbd>Enter</kbd>                 | tick the focused item                                                                 |
-| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | count a focused `[n]` item up or down                                                 |
-| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>         | undo a delete, a move, an import, or a cleared day                                    |
-| `⋯` on a row                                        | move it up or down; in or out of a group; reset a count; mark it important or one-off |
-| `⋯` in the header                                   | theme, tidying, the success bar, save a copy, load one back, erase everything         |
+| Do this                                             | To                                                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Click a row's ring                                  | tick it, or untick it — a counted item counts up instead                                         |
+| Shift-click a row's ring                            | count back down — on touch, tap the `1/3` label                                                  |
+| Click the day ring                                  | open where the day stands: the gates, the rail, and what the next tick buys                      |
+| Drag the `⠿` grip                                   | move a row, in and out of groups as it travels; `Escape` calls it off                            |
+| Click any text                                      | edit in place, `[3]`, `!` and `~` included; `Enter` commits, `Escape` reverts                    |
+| <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>            | move the focused row up or down among its siblings                                               |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd>    | with a tick focused, move that item into the group above or back out                             |
+| <kbd>Space</kbd> / <kbd>Enter</kbd>                 | tick the focused item                                                                            |
+| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | count a focused `[n]` item up or down                                                            |
+| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>         | undo a delete, a move, an import, or a cleared day                                               |
+| `⋯` on a row                                        | move it up or down; in or out of a group; reset a count; mark it important or one-off; delete it |
+| `⋯` in the header                                   | theme, tidying, the success bar, save a copy, load one back, erase everything                    |
 
 ## Quick start
 
