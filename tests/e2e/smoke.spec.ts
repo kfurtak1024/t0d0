@@ -256,6 +256,45 @@ test("an empty group says only that it is a group", async ({ page }) => {
  * down, so if the countdown stops working it would sit over the composer for
  * the rest of the session.
  */
+/*
+ * A nested row leaves the same way a root one does. `#rows` holds only the top
+ * level, so looking for the row there found nothing for a task inside a group
+ * and it vanished outright — the CSS had dressed it for the exit all along.
+ */
+test("a row inside a group leaves with the same animation as one outside", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "eat breakfast");
+
+  const row = page.locator(".items > .task", { hasText: "eat breakfast" });
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: /^Delete/ }).click();
+
+  await expect(row).toHaveClass(/leaving/);
+  await expect(page.locator(".items > .task")).toHaveCount(0);
+});
+
+test("undo during a nested row's exit puts it back", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "eat breakfast");
+  await addItem(page, "walk the dog");
+
+  const row = page.locator(".items > .task", { hasText: "eat breakfast" });
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: /^Delete/ }).click();
+
+  /*
+   * Undo has to land *inside* the exit, or this says nothing: undo puts the row
+   * back either way, and only the pending state tells the two apart. Without
+   * the row being found at all there is no pending delete and no class.
+   */
+  await expect(row).toHaveClass(/leaving/);
+  await page.keyboard.press("Control+z");
+
+  await expect(row).toBeVisible();
+  await expect(row).not.toHaveClass(/leaving/);
+  await expect(page.locator(".items > .task")).toHaveCount(2);
+});
+
 test("the toast takes itself away", async ({ page }) => {
   await addItem(page, "shopping");
   const row = page.locator(".task", { hasText: "shopping" });

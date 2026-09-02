@@ -466,12 +466,20 @@ export class App {
       this.#toast.show(label);
     };
 
-    const entry = this.#rows.get(id);
-    if (entry && !this.#motion.matches) {
-      entry.element.classList.add("leaving");
+    /*
+     * Found in the DOM, not only in the root patch. `#rows` holds the top level;
+     * a task inside a group lives in that group's own list, so looking only
+     * there meant a nested row was deleted without its exit — it simply
+     * vanished where a root row faded. The CSS had always dressed it for the
+     * exit (`.items > .task.leaving`); nothing ever gave it the class.
+     */
+    const element =
+      this.#rows.get(id)?.element ?? this.#list.querySelector<HTMLElement>(`[data-id="${id}"]`);
+    if (element && !this.#motion.matches) {
+      element.classList.add("leaving");
       this.#pendingDelete = {
         id,
-        element: entry.element,
+        element,
         timer: setTimeout(() => {
           this.#pendingDelete = null;
           finish();
