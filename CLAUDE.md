@@ -556,6 +556,13 @@ Invariants worth defending in review:
   both halves.
 - **An empty list gets no gates and no rail**, not "Everything 0 of 0" — reachable through
   the stale-day card, which opens on a day left overnight whose list has since been emptied.
+- **The confirm says "Close the day".** It said "Clear the ticks", which was accurate and
+  read like a maintenance command rather than the end of a day. "That's the day" was the
+  obvious warmer choice and is taken: it is the lowest verdict on the main screen, shown
+  directly above the button that opens this card, so the same words would be a judgement
+  in one place and a destructive action in the other. "Close the day" is the app's own
+  word for this — the closer, the closing card — and stays unmistakably an action, which
+  the departing note above it depends on. Do not soften it further.
 - **The closing card's confirm and its warning are never below the fold.** It is the one
   card with a destructive button, and "Clear the ticks" out of sight is how someone taps
   it without reading what it takes away. This used to be written as "the card must fit
