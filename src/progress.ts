@@ -146,22 +146,33 @@ export function dayHue(score: DayScore, bar: number): number {
 export interface DaySummary {
   done: number;
   total: number;
-  clearedGroups: string[];
-  elapsedMs: number | null;
+  /**
+   * What actually got finished, named, in the order the list keeps them.
+   *
+   * The count above says how much; this says what. The closing card reports
+   * both, because a number is not recognition — and the card's other list
+   * names what is still outstanding, so naming only that made the one ritual
+   * the app exists for a record of what you missed.
+   */
+  finished: string[];
   /** The verdict the card reports before it clears anything. */
   score: DayScore;
 }
 
-export function summarise(state: State, now: number, bar: number): DaySummary {
+/**
+ * No clock. How long a day took is not something this app has an opinion about,
+ * and the cards said it only because `openedAt` happened to be there —
+ * `openedAt` stays, because the stale-day card still needs to know a day was
+ * left overnight, but nothing reports it back at you.
+ */
+export function summarise(state: State, bar: number): DaySummary {
   const tasks = allTasks(state.list);
+  const finished = tasks.filter(isDone);
   return {
-    done: tasks.filter(isDone).length,
+    done: finished.length,
     total: tasks.length,
     score: scoreDay(state, bar),
-    clearedGroups: state.list
-      .filter((node) => node.kind === "group" && node.items.length > 0 && node.items.every(isDone))
-      .map((node) => (node as { title: string }).title),
-    elapsedMs: state.openedAt === null ? null : Math.max(0, now - state.openedAt),
+    finished: finished.map((task) => task.text),
   };
 }
 
@@ -178,6 +189,90 @@ export function summarise(state: State, now: number, bar: number): DaySummary {
  * landmark there, the same rule `dayHue` follows.
  */
 export const hueMark = (hue: number): number => (hue - HUE.red) / (HUE.violet - HUE.red);
+
+/**
+ * One of the day's two gates, as both cards report it.
+ *
+ * The shape rather than the pixels: which gates exist at all, what each is
+ * called, how full its bar is and where its threshold sits. It lives here
+ * beside the scoring it is derived from, and out of `src/ui`, because every
+ * one of those is decidable without a DOM and the rules are not obvious —
+ * the Important gate is *absent* rather than empty when nothing is marked, and
+ * only the second gate has a threshold short of everything.
+ */
+export interface Gate {
+  /** Which gate this is, for a caller that needs to tell them apart. */
+  key: "important" | "rest";
+  name: string;
+  done: number;
+  total: number;
+  /** How much of it is done, 0 to 1 — the mean the ring uses, not done/total. */
+  fill: number;
+  /**
+   * Where this gate is cleared, as a fraction, or null when there is no line
+   * short of finishing it. The marked work is not negotiable, so its gate has
+   * no threshold; the rest clears at `prefs.successAt`.
+   */
+  threshold: number | null;
+  /** Whether the gate is currently met. */
+  met: boolean;
+  /** Marked work still to do. Only ever non-empty on the Important gate. */
+  outstanding: Task[];
+  /**
+   * The work this gate has finished, in the order the list keeps it.
+   *
+   * The closing card counts these off one at a time as the bar fills, so a bar
+   * moving has a name attached to it. Kept beside `outstanding` because they are
+   * the two halves of the same gate and drifting apart would be a card claiming
+   * one thing in its numbers and another in its ceremony.
+   */
+  finished: Task[];
+}
+
+/**
+ * The gates this day actually has.
+ *
+ * Empty for an empty list — no obligations were taken on, so there is nothing
+ * to report and neither card draws anything. The Important gate is dropped
+ * entirely when nothing is marked, rather than shown at "0 of 0": that would
+ * claim an obligation nobody made, and `dayHue` does not draw its landmark
+ * there either.
+ */
+export function dayGates(state: State, bar: number): Gate[] {
+  const { important, rest } = partition(state.list);
+  if (important.length === 0 && rest.length === 0) return [];
+
+  const restGate: Gate = {
+    key: "rest",
+    // It is only "everything else" when there is something else to be beside.
+    name: important.length > 0 ? "Everything else" : "Everything",
+    done: rest.filter(isDone).length,
+    total: rest.length,
+    fill: rest.length > 0 ? progress(rest) : 1,
+    finished: rest.filter(isDone),
+    threshold: bar,
+    // Vacuously met when there is nothing but marked work, the same way
+    // `scoreDay` reads it.
+    met: rest.length === 0 || progress(rest) >= bar,
+    outstanding: [],
+  };
+  if (important.length === 0) return [restGate];
+
+  return [
+    {
+      key: "important",
+      name: "Important",
+      done: important.filter(isDone).length,
+      total: important.length,
+      fill: progress(important),
+      finished: important.filter(isDone),
+      threshold: null,
+      met: important.every(isDone),
+      outstanding: important.filter((task) => !isDone(task)),
+    },
+    restGate,
+  ];
+}
 
 /** Every marked thing still to do, in the order the list keeps them. */
 export function outstandingImportant(list: Node[]): Task[] {

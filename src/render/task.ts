@@ -1,6 +1,6 @@
 import { isDone } from "../progress";
 import type { Task } from "../types";
-import { button, grip, icon, menuButton, type RowActions } from "./context";
+import { grip, menuButton, type RowActions } from "./context";
 import type { Keyed } from "./list";
 import { makeRing, paintRing } from "./ring";
 
@@ -73,9 +73,6 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
 
   const dots = menuButton("More");
 
-  const kill = button("kill", "Delete");
-  kill.append(icon("x"));
-
   // The row re-reads itself on every update, so handlers below decide from the
   // current task rather than the one this was built with.
   let current = task;
@@ -117,14 +114,11 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
   dots.addEventListener("click", () => {
     actions.openMenu(dots, task.id);
   });
-  kill.addEventListener("click", () => {
-    actions.remove(task.id);
-  });
   label.addEventListener("click", () => {
     actions.beginEdit(label, task.id, false);
   });
 
-  row.append(grip(), tick, label, tag, count, dots, kill);
+  row.append(grip(), tick, label, tag, count, dots);
 
   const update = (next: Task): void => {
     current = next;
@@ -167,7 +161,6 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     const marks = [next.important ? "important" : "", next.once ? "one-off" : ""].filter(Boolean);
     tick.setAttribute("aria-label", [next.text, ...marks].join(", "));
     dots.setAttribute("aria-label", `More for ${next.text}`);
-    kill.setAttribute("aria-label", `Delete ${next.text}`);
   };
 
   update(task);

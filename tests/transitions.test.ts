@@ -1192,3 +1192,107 @@ describe("the group mark holds under any sequence of transitions", () => {
     );
   });
 });
+
+/**
+ * Where the pile of finished rows begins.
+ *
+ * Positional on purpose. A row is finished for the length of the tidy's delay
+ * before `sink` moves it — that pause is the reward playing out — so a split
+ * that asked "is this row done?" would drop it into the pile the instant it was
+ * ticked, over the top of the thing the delay exists to protect.
+ */
+describe("pileFrom", () => {
+  /** Tick every row named, so the state reads as a day part-way through. */
+  const ticked = (state: State, ...names: string[]): State => {
+    let next = state;
+    for (const name of names) {
+      const task = T.findTask(next, name);
+      if (task) next = T.bump(next, task.id, task.target, NOW);
+    }
+    return next;
+  };
+
+  it("is the length when nothing is resting at the foot", () => {
+    expect(T.pileFrom([])).toBe(0);
+    expect(T.pileFrom(rows("a", "b").list)).toBe(2);
+  });
+
+  it("finds the start of the trailing run", () => {
+    expect(T.pileFrom(ticked(rows("a", "b", "c"), "b", "c").list)).toBe(1);
+    expect(T.pileFrom(ticked(rows("a", "b"), "a", "b").list)).toBe(0);
+  });
+
+  /* Finished rows further up are not the pile — only the run at the foot is. */
+  it("ignores finished rows that still have work below them", () => {
+    expect(T.pileFrom(ticked(rows("a", "b", "c"), "a", "c").list)).toBe(2);
+    expect(T.pileFrom(ticked(rows("a", "b"), "a").list)).toBe(2);
+  });
+
+  it("counts a finished group as part of the pile", () => {
+    expect(T.pileFrom(ticked(rows("a", "# Morning", "  m1"), "m1").list)).toBe(1);
+  });
+
+  /* An empty group is not finished, it is simply empty — so it is not pile. */
+  it("does not count an empty group as finished", () => {
+    expect(T.pileFrom(rows("a", "# Later").list)).toBe(2);
+  });
+
+  it("agrees with what sink actually does", () => {
+    // Tick a middle row, sink it, and the pile should now start where it rests.
+    const day = ticked(rows("a", "b", "c"), "b");
+    const after = T.sink(day, "b");
+    expect(shape(after)).toEqual(["a", "c", "b"]);
+    expect(T.pileFrom(after.list)).toBe(2);
+  });
+});
+
+/**
+ * Whether a row has settled into the pile, where its place is fixed.
+ *
+ * The pile is in the order the rows were finished in, which nobody arranged —
+ * so nothing down there may be reordered or re-nested. Read through the owning
+ * group, so a task inside a finished group is settled with it, while a finished
+ * task inside an unfinished group is not: its group is still up in the work and
+ * travels as one block.
+ */
+describe("inPile", () => {
+  const ticked = (state: State, ...names: string[]): State => {
+    let next = state;
+    for (const name of names) {
+      const task = T.findTask(next, name);
+      if (task) next = T.bump(next, task.id, task.target, NOW);
+    }
+    return next;
+  };
+
+  it("settles the rows resting at the foot, and nothing above them", () => {
+    const day = ticked(rows("a", "b", "c"), "b", "c");
+    const from = T.pileFrom(day.list);
+    expect(T.inPile(day, "a", from)).toBe(false);
+    expect(T.inPile(day, "b", from)).toBe(true);
+    expect(T.inPile(day, "c", from)).toBe(true);
+  });
+
+  it("settles a task inside a finished group along with it", () => {
+    const day = ticked(rows("a", "# Morning", "  m1"), "m1");
+    const from = T.pileFrom(day.list);
+    expect(T.inPile(day, "Morning", from)).toBe(true);
+    expect(T.inPile(day, "m1", from)).toBe(true);
+  });
+
+  /* Its group is still work, so it moves with the work. */
+  it("leaves a finished task inside an unfinished group alone", () => {
+    const day = ticked(rows("# Errands", "  e1", "  e2"), "e1");
+    const from = T.pileFrom(day.list);
+    expect(T.inPile(day, "e1", from)).toBe(false);
+  });
+
+  it("settles nothing when there is no pile", () => {
+    const day = rows("a", "b");
+    expect(T.inPile(day, "a", T.pileFrom(day.list))).toBe(false);
+  });
+
+  it("says no about a row that is not there", () => {
+    expect(T.inPile(rows("a"), "ghost", 0)).toBe(false);
+  });
+});

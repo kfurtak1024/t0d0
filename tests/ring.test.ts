@@ -5,7 +5,16 @@
  * dasharray still renders, just wrongly, and no other test would notice.
  */
 import { describe, expect, it } from "vitest";
-import { dayStroke, hueAt, makeRing, paintRing } from "../src/render/ring";
+import { HUE } from "../src/progress";
+import {
+  dayStroke,
+  hueAt,
+  makeRing,
+  oklchToRgb,
+  paintRing,
+  ringOklch,
+  ringRgb,
+} from "../src/render/ring";
 
 const SIZE = 26;
 const WIDTH = 3;
@@ -199,5 +208,67 @@ describe("hueAt", () => {
   it("clamps outside the range rather than inventing hues", () => {
     expect(hueAt(-5)).toBeCloseTo(268, 6);
     expect(hueAt(5)).toBeCloseTo(150, 6);
+  });
+});
+
+/**
+ * The colour the confetti paints, which has to be the colour the ring wears.
+ *
+ * A canvas cannot resolve a `var()`, so the burst converts OKLCH to sRGB
+ * itself. The values below were taken from Chromium painting the same
+ * `oklch()` into a canvas and reading the pixel back, across both themes and
+ * the whole sweep — 142 samples, none off by more than one part in 255.
+ *
+ * What it replaced poured the ring's OKLCH hue number into `hsl()`, which is a
+ * different space: the blue milestone burst `rgb(124, 75, 221)` — a purple —
+ * while the ring beside it turned `rgb(60, 114, 203)`.
+ */
+describe("oklchToRgb", () => {
+  const LIGHT = { l: 0.56, c: 0.15, lift: 0.1 };
+  const DARK = { l: 0.74, c: 0.14, lift: 0.06 };
+
+  it("matches the browser on every landmark of the rainbow, in light", () => {
+    expect(ringRgb(HUE.red, LIGHT)).toBe("rgb(195, 79, 75)");
+    expect(ringRgb(HUE.green, LIGHT)).toBe("rgb(36, 151, 76)");
+    expect(ringRgb(HUE.blue, LIGHT)).toBe("rgb(60, 114, 203)");
+    expect(ringRgb(HUE.violet, LIGHT)).toBe("rgb(154, 83, 170)");
+  });
+
+  it("matches the browser on every landmark of the rainbow, in dark", () => {
+    expect(ringRgb(HUE.red, DARK)).toBe("rgb(251, 137, 129)");
+    expect(ringRgb(HUE.green, DARK)).toBe("rgb(105, 202, 129)");
+    expect(ringRgb(HUE.blue, DARK)).toBe("rgb(117, 171, 255)");
+    expect(ringRgb(HUE.violet, DARK)).toBe("rgb(210, 140, 225)");
+  });
+
+  /*
+   * The two themes are genuinely different colours, not one scaled: reading
+   * the tokens is the whole reason `ringTokens` exists rather than a constant.
+   */
+  it("gives the two themes different colours for the same hue", () => {
+    expect(ringRgb(HUE.blue, LIGHT)).not.toBe(ringRgb(HUE.blue, DARK));
+  });
+
+  it("lifts the warm band and leaves the cold band alone", () => {
+    // Yellow sits at the peak of the lift; blue is far enough out to escape it.
+    const [warm] = ringOklch(95, LIGHT);
+    const [cold] = ringOklch(HUE.blue, LIGHT);
+    expect(warm).toBeCloseTo(LIGHT.l + LIGHT.lift, 6);
+    expect(cold).toBeCloseTo(LIGHT.l, 3);
+  });
+
+  it("clips out-of-gamut channels rather than wrapping them", () => {
+    // Absurd chroma: every channel still lands inside 0-255.
+    const channels = oklchToRgb(0.7, 0.9, 140).slice(4, -1).split(", ").map(Number);
+    expect(channels).toHaveLength(3);
+    for (const channel of channels) {
+      expect(channel).toBeGreaterThanOrEqual(0);
+      expect(channel).toBeLessThanOrEqual(255);
+    }
+  });
+
+  it("keeps black and white honest at the ends of lightness", () => {
+    expect(oklchToRgb(0, 0, 0)).toBe("rgb(0, 0, 0)");
+    expect(oklchToRgb(1, 0, 0)).toBe("rgb(255, 255, 255)");
   });
 });

@@ -23,6 +23,9 @@ const t = (id: string, text: string, important: boolean, count = 0, target = 1) 
 /** One marked item done of three, and the rest one short of a 70% bar. */
 const A_DAY = {
   v: 1,
+  // Recent, so the stale-day card does not open over this one. Nothing reports
+  // how long the day has taken; `openedAt` only says whether it was left
+  // overnight.
   openedAt: Date.now() - 90 * 60_000,
   list: [
     {
@@ -61,11 +64,26 @@ test("the ring opens the day's card, and the card only reports", async ({ page }
   // The marked work still to do, named, so the card says what to do next.
   await expect(page.locator(".stands .gate").first()).toContainText("book the tickets");
   await expect(page.locator(".stands .gate").first()).toContainText("reply to Dana");
-  await expect(page.locator("#standsdur")).toHaveText("1h 30m in");
 
   // Nothing here can change the list: one way out, and it is not a confirm.
   await expect(page.locator(".stands button")).toHaveCount(1);
   await expect(page.locator(".stands .dismiss")).toHaveText("Back to the list");
+});
+
+/*
+ * No clock on either card. How long the day has taken is not something this app
+ * has an opinion about; `openedAt` survives only so a day left overnight can be
+ * met with its own summary in the morning.
+ */
+test("neither day card reports how long the day has taken", async ({ page }) => {
+  await seedStorage(page, A_DAY);
+  await open(page);
+  await expect(page.locator(".stands")).not.toContainText(/\d+h \d+m|\d+ min/);
+  await page.keyboard.press("Escape");
+
+  await page.locator("#closeday").click();
+  await expect(page.locator("#veil .sheet")).toBeVisible();
+  await expect(page.locator("#veil .sheet")).not.toContainText(/\d+h \d+m|\d+ min/);
 });
 
 test("both gates are reported, because the day turns on both", async ({ page }) => {
@@ -106,6 +124,81 @@ test("a list with nothing marked has no green landmark and one gate", async ({ p
   await expect(gates).toHaveCount(1);
   await expect(gates).toContainText("Everything");
   await expect(page.locator("#standsnext")).toHaveText("2 more and it's a good day.");
+});
+
+/*
+ * The line is unit-tested in `tests/stands.test.ts`; what only a browser proves
+ * is that the card hands it both counts. Handed only the marked one it read
+ * "0 things left for a clean sweep" here — the marked work being done is
+ * precisely what puts the day in this branch.
+ */
+test("a day past the bar is told what a clean sweep still costs", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [
+      t("m1", "book the tickets", true, 1),
+      t("r1", "water plants", false, 1),
+      t("r2", "shopping", false, 1),
+      t("r3", "sweep up", false, 1),
+      t("r4", "stretch", false, 0),
+    ],
+  });
+  await open(page);
+
+  await expect(page.locator("#standsscore")).toHaveText("4 of 5");
+  await expect(page.locator("#standsnext")).toHaveText("1 thing left for a clean sweep.");
+});
+
+/*
+ * A tally says the number; the bar says the proportion, which is the thing a
+ * number alone does not give you — "3 of 5" and "12 of 20" read the same until
+ * you see them. It fills to the mean the ring uses, so a part-counted item
+ * moves the bar where it does not move the tally.
+ */
+test("each gate carries a bar, filled to the mean rather than the tally", async ({ page }) => {
+  await seedStorage(page, A_DAY);
+  await open(page);
+
+  const fill = (n: number) =>
+    page
+      .locator(".stands .gate")
+      .nth(n)
+      .locator(".gfill")
+      .evaluate((el) => (el as HTMLElement).style.getPropertyValue("--fill"));
+
+  expect(await fill(0)).toBe("33.33%");
+  // 3 of 5 is 60%, but "make calls" sits at 1 of 3 — so the bar reads higher.
+  expect(await fill(1)).toBe("66.67%");
+  await expect(page.locator(".stands .gate").nth(1).locator(".gtally")).toHaveText("3 of 5");
+});
+
+/*
+ * The marked work has no line short of finishing it, so its gate has no notch.
+ * The rest clears at the preference's bar, and the notch is where that sits.
+ */
+test("only the second gate is marked with where it clears", async ({ page }) => {
+  await seedStorage(page, A_DAY);
+  await open(page);
+
+  const gates = page.locator(".stands .gate");
+  await expect(gates.nth(0).locator(".gthreshold")).toHaveCount(0);
+  await expect(gates.nth(1).locator(".gthreshold")).toHaveCount(1);
+  await expect(gates.nth(1).locator(".gthreshold")).toHaveCSS("left", /.+/);
+});
+
+test("a gate with nothing in it draws no bar", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [t("m1", "book the tickets", true), t("m2", "reply to Dana", true, 1)],
+  });
+  await open(page);
+
+  const gates = page.locator(".stands .gate");
+  await expect(gates.nth(1)).toContainText("nothing here but marked work");
+  await expect(gates.nth(1).locator(".gbar")).toHaveCount(0);
+  await expect(gates.nth(0).locator(".gbar")).toHaveCount(1);
 });
 
 test("the dot sits where the ring's own hue says it does", async ({ page }) => {

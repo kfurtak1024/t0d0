@@ -278,3 +278,85 @@ test("a preference is not carried in a backup", async ({ page }) => {
   // Preferences belong to this browser, the way the theme does.
   expect(Buffer.concat(chunks).toString("utf8")).not.toContain("autoCollapse");
 });
+
+/**
+ * The first row to finish travels to the pile; it does not fly in from a corner.
+ *
+ * FLIP measures where a row ended up the moment the patch returns, and a
+ * `display: none` container has no box to measure. While the empty pile stayed
+ * hidden until after the patch, the first row to sink into it was handed its own
+ * position minus a zero rect and told to start 76px across and 94px down from
+ * where it belonged — a diagonal entrance from the bottom-right of the page.
+ *
+ * Asserted as "travels vertically" rather than on an exact number: the small
+ * horizontal component belongs to every reorder in the app, pile or not, and
+ * predates this. What must not come back is the order-of-magnitude one.
+ */
+test("the first finished row travels down to the pile, not in from a corner", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  const travel = await page.evaluate(async () => {
+    const moves: { x: number; y: number }[] = [];
+    /*
+     * Instrumenting the prototype is the only way to see a FLIP animation's
+     * keyframes: it is created and left to run, so by the time a test could
+     * poll for it the numbers it started from are gone. Unbound on purpose —
+     * `this` is the element being animated, which is the point.
+     */
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const real = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, frames, options) {
+      const first = (frames as Keyframe[] | null)?.[0]?.["transform"];
+      const found = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(String(first ?? ""));
+      if (found) moves.push({ x: Number(found[1]), y: Number(found[2]) });
+      return real.call(this, frames, options);
+    };
+
+    document.querySelector<HTMLElement>("[data-id] .tick")?.click();
+    await new Promise((done) => setTimeout(done, 900));
+    Element.prototype.animate = real;
+    return moves;
+  });
+
+  // The sinking row is the one that travels furthest.
+  const furthest = travel.sort((a, b) => Math.abs(b.y) - Math.abs(a.y))[0];
+  expect(furthest, "the row should have been animated at all").toBeDefined();
+  expect(Math.abs(furthest?.y ?? 0)).toBeGreaterThan(40);
+  expect(
+    Math.abs(furthest?.x ?? 0),
+    `travelled sideways: ${JSON.stringify(furthest)}`,
+  ).toBeLessThan(30);
+});
+
+/*
+ * And the way back. Unticking the only finished row leaves the list itself
+ * untouched — `rise` has nowhere to lift it to — while the boundary moves back
+ * to the end and the row returns from the pile into the work. Keyed on the list
+ * alone, that journey was made instantly.
+ */
+test("a row lifted back out of the pile travels too", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+  await tick(page, "alpha").click();
+  await expect(page.locator("#donelist > .task")).toHaveCount(1);
+  await settle(page);
+
+  const moved = await page.evaluate(async () => {
+    let seen = 0;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const real = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, frames, options) {
+      seen++;
+      return real.call(this, frames, options);
+    };
+
+    document.querySelector<HTMLElement>("#donelist [data-id] .tick")?.click();
+    await new Promise((done) => setTimeout(done, 700));
+    Element.prototype.animate = real;
+    return seen;
+  });
+
+  expect(moved).toBeGreaterThan(0);
+  await expect(page.locator("#donelist")).toBeHidden();
+});

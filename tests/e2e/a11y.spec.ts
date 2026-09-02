@@ -117,6 +117,9 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
 
   // Locks roles, names and states. A row that stops being a checkbox, or loses
   // aria-checked, fails here rather than in someone's screen reader.
+  //
+  // The day's work; what is finished with sits in its own list below the
+  // ending and is pinned separately, just under this.
   await expect(page.locator("#list")).toMatchAriaSnapshot(`
     - list:
       - listitem:
@@ -124,46 +127,44 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
         - text: Morning 1/2
         - button "Add to Morning": +
         - button "More for Morning": ⋯
-        - button "Delete Morning"
         - list:
           - listitem:
             - checkbox "eat breakfast" [checked]
             - text: eat breakfast
             - button "More for eat breakfast": ⋯
-            - button "Delete eat breakfast"
           - listitem:
             - checkbox "walk the dog"
             - text: walk the dog
             - button "More for walk the dog": ⋯
-            - button "Delete walk the dog"
       - listitem:
         - button "Expand Later, important"
         - text: Later empty
         - button "Add to Later": +
         - button "More for Later": ⋯
-        - button "Delete Later"
         - list
       - listitem:
         - spinbutton "make calls"
         - text: make calls
         - 'button "make calls: one fewer"': 1/3
         - button "More for make calls": ⋯
-        - button "Delete make calls"
       - listitem:
         - checkbox "shopping" [checked]
         - text: shopping
         - button "More for shopping": ⋯
-        - button "Delete shopping"
       - listitem:
         - checkbox "call the bank, important"
         - text: call the bank
         - button "More for call the bank": ⋯
-        - button "Delete call the bank"
+  `);
+
+  // And the pile below the ending, which is a list in its own right and needs a
+  // name of its own — nothing else on the page says what it is.
+  await expect(page.locator("#donelist")).toMatchAriaSnapshot(`
+    - list "Finished today":
       - listitem:
         - checkbox "post the parcel, one-off" [checked]
         - text: post the parcel
         - button "More for post the parcel": ⋯
-        - button "Delete post the parcel"
   `);
 });
 

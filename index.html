@@ -48,9 +48,32 @@
 
       <ul class="list" id="list"></ul>
 
-      <button class="endday" id="closeday" type="button" hidden>
-        <span id="endlabel">That's the day</span> <span aria-hidden="true">→</span>
-      </button>
+      <!--
+        The verdict and the action, said separately.
+
+        The label used to be the verdict itself, which made a statement look
+        like a control and left "End day" unsaid. It cannot simply become a
+        static label, though: the words are the day's only verdict channel that
+        is not hue, and red and green are one colour to a deuteranope — so the
+        verdict moves out beside the button rather than away. `aria-describedby`
+        is what keeps it on the button's own announcement.
+      -->
+      <div class="ending" id="ending" hidden>
+        <p class="dayverdict" id="endlabel">That's the day</p>
+        <button class="endday" id="closeday" type="button" aria-describedby="endlabel">
+          End day <span aria-hidden="true">→</span>
+        </button>
+      </div>
+
+      <!--
+        What is finished with, below the ending rather than in front of it.
+
+        On a good day the pile put the whole of it between your last piece of
+        work and the button that closes the day. A second list rather than a
+        divider inside the first: a <ul> may only hold <li>, and the ending is
+        neither.
+      -->
+      <ul class="list donelist" id="donelist" aria-label="Finished today" hidden></ul>
 
       <p class="empty" id="empty" hidden>Nothing here yet.<br />Type below to add today's list.</p>
     </main>
@@ -85,19 +108,30 @@
 
     <div class="veil" id="veil" hidden>
       <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle" tabindex="-1">
-        <h2 id="sheettitle">Today</h2>
-        <p class="score">0 of 0</p>
-        <p class="of">done</p>
-        <p class="verdict"></p>
-        <!-- The rail is inserted here by the card: both cards build it from one
-             place rather than carrying two copies of the same markup. -->
-        <div class="gates" id="closegates"></div>
-        <ul class="cleared"></ul>
-        <p class="dur"></p>
+        <!-- Everything the card reports. It is the only part allowed to
+             scroll, and only once a day genuinely will not fit: the note and
+             the two buttons below sit outside it and are always on screen. -->
+        <div class="sheet-body">
+          <h2 id="sheettitle">Today</h2>
+          <!-- One line. Two cost a whole row of the card's height, which the
+               gate bars have since spent: on an iPhone an ordinary day tipped
+               into scrolling. The number stays big — this card is the moment,
+               where the stands card is a status check. -->
+          <p class="glance"><span class="score">0 of 0</span> <span class="of">done</span></p>
+          <p class="verdict"></p>
+          <!-- The rail is inserted here by the card: both cards build it from
+               one place rather than carrying two copies of the same markup. -->
+          <div class="gates" id="closegates"></div>
+          <!-- What got done, named. The gates above say what is still owed;
+               this is the other half, and the reason the close is a report
+               rather than a receipt. -->
+          <div class="did" hidden></div>
+        </div>
         <!-- What this button takes away for good, said before it is pressed:
-             ticks come back tomorrow, a removed one-off does not. -->
+             ticks come back tomorrow, a removed one-off does not. Outside the
+             scroller on purpose — it is the reason the button is dangerous. -->
         <p class="departing" hidden></p>
-        <button class="confirm" type="button">Clear the ticks</button>
+        <button class="confirm" type="button">Close the day</button>
         <button class="dismiss" type="button">Not yet</button>
       </div>
     </div>
@@ -110,13 +144,22 @@
         aria-labelledby="standstitle"
         tabindex="-1"
       >
-        <h2 id="standstitle">Where the day stands</h2>
-        <p class="score" id="standsscore">0 of 0</p>
-        <p class="of">done</p>
-        <!-- The rail goes in above this line; see the note on the closing card. -->
-        <p class="next" id="standsnext"></p>
-        <div class="gates" id="standsgates"></div>
-        <p class="dur" id="standsdur"></p>
+        <div class="sheet-body">
+          <h2 id="standstitle">Where the day stands</h2>
+          <!-- One line, and a quiet one. This card is a status check rather than
+               an event, so the number anchors it without shouting and the gates
+               below are the content; the closing card keeps the big number,
+               because there it is the moment. -->
+          <p class="glance">
+            <span class="score" id="standsscore">0 of 0</span> <span class="of">done</span>
+          </p>
+          <!-- The rail goes in above the gates; see the note on the closing card. -->
+          <div class="gates" id="standsgates"></div>
+          <!-- Last, not in the middle. It names the next landmark, which is
+               what you do *after* reading where you are — and stated above the
+               gates it was a bold restatement of the one directly beneath it. -->
+          <p class="next" id="standsnext"></p>
+        </div>
         <button class="dismiss" type="button">Back to the list</button>
       </div>
     </div>

@@ -13,7 +13,7 @@ file, and losing it should cost nothing.
 
 <br>
 
-[![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE) [![Bundle](https://img.shields.io/badge/bundle-under_28_kB_gzipped-158A62)](./.github/actions/verify/action.yml) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json) [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
+[![Deploy](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml/badge.svg)](https://github.com/kfurtak1024/t0d0/actions/workflows/deploy.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-3B6FD6)](./LICENSE) [![Bundle](https://img.shields.io/badge/bundle-under_30_kB_gzipped-158A62)](./.github/actions/verify/action.yml) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-1786B0)](./tsconfig.json) [![PWA](https://img.shields.io/badge/PWA-offline--first-1786B0)](./vite.config.ts)
 
 ### [**→ t0d0.krfu.dev**](https://t0d0.krfu.dev)
 
@@ -21,7 +21,7 @@ file, and losing it should cost nothing.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/screenshot-dark.png">
-  <img alt="The app: two groups, an important group and item, a counted item, and a progress ring" src=".github/screenshot-light.png" width="420">
+  <img alt="The app: two groups, an important group and item, a counted item, a one-off, and the day ring" src=".github/screenshot-light.png" width="420">
 </picture>
 
 </div>
@@ -41,11 +41,14 @@ that rather than merely promising it.
 - **One-off items.** A trailing `~` — `post the parcel~` — tags a row as not part of the standing list, and the `⋯` menu tags one without typing. Tick it and closing the day takes it away instead of resetting it; leave it undone and it is still there in the morning, because the errand you did not run is the one you most need to see. The closer names what it is about to remove before you press the button.
 - **A day is scored on two gates.** Everything marked `!` has to be done, _and_ enough of the rest — 70% by default, and Settings → Behaviour moves the bar. So an almost-perfect day with one important thing still open is not a success, while a day with nothing marked is judged on the rest alone.
 - **The day's ring runs a rainbow.** Red at nothing done, **green** the moment the important work lands, **blue** the moment the rest clears the bar, **violet** at everything. All three are celebrated. The arc still measures the whole list — the colour is the verdict on it.
+- **The ring is a button.** Press it and the day's card unrolls that rainbow into a rail, puts a dot where you are on it, marks whichever gates the day actually has, and names what the next tick buys — _one more clears the bar_. It only reports; the closer is still the only thing that ends a day.
 - **A rewarding tick.** Springy rings that sweep indigo → green as each row fills in, a wiping strike-through, and confetti at every milestone.
-- **An ending.** Closing the day reports what you actually did before clearing the ticks — so an ordinary 7-of-9 day gets an ending too, not just a perfect one. Tomorrow opens on the whole list, every fold reopened and the finished one-offs gone.
+- **An ending you can see coming.** The list runs into a verdict and an **End day** button. The words say how it went — _That's the day_ → _The important work is done_ → _That's a good day_ → _Everything done_ — and the button answers in shape: a plain outline at nothing, a green ring the moment the marked work lands and the minimum plan is met, filled once the day is a success. Both, because hue is not a channel everyone has.
+- **An ending worth reaching.** The card counts the score up, grows a bar for each gate, walks the day's dot along the rainbow and stamps a ✓ on whatever you cleared — with a shower sized to what the day actually earned, and none at all for one that earned nothing. Any press lands the whole thing at once, and reduced motion shows it finished on arrival.
+- **An ending.** Closing the day counts off what you actually did — every finished row named in turn over the gate it belongs to, then gone, leaving the tally — before clearing the ticks, so an ordinary 7-of-9 day gets an ending too and not just a perfect one. The same card says what is still outstanding and what it is about to remove for good. Tomorrow opens on the whole list, every fold reopened and the finished one-offs gone.
 - **Reorderable, three ways.** Drag by the grip and the row goes where you point, in or out of a group. `Alt`+arrows and the `⋯` menu move it among its own siblings and stop there — changing level is its own command, so a move never re-nests anything behind your back. One undo puts a whole drag back.
 - **Untickable.** Tap a finished item again and it comes back. A counted item counts up instead, and resets from its menu.
-- **Finished work gets out of the way.** Tick something off and it drops below what's left, settling on top of whatever finished before it rather than burying it. A group waits for its last item, then folds shut as it goes. Untick something and it comes straight back up above the pile. On by default; Settings → Behaviour turns it off.
+- **Finished work gets out of the way.** Tick something off and it drops past the rest of the day, settling below **End day** with whatever finished before it. A group waits for its last item, then folds shut as it goes. What is down there keeps the order you earned it in — it can be marked, tagged or deleted, but not rearranged — and unticking anything lifts it straight back up into the work. On by default; Settings → Behaviour turns it off, and then the list stays in one piece as you left it.
 - **Offline and installable.** A real PWA; open it with the network off.
 - **Light, dark, or whatever your device says.** Settings → Theme, remembered per browser.
 - **Backups.** Save a `.json` copy, drop one back in. Loading previews what the file holds before replacing anything, and erasing takes two deliberate presses.
@@ -63,19 +66,20 @@ that rather than merely promising it.
 | `post parcel~`    | a one-off: removed at the close, once it is ticked    |
 | `call back!~`     | both marks; `call back~!` reads the same              |
 
-| Do this                                          | To                                                                                    |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Click a ring                                     | tick it, or untick it — a counted item counts up instead                              |
-| Shift-click a ring                               | count back down — on touch, tap the `1/3` label                                       |
-| Drag the `⠿` grip                                | move a row, in and out of groups as it travels; `Escape` calls it off                 |
-| Click any text                                   | edit in place, `[3]`, `!` and `~` included; `Enter` commits, `Escape` reverts         |
-| <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>         | move the focused row up or down among its siblings                                    |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | with a tick focused, move that item into the group above or back out                  |
-| <kbd>Space</kbd> / <kbd>Enter</kbd>              | tick the focused item                                                                 |
-| <kbd>↑</kbd> <kbd>↓</kbd>                        | count a focused `[n]` item up or down                                                 |
-| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>      | undo a delete, a move, an import, or a cleared day                                    |
-| `⋯` on a row                                     | move it up or down; in or out of a group; reset a count; mark it important or one-off |
-| `⋯` in the header                                | theme, tidying, the success bar, save a copy, load one back, erase everything         |
+| Do this                                             | To                                                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Click a row's ring                                  | tick it, or untick it — a counted item counts up instead                                         |
+| Shift-click a row's ring                            | count back down — on touch, tap the `1/3` label                                                  |
+| Click the day ring                                  | open where the day stands: the gates, the rail, and what the next tick buys                      |
+| Drag the `⠿` grip                                   | move a row, in and out of groups as it travels; `Escape` calls it off                            |
+| Click any text                                      | edit in place, `[3]`, `!` and `~` included; `Enter` commits, `Escape` reverts                    |
+| <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>            | move the focused row up or down among its siblings                                               |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd>    | with a tick focused, move that item into the group above or back out                             |
+| <kbd>Space</kbd> / <kbd>Enter</kbd>                 | tick the focused item                                                                            |
+| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | count a focused `[n]` item up or down                                                            |
+| <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>         | undo a delete, a move, an import, or a cleared day                                               |
+| `⋯` on a row                                        | move it up or down; in or out of a group; reset a count; mark it important or one-off; delete it |
+| `⋯` in the header                                   | theme, tidying, the success bar, save a copy, load one back, erase everything                    |
 
 ## Quick start
 
@@ -106,11 +110,13 @@ Node version is pinned in [`.nvmrc`](./.nvmrc).
 
 ```
 src/
-├─ types.ts parse.ts progress.ts normalize.ts   pure, DOM-free, heavily tested
+├─ types.ts parse.ts progress.ts normalize.ts    pure, DOM-free, heavily tested
 ├─ transitions.ts                               every state change as State → State
+├─ marks.ts milestones.ts                       a group's mark; the moments a change crossed
+├─ words.ts                                     every sentence the day is reported in
 ├─ storage.ts store.ts                          persistence and one level of undo
 ├─ theme.ts prefs.ts                            appearance and behaviour, own storage keys
-├─ render/    list flip ring task group         keyed DOM patching, and FLIP
+├─ render/    list flip ring task group context keyed DOM patching, and FLIP
 ├─ ui/        drawer sheet stands rail gates menu drag toast edit focus confetti dom
 └─ styles/    tokens.css base.css app.css
 ```

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cross, spend, type Arming } from "../src/milestones";
+import { cross, highest, spend, type Arming } from "../src/milestones";
 import type { DayScore } from "../src/progress";
 
 /**
@@ -102,5 +102,48 @@ describe("spend", () => {
     // same question asked at different moments.
     const s = score({ cleared: true, succeeded: true });
     expect(spend(s)).toEqual(cross(ALL_ARMED, s).armed);
+  });
+});
+
+/**
+ * Which moment a day has reached, regardless of what it has already spent.
+ *
+ * The closing card's shower is scaled by this, so it is what keeps the reward
+ * proportional rather than unconditional — a day that reached none of the three
+ * gets nothing, the same silence `verdictOf` keeps on an unfinished day.
+ */
+describe("highest", () => {
+  it("reaches nothing on a day that has done nothing", () => {
+    expect(highest(score())).toBeNull();
+  });
+
+  it("names the top moment, not the first", () => {
+    expect(highest(score({ cleared: true }))).toBe("cleared");
+    expect(highest(score({ cleared: true, succeeded: true }))).toBe("succeeded");
+    expect(highest(score({ cleared: true, succeeded: true, complete: true }))).toBe("complete");
+  });
+
+  /* Vacuously cleared is not cleared — the same gate `cross` puts on it. */
+  it("does not count a cleared flag nobody earned", () => {
+    expect(highest(score({ hasImportant: false, cleared: true }))).toBeNull();
+    expect(highest(score({ hasImportant: false, cleared: true, succeeded: true }))).toBe(
+      "succeeded",
+    );
+  });
+
+  it("reaches nothing on an empty list, whatever the flags say", () => {
+    expect(highest(score({ total: 0, cleared: true }))).toBeNull();
+  });
+
+  it("agrees with what cross would fire from a full arming", () => {
+    for (const over of [
+      {},
+      { cleared: true },
+      { cleared: true, succeeded: true },
+      { cleared: true, succeeded: true, complete: true },
+    ]) {
+      const day = score(over);
+      expect(highest(day)).toBe(cross(ALL_ARMED, day).fired);
+    }
   });
 });

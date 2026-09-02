@@ -121,6 +121,35 @@
   padding: 0;
 }
 
+/*
+  The pile of finished rows, below the ending rather than in front of it.
+
+  It reads as an afterword: the same rows, set a little apart from the day's
+  work by the ending that now sits between them. No heading of its own — the
+  button above it is the divider, and a second label would be saying what the
+  green frames already say.
+*/
+.donelist {
+  margin-top: 1.6rem;
+}
+
+.donelist[hidden] {
+  display: none;
+}
+
+/*
+  No grip down here: the pile is in the order the rows were finished in, the
+  dragger is wired to the work list alone, and a handle that looks draggable and
+  is not is worse than no handle at all.
+
+  Hidden rather than removed, because on a touch device the grip stays in the
+  flow and takes real width — dropping it would set every settled row a grip's
+  width out of line with the work above it.
+*/
+.donelist .grip {
+  visibility: hidden;
+}
+
 .list > .task,
 .list > .group,
 .items > .task {
@@ -441,7 +470,6 @@ body.dragging-row {
   visual weight changing.
 */
 .tick::after,
-.kill::after,
 .plus::after,
 .dots::after,
 .count::after,
@@ -534,28 +562,35 @@ body.dragging-row {
   padding: 0.1rem 0;
 }
 
+/*
+  The strike wipes across the words, not the width of the row.
+
+  A background rather than a positioned bar. The bar was one absolutely
+  positioned box, which an inline span that wraps does not have: on a phone,
+  where a task of any length takes two lines, it resolved against the union of
+  both — landing between them and reaching only as far as the first, so a
+  finished row read as *underlined on line one and untouched on line two*.
+
+  Left at `box-decoration-break: slice`, deliberately. Sliced, the gradient is
+  laid across the whole run and each line paints its own piece, so the wipe
+  travels through line one and on into line two as a single stroke. `clone`
+  also fixes the wrapping, but gives each line a stroke of its own and they
+  travel at once — two pens rather than one. Both were rendered mid-wipe, on
+  both engines, before choosing.
+*/
 .label .line {
-  position: relative;
+  background-image: linear-gradient(
+    color-mix(in oklab, currentcolor 55%, transparent),
+    color-mix(in oklab, currentcolor 55%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-position: 0 55%;
+  background-size: 0% 1.5px;
+  transition: background-size 0.3s var(--ease);
 }
 
-/* The strike wipes across the words, not the width of the row. */
-.label .line::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  height: 1.5px;
-  width: 100%;
-  background: currentcolor;
-  border-radius: 2px;
-  transform: scaleX(0);
-  transform-origin: left;
-  opacity: 0.55;
-  transition: transform 0.3s var(--ease);
-}
-
-.done .label .line::after {
-  transform: scaleX(1);
+.done .label .line {
+  background-size: 100% 1.5px;
 }
 
 .done .label {
@@ -631,7 +666,6 @@ body.dragging-row {
   margin-left: auto;
 }
 
-.kill,
 .plus,
 .dots {
   flex: none;
@@ -654,7 +688,6 @@ body.dragging-row {
   line-height: 1;
 }
 
-.kill:hover,
 .dots:hover,
 .dots[aria-expanded="true"] {
   color: var(--ink);
@@ -670,7 +703,6 @@ body.dragging-row {
 
 /* Hover is the right fork, not width: it asks whether a control can hide. */
 @media (hover: hover) {
-  .kill,
   .plus,
   .dots,
   .grip {
@@ -709,16 +741,13 @@ body.dragging-row {
     left: -1.6rem;
   }
 
-  .task:hover .kill,
   .task:hover .dots,
   .task:hover .grip,
-  .ghead:hover .kill,
   .ghead:hover .plus,
   .ghead:hover .dots,
   .ghead:hover .grip,
   .task.dragging .grip,
   .group.dragging .grip,
-  .kill:focus-visible,
   .plus:focus-visible,
   .dots:focus-visible,
   /* An open menu has to keep its own handle on screen. */
@@ -865,12 +894,45 @@ body.dragging-row {
 
 /* --------------------------------------------------------------- the end */
 
-.endday {
-  --end-hue: 268;
+/*
+  The verdict and the button beneath it, as one block at the foot of the list.
 
+  The dotted stem leads into the pair rather than into the button, because the
+  first thing it runs into is the sentence about the day.
+*/
+.ending {
   align-self: center;
   position: relative;
   margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ending[hidden] {
+  display: none;
+}
+
+/*
+  The day's verdict, in words.
+
+  Hue is not a channel everyone has — red and green come out at dE 4 for a
+  deuteranope, and they are the rainbow's two most meaningful landmarks — so
+  the ring alone was a WCAG 1.4.1 failure and this is the sentence that fixes
+  it. It reads quietly: the button beside it is the thing to press.
+*/
+.dayverdict {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color 0.3s var(--ease);
+}
+
+.endday {
+  --end-hue: 268;
+
+  position: relative;
   padding: 0.72rem 1.35rem;
   font-size: 0.86rem;
   font-weight: 650;
@@ -895,7 +957,7 @@ body.dragging-row {
 }
 
 /* A dotted stem, so the list visibly runs into its ending. */
-.endday::before {
+.ending::before {
   content: "";
   position: absolute;
   top: -1.15rem;
@@ -908,6 +970,25 @@ body.dragging-row {
 
 .endday.lit {
   border-color: oklch(var(--ring-l) var(--ring-c) var(--end-hue) / 40%);
+}
+
+/*
+  The minimum plan is met: every marked thing is done.
+
+  The state the day actually turns on, and until now it looked exactly like one
+  tick — `lit` covered the whole span from the first tick to almost-done. The
+  border goes solid in the day's own hue, which at this moment is green by
+  construction: `dayHue` reaches its green landmark precisely when the marked
+  work lands. Not filled, because that is what a day that also cleared the bar
+  earns, and the two have to stay tellable apart.
+*/
+.endday.cleared {
+  border-color: oklch(var(--ring-l) var(--ring-c) var(--end-hue));
+  color: var(--ink);
+}
+
+.ending:has(.cleared) .dayverdict {
+  color: var(--ink);
 }
 
 /*
@@ -1161,6 +1242,19 @@ body.dragging-row {
 
 /* Spent moves stay in place rather than unmounting: a menu that reflows under
    a finger mid-tap is worse than one with a dead row in it. */
+/*
+  The only destructive entry in the menu, in the colour the settings sheet
+  already uses for one. --danger is measured against --card, which is what the
+  menu is painted on, so the a11y spec's floor covers it here too.
+*/
+.rowmenu button.danger {
+  color: var(--danger);
+}
+
+.rowmenu button.danger:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+}
+
 .rowmenu button:disabled {
   color: var(--faint);
   cursor: default;
@@ -1206,6 +1300,39 @@ body.dragging-row {
   align-items: center;
   gap: 0.35rem;
   animation: rise 0.5s var(--spring);
+  /*
+    Bounded by the window, minus the veil's own padding either side.
+
+    Without this the card simply grew, and on a short screen it grew past the
+    bottom of it: at 360x640 a full day put "Clear the ticks" three pixels
+    below the fold, and at 320x568 an ordinary one did. The guard could not
+    see it — with nothing capping the height, scrollHeight and clientHeight
+    are the same number by construction, so the fit assertion passed on every
+    day it was ever given.
+  */
+  max-height: calc(100dvh - 2.5rem);
+}
+
+/*
+  The part of the card that reports, and the only part allowed to scroll.
+
+  "Fits without scrolling" cannot be promised for every day at every window
+  size — a long day on a small phone simply does not fit — so what is promised
+  instead is the thing that rule was protecting: the note naming what will be
+  destroyed and the button that destroys it are outside this box and therefore
+  never below the fold. On any day that does fit, nothing scrolls and the card
+  is exactly as it was.
+*/
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  /* A card that has run out of room must not scroll the list behind it. */
+  overscroll-behavior: contain;
 }
 
 @keyframes rise {
@@ -1228,6 +1355,21 @@ body.dragging-row {
   color: var(--faint);
 }
 
+/*
+  The score and its label on one line, on both cards.
+
+  Two lines cost a whole row of height, and the gate bars have since spent it:
+  measured on an iPhone, an ordinary day needed 445px of a 416px box, and 29 of
+  those were the bars. The cards still read differently — the size below is the
+  closing card's, and `.stands` takes it down to a quiet 1.55rem.
+*/
+.glance {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
 .sheet .score {
   font-size: 2.6rem;
   font-weight: 700;
@@ -1240,7 +1382,6 @@ body.dragging-row {
 .sheet .of {
   font-size: 0.9rem;
   color: var(--muted);
-  margin-bottom: 0.5rem;
 }
 
 /* The day's verdict, above the list of what got cleared. Absent rather than
@@ -1296,21 +1437,63 @@ body.dragging-row {
   display: none;
 }
 
-.sheet .cleared {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+/*
+  What got done, named — the mirror of the gates directly above it.
+
+  Deliberately quieter than a gate: those are the day's two obligations and
+  carry their own panel, while this is a recital of work already behind you.
+  It wears the gates' own item list so the two halves of the report read as
+  one card rather than two.
+*/
+.sheet .did {
+  width: 100%;
+  text-align: left;
+  margin-top: 0.85rem;
 }
 
-.sheet .cleared li {
-  font-size: 0.85rem;
+.sheet .did[hidden] {
+  display: none;
+}
+
+.sheet .did-title {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+}
+
+.sheet .did .gitems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+}
+
+.sheet .did .gitems li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 
-.sheet .dur {
-  font-size: 0.8rem;
+/*
+  Green rather than the gates' --flag: this pip marks work that is finished,
+  and it is the hue the ring and the finished frame already end on, so a done
+  row says the same thing here as it does in the list behind the card.
+*/
+.sheet .did .gitems .pip {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: oklch(var(--ring-l) var(--ring-c) 150);
+}
+
+.sheet .did .gmore {
+  font-size: 0.75rem;
   color: var(--faint);
-  margin-top: 0.6rem;
+  padding-left: 0.95rem;
 }
 
 /*
@@ -1357,8 +1540,31 @@ body.dragging-row {
   gap: 0;
 }
 
+/*
+  The card's anchor, on one line and at a size that does not compete.
+
+  It reported the day five times over: this number, the rail's dot, a bold
+  two-line "what next", and then both gates saying the halves it is the sum of.
+  Nothing was wrong; nothing was subordinate either, so all five shouted at
+  once. The number stays because a card wants an anchor — demoted, because the
+  gates below are what the card is actually for.
+*/
+.stands .glance {
+  gap: 0.4rem;
+  margin: 0.1rem 0 0.2rem;
+}
+
 .stands .score {
-  margin-top: 0.2rem;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 0;
+}
+
+.stands .of {
+  font-size: 0.85rem;
+  color: var(--faint);
+  margin-bottom: 0;
 }
 
 /* The rail sits under the score on both cards, and hides itself on a day with
@@ -1465,12 +1671,19 @@ body.dragging-row {
   margin-top: 0.1rem;
 }
 
+/*
+  What the next tick buys, read after the gates rather than over them.
+
+  It used to sit above them in --ink at 650, which put the loudest sentence on
+  the card immediately above the two panels that restate it — "2 important
+  things left" is the Important gate's own tally, subtracted.
+*/
 .stands .next {
-  font-size: 0.95rem;
-  font-weight: 650;
-  color: var(--ink);
-  line-height: 1.35;
-  margin: 0.85rem 0 0.15rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0.9rem 0 0;
 }
 
 /* Both gates, because the day turns on both and the ring can only show one. */
@@ -1484,6 +1697,7 @@ body.dragging-row {
 }
 
 .gate {
+  position: relative;
   background: var(--nest);
   border-radius: 14px;
   padding: 0.6rem 0.75rem;
@@ -1507,6 +1721,104 @@ body.dragging-row {
   font-weight: 700;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+  The proportion behind the tally.
+
+  "3 of 5" and "12 of 20" read the same until you see them, which is the whole
+  reason a number gets a bar. Sized to sit under the head without crowding the
+  rows named below it.
+
+  The fill is a width transition off --fill, so a card that wants the bar to
+  grow on open only has to set the property a frame later; a card that does not
+  sets it once and nothing moves.
+*/
+.gbar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  margin-top: 0.45rem;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.gfill {
+  display: block;
+  height: 100%;
+  width: var(--fill, 0%);
+  border-radius: 999px;
+  /* hueAt's indigo→green, not the day's rainbow — only the day ring wears
+     that, and a gate is a thing that gets finished, so it ends on the same
+     green as a finished row's frame. */
+  background: oklch(var(--ring-l) var(--ring-c) var(--gate-hue, 268));
+  transition:
+    width 0.7s var(--ease),
+    background 0.7s var(--ease);
+}
+
+/*
+  Where this gate is cleared. Drawn over the fill and standing proud of the
+  track at both ends, which is the rail's own lesson: a mark the fill can cover
+  answers "did it get past?" wrongly at exactly the moment you are asking. So
+  the bar does not clip it, and it is one solid line rather than an outlined
+  one — outlined, at 2px, it read as two.
+*/
+.gthreshold {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--muted);
+  transform: translateX(-1px);
+}
+
+/*
+  A gate that has been met, marked once at the end of its own row.
+
+  Green, at the hue the ring and a finished frame already end on, so a met gate
+  says the same thing here as a done row says in the list. Decorative — the
+  tally and the note carry it — which is what lets the closing card stamp it in
+  without a screen reader hearing a flourish.
+*/
+.gstamp {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  color: oklch(var(--ring-l) var(--ring-c) 150);
+}
+
+/*
+  The names counted off over a gate's bar as it fills.
+
+  Out of the flow entirely: a gate is exactly as tall whether it finished
+  nothing or thirty things, because the card has to fit and a ceremony must not
+  be paid for in layout. They rest at opacity 0 and only the closing card's
+  reveal wakes them, which is why the stands card can carry them for free.
+*/
+.gflash {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.gflash span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--ink);
+  text-align: center;
+  padding: 0 0.6rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 6px var(--nest);
 }
 
 .gate .gnote {
@@ -1544,14 +1856,6 @@ body.dragging-row {
   font-size: 0.78rem;
   color: var(--faint);
   padding-left: calc(var(--r-card) / 3 + 0.45rem);
-}
-
-.stands .dur {
-  margin-top: 1rem;
-}
-
-.stands .dur[hidden] {
-  display: none;
 }
 
 .sheet .dismiss {

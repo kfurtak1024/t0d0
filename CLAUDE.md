@@ -19,8 +19,15 @@ These are decisions, not defaults. Changing one is a conversation, not a refacto
   its place.
 - **No network at runtime.** No fonts, analytics, CDNs, telemetry, or API calls. The CSP
   meta tag enforces this — if a change needs an exception, the change is wrong.
-- **No dates.** `openedAt` is the only timestamp in the app, and it exists solely so the
-  end-of-day card can report elapsed time. Nothing rolls over, expires, or resets itself.
+- **No dates, and no clock.** `openedAt` is the only timestamp in the app, and the one
+  thing that reads it is the stale check: a day left open past `STALE_MS` is met with its
+  own summary in the morning. Nothing rolls over, expires, or resets itself, and **nothing
+  reports how long the day has taken** — both cards used to end on "3h 30m in" and
+  "6h 00m since you started", which measured the day rather than the work in it. Removing
+  that took `elapsedMs` out of `DaySummary`, `elapsed()` out of `words.ts` and the `now`
+  argument out of `summarise()` and both cards' `show()`; `openedAt` stays because the
+  stale check is a different question. Do not add a duration anywhere — it is the one
+  number this app has decided not to keep.
 - **No history.** Ticks are cleared, never archived. No streaks, no yesterday, no stats
   beyond the current list. A one-off removed at the close is deleted, not filed away —
   deleting is not archiving, which is why `once` does not breach this.
@@ -60,9 +67,17 @@ Invariants worth defending in review:
 - **`list` is one ordered array.** Position is the ordering. Ungrouped tasks sit at the
   root beside groups; there is no implicit "Inbox".
 - **Progress is `mean(count / target)`** over tasks, so one `[20]` item cannot swamp the
-  ring. Empty groups are excluded from totals and render no ring.
+  ring. Empty groups are excluded from the totals. A group has no ring of its own and
+  never has had one — it carries a `2/3` tally in text — so the only fractional ring in
+  the app is the day's.
+- **A count and a proportion are different questions, and the header asks both.** The arc
+  and `#pct` report `progress()` — the mean — while `#frac` counts the rows that are
+  finished, so a list holding a part-done `[3]` reads "48%" beside "3 of 7" and the two
+  are both right. This is the same pairing a gate makes, where the bar fills to the mean
+  and the tally beside it counts: partial work moves the proportion and not the count.
+  (This line used to claim `#frac` and `#pct` reported the same thing. They never have.)
 - **The arc measures the list; the colour judges the day.** They answer different
-  questions and must not be conflated: `3 of 7` is what the arc and `#pct` report, while
+  questions and must not be conflated: the arc reports how much is done, while
   the hue reports `scoreDay()` — a list can be most of the way done and still have an
   important item outstanding, and the ring has to say so rather than average it away.
 - **The day succeeds on two gates, not one number.** Every important thing finished,
@@ -75,11 +90,25 @@ Invariants worth defending in review:
   Green is a landmark **only when something is marked** — with nothing important the
   sweep runs straight from red to blue, because a list with nothing marked would
   otherwise open on green and read as "you are safe" before a single tick.
-- **The day's verdict is in words as well as in hue.** The closer's label follows
-  `scoreDay()` — "That's the day" / "The important work is done" / "That's a good day" /
-  "Everything done" — because hue is not a channel everyone has. Measured with a
-  dichromacy simulation: red and green come out at ΔE 4 for a deuteranope, and they are
-  the rainbow's two most meaningful landmarks, so the ring alone was a WCAG 1.4.1 failure.
+- **The day's verdict is in words as well as in hue, and it is not the button's label.**
+  `#endlabel` follows `scoreDay()` — "That's the day" / "The important work is done" /
+  "That's a good day" / "Everything done" — because hue is not a channel everyone has.
+  Measured with a dichromacy simulation: red and green come out at ΔE 4 for a deuteranope,
+  and they are the rainbow's two most meaningful landmarks, so the ring alone was a WCAG
+  1.4.1 failure. It **was** the button's label, which made a statement look like a control
+  and left the action unsaid; the button now says "End day" and the verdict sits above it,
+  with `aria-describedby` keeping it on the button's own announcement so a screen reader
+  does not lose what focusing the button used to say. Moving the words off the screen
+  entirely re-opens the failure — `scoring.spec.ts` walks all four through `#endlabel`.
+- **The button has four states, because the day has four.** `lit` used to cover everything
+  from the first tick to almost-done, so the moment the day actually turns on — every
+  marked thing finished, the minimum plan met — looked exactly like a single tick.
+  `cleared` is that moment: a solid border in the day's own hue, which is green there by
+  construction, since `dayHue` reaches its green landmark precisely when the marked work
+  lands. `ripe` fills it, and stays distinct because clearing the bar on top is a further
+  thing. `cleared` is gated on `hasImportant`: the flag is vacuously true with nothing
+  marked, the same way `milestones` reads it, and a day with no minimum plan has none to
+  meet.
 - **A lightness ramp along the rainbow was tried as a second channel and rejected.**
   Measured, it broke white-on-`.ripe` contrast in light mode (4.71 → 3.99, against a 4.5
   floor), still left red/green confusable (ΔE 4 → 9, against a ~12 threshold), and made
@@ -92,6 +121,19 @@ Invariants worth defending in review:
 - **The warm band of the rainbow is lifted by `--ring-lift`.** Yellow is inherently a
   light colour; held at `--ring-l` an OKLCH yellow renders olive and red→green reads as
   mud. This was checked by rendering the sweep, not by eye-balling the numbers.
+- **The confetti is painted in the ring's own colour, converted rather than
+  approximated.** A canvas takes a CSS colour but cannot resolve a `var()`, so
+  `oklchToRgb` in `src/render/ring.ts` does the conversion and `ringOklch` is
+  the single formula `dayStroke` also spells out as a `calc()`. It replaced
+  `hsl()` fed the ring's **OKLCH hue number** — a different colour space, with
+  neither the theme's lightness nor its chroma reaching the canvas at all: the
+  blue milestone showered `rgb(124, 75, 221)`, a purple, while the ring beside
+  it turned `rgb(60, 114, 203)`. The tokens are read per burst so a theme
+  changed in Settings is honoured, and out-of-gamut channels are clipped, which
+  is what the browser does displaying the same `oklch()` — so the clip is the
+  ring's clip and not a second approximation. The conversion is checked against
+  Chromium painting the same colour into a canvas and reading the pixel back;
+  `tests/ring.test.ts` pins all eight landmarks, both themes.
 - **All three moments are celebrated**, each once, on the transition into it, re-arming
   when the list falls back below. The arming lives in `src/milestones.ts` as a pure
   machine over `DayScore`; `app.ts` only owns what a celebration looks like. One tick can cross two gates at once — the last
@@ -113,6 +155,48 @@ Invariants worth defending in review:
   finished there is nothing to go in front of, so it appends, which is where it always
   landed. Root tasks still append: the composer aims at a new group, so an item you add
   next goes inside it rather than needing a place of its own.
+- **The day's work sits above the ending; what is finished with sits below it.** On a
+  good day the pile put the whole of itself between your last piece of work and the button
+  that closes the day — measured, 593px, and "End day" off screen on a phone _and_ on an
+  800px desktop window. So `#donelist` is a second `<ul>` after the ending block. A second
+  list rather than a divider inside the first, because a `<ul>` may hold only `<li>` and
+  the ending is neither; `KeyedList` therefore patches across two containers, sharing one
+  entry map so a row crossing between them is `insertBefore`d and keeps its element. That
+  identity is the whole point — it is what lets FLIP carry the row over instead of
+  rebuilding it. Focus is _not_ part of the promise: moving a node between parents is a
+  removal and an insertion, and a browser blurs what it removes.
+- **The split is positional — `pileFrom` — and never `isFinished` over the list.** A row
+  stays finished-but-in-place for the length of the tidy's delay, because the tick landing
+  is the reward and nothing moves over it until it has played out. Splitting on "is this
+  row done?" would drop it into the pile the instant it was ticked, straight over the top
+  of that. Measured: ticked at +0, still in the work at +300ms, in the pile at +700ms.
+  It also keeps `groupAbove()` honest, since array order and visual order then agree.
+- **Only while the tidy is on.** With `autoCollapseDone` off the list is deliberately
+  unsorted — `alpha | ✓beta | gamma | ✓delta` — so there is no run at the foot to be a
+  boundary, the split is the list's length, and everything stays in one list as before.
+- **Nothing in the pile is arranged by hand.** It is in the order the rows were finished
+  in, which nobody chose, so `inPile()` refuses every reorder: the ⋯ menu omits its move
+  and nest entries rather than disabling them (a spent move stays as a dead row because it
+  may come back; these never will), Alt+arrows and Tab return without swallowing the key
+  so focus still moves normally, and the dragger is wired to the work list alone. The
+  grips down there are `visibility: hidden` — kept, so a settled row stays in line with
+  the work on touch where the grip is in the flow, but not shown, because a handle that
+  looks draggable and is not is worse than no handle. Marking, tagging and deleting all
+  still work: they say something about the row rather than about where it sits. It reads
+  through the _owning_ row, so a task in a finished group is settled with it while a
+  finished task in an unfinished group is not — its group is still work and moves as one
+  block.
+- **Show the pile before the patch; hide it only after.** FLIP measures where a row landed
+  the moment the patch returns, and a `display: none` container has no box — so the first
+  row to sink into an empty pile was handed its own position minus a zero rect and told to
+  start 76px across and 94px down from where it belonged, flying in from the corner of the
+  page. Hiding afterwards is the mirror: a pile emptying has to keep its box until the rows
+  leaving it have been measured.
+- **A moved boundary is a rearrangement even when the list is unchanged.** Unticking the
+  only finished row leaves the array exactly as it was — `rise` has nowhere to lift it to —
+  while the split returns to the end and the row travels from the pile back into the work.
+  Keyed on the list alone, that journey happened instantly. `#render` compares the split
+  with the last one and animates on its own account.
 - **A finished row sinks to the foot of the unfinished list**, stopping above
   the run of finished rows already resting there — the pile keeps the order it
   was earned rather than each arrival burying the last. A ticked root item and a
@@ -348,6 +432,13 @@ Invariants worth defending in review:
 - **The card names the next landmark, which is not the same as praising you.** The closing
   card deliberately says nothing to an unfinished day; this one always says what the next
   tick buys, because a card opened mid-morning that said nothing would be opened once.
+  **Each branch of `nextLine` counts what its own gate is waiting on**, which is two
+  numbers and not one: past the bar with the marked work done, the outstanding-important
+  count is zero _by construction_ — that is what `succeeded` means — so the line offering
+  a clean sweep has to read the unfinished total instead. Sharing one figure had it say
+  "0 things left for a clean sweep" on every day that cleared the bar without finishing,
+  which is the day the card is most often opened on. `tests/words.test.ts` walks every
+  branch; `stands.spec.ts` proves the card hands both counts over.
 - **The rail shows the stretch not yet reached as dimmed, and a gate's mark is drawn over
   everything — the dot included.** Both came from the same measured failure: at 95% of the
   way to the bar, an 18px dot with a 3px halo covered the bar's mark completely, in the
@@ -356,12 +447,122 @@ Invariants worth defending in review:
   rail, and the dimming is what turns "did it clear that gate?" into something you look at
   rather than judge by a dot's centre. Six treatments were rendered before this one; a
   smaller dot alone does not fix it, because the halo is what hides the mark.
+- **The day's sentences live in `src/words.ts`, not in the cards that print
+  them.** They are pure functions over a `DayScore` and a couple of counts, and
+  `src/ui/**` and `app.ts` are excluded from coverage because Playwright owns
+  the rendering layer — so a pure function that drifted in there was measured by
+  nothing, and checked only by whichever browser test happened to assert its
+  text. That is how `nextLine` kept a branch nobody had ever asked. The
+  exclusion list is a claim that the excluded code needs a browser; anything
+  decidable without a DOM has to sit outside it. The **numbers** are shared in
+  `progress.ts` and the **words are not** — `barSoFar` and `barAtClose` are the
+  same figure in two voices, one looking forward and one reporting a day that
+  is over, and keeping both in one file is what makes that contrast visible.
+- **A gate carries a bar, and the bar fills to the mean rather than the tally.**
+  "3 of 5" and "12 of 20" read the same until you see them, which is the whole reason a
+  number gets a bar. It fills to `progress()` — the measure the ring uses — so a
+  part-counted item moves the bar where it does not move the tally: a gate can read
+  "3 of 5" and sit at 67%. That is the first place partial progress is visible anywhere
+  in the summary. It wears `hueAt`'s indigo→green and **not** the rainbow, because only
+  the day ring wears that and a gate is a thing that gets finished, so it ends on the
+  green a finished row's frame already wears. It is `aria-hidden`: the tally beside it
+  says the number and the outstanding rows are named underneath, so the bar is the same
+  fact a third time in the one channel not everyone has.
+- **Only the second gate is marked with where it clears.** The marked work has no line
+  short of finishing it — it simply has to be done — so `Gate.threshold` is null there
+  and the notch is not drawn. The notch stands proud of the track at both ends and is one
+  solid `--muted` line: the bar must not clip it, because a mark the fill can cover
+  answers "did it get past?" wrongly at exactly the moment you are asking, which is the
+  rail's own lesson. Outlined at 2px it read as two lines rather than one.
+- **Which gates a day has is decided in `progress.ts`, not in the renderer.** `dayGates()`
+  returns the model — which gates exist, their names, fills, thresholds and what is
+  outstanding — and `src/ui/gates.ts` only draws it. The rules are not obvious (the
+  Important gate is _absent_ rather than empty when nothing is marked; the second gate's
+  name changes to "Everything" when it stands alone; an empty second gate is vacuously
+  met) and every one of them is decidable without a DOM, so they belong where coverage
+  reaches. `tests/progress.test.ts` pins them.
+- **The day-stands card is a status check; the closing card is the event.** The stands
+  card reported the day five times over — a 42px "4 of 8", the rail's dot, a bold two-line
+  "what next", and both gates saying the halves that number is the sum of. Nothing was
+  wrong and nothing was subordinate, so all five shouted at once. So its number is one
+  quiet line, "what next" moved **below** the gates (stated above them it was a loud
+  restatement of the panel directly beneath it), and the gates are the content. The
+  closing card keeps the big number on purpose: there it is the moment, and the two cards
+  reading differently is what tells them apart.
 - **Both day cards wear the same rail and the same gates**, from `src/ui/rail.ts` and
   `src/ui/gates.ts`. Two copies would be two rainbows able to drift from `dayStroke` and
   from each other, and the rail's whole claim is that it cannot disagree with the ring.
   The _numbers_ are shared; the **words are not** — one card is looking forward ("one more
   clears the bar") and the other is reporting a day that is over ("short of the bar"), so
   each passes in its own note.
+- **The close counts what got done off over the gates, and keeps only the count.** The
+  names used to sit under the gates as a static list, capped at four with a remainder. It
+  was a quarter of the card's height — measured at 84px on a small day and 128px on a big
+  one — and the card overflowed its box on an iPhone because of it. They are now shown one
+  at a time over the bar they belong to, rising and vaporising as it fills, so the bar
+  moving has a name attached to it; and every finished row gets named rather than four of
+  them, because they are sequential rather than stacked and so cost no height at all
+  (17px, and the card no longer scrolls). **What survives is the one line.** That matters
+  more than the flourish: an animation is the only channel a reduced-motion setting, a
+  screen reader, or anyone who glanced away does not have, so the record cannot live
+  inside it. The line is the finished state all three land on.
+- **A gate's phase fills its bar while its own names are counted off, and the next waits.**
+  The marked work first, then everything else — two bars racing would not read as "the
+  important work, and then the rest". The step between names is clamped rather than fixed,
+  so a thirty-item day is a satisfying blur rather than half a minute in front of a
+  destructive button; the run is skippable at any press either way.
+- **The close names what got done, not only how much.** The card reported a bare number,
+  named what was still outstanding through the gates, and then wiped the evidence — so
+  the one ritual the app exists for was a record of what you missed. `summarise().finished`
+  names the work, and `didHeading` counts it; the pips are the finished green the ring and
+  the frame already end on, against the gates' `--flag` red, so the two lists read as the
+  two halves of one report. It replaced a list of cleared _group_ titles, which said less
+  about a day than the rows themselves do. Silent when nothing got done, for the reason
+  `verdictOf` is silent on an unfinished day: an empty "Got done" is worse than no heading.
+- **Both lists are capped by one rule.** `shortlist()` in `words.ts` names the first four
+  and counts the rest, for the gates and for the close alike — the card is bounded, so a
+  list that grew with the day is exactly what would push the confirm off it, and two
+  different caps would be the same kind of statement made in two voices.
+- **The closing card's numbers arrive; they are not simply there.** The score counts up,
+  the gate bars grow in turn, the rail's dot travels from nothing to where the day sits,
+  and a ✓ stamps onto each gate that was met. **Everything only ever travels _to_ a value
+  already written into the DOM**, which is the whole trick: reduced motion is not a second
+  path but this one skipped, and cutting the run short is `finish()` on a list of
+  animations rather than a re-render. Only this card plays it — the stands card is a
+  status check, and a flourish every time you glance at the day would wear out in a week.
+- **The reveal starts on the first painted frame, not on the press.** WebKit spends around
+  300ms getting this card on screen the first time — the veil's blur, the card's own
+  entry — and an animation whose clock started at the press has by then already run most
+  of its course: measured, the bars stood 73% along before a single frame had been
+  painted, so on Safari the reveal was over before it was ever seen. Everything is created
+  **paused**, which `fill: "backwards"` pins at its first keyframe, and let go on one
+  `requestAnimationFrame`. The score is written out as "0 of n" in the same breath, since
+  it is the one value not held by an animation and would otherwise flash its answer.
+- **Test the reveal by scrubbing it, never by sampling frames.** Reading whichever frame
+  arrives first measures when the _sampler_ started, not whether the card travels, and it
+  is a different number on every engine — Chromium's first frame landed at 7ms and
+  WebKit's at ~330ms, which is what made the sampled version fail on CI and pass here.
+  `scoring.spec.ts` pauses the animations and drives `currentTime` to nothing, halfway and
+  the end, which asks the question directly and gets the same answer everywhere.
+- **The two day cards put the score and its label on one line.** Two lines cost a whole
+  row of the card's height, and the gate bars spent it: measured on an iPhone 13 (a 664px
+  viewport, not the 844px screen), an ordinary day needed 445px of a 416px box and 29 of
+  those were the bars. The sizes still differ — the closing card keeps the big number
+  because it is the moment, `.stands` takes it to a quiet 1.55rem — but the label sits
+  beside it on both. Adding a row to the closing card means re-measuring this on the small
+  viewport, not on a desktop one.
+- **Any press lands the reveal at once.** This is the one card with a destructive button,
+  and an animation you have to sit through before you can read what "Clear the ticks"
+  takes away is a worse problem than a card that does not move. The listener is on the
+  veil in the **capture** phase, so it fires before the button underneath acts on the same
+  press: someone reaching straight for the confirm sees the finished numbers on the way
+  past rather than being made to wait. The whole run is ~800ms even when watched.
+- **The shower is what the day earned, and a day that earned nothing gets none.**
+  `highest()` in `src/milestones.ts` names the top moment reached, and is null for a day
+  that reached none — so the card is silent there in confetti for the same reason
+  `verdictOf` is silent in words. Praise for 2 of 9 is not believed twice in either
+  channel. It is shared with `cross()` rather than written out again: two definitions of
+  "which moment" is how a card comes to celebrate something the ring never did.
 - **The closing card carries them because it is the one card that erases something.** A
   day that finished 5 of 6 with the marked item outstanding used to read as a good day and
   then clear the evidence: the number is honest and says nothing about _which_ thing was
@@ -371,10 +572,33 @@ Invariants worth defending in review:
   both halves.
 - **An empty list gets no gates and no rail**, not "Everything 0 of 0" — reachable through
   the stale-day card, which opens on a day left overnight whose list has since been emptied.
-- **The closing card must fit without scrolling.** It is the one card with a destructive
-  button, and "Clear the ticks" below the fold is how someone taps it without reading it.
-  Measured in `scoring.spec.ts` the way `drawer.spec.ts` measures the settings sheet;
-  adding a row to this card means re-running it.
+- **The confirm says "Close the day".** It said "Clear the ticks", which was accurate and
+  read like a maintenance command rather than the end of a day. "That's the day" was the
+  obvious warmer choice and is taken: it is the lowest verdict on the main screen, shown
+  directly above the button that opens this card, so the same words would be a judgement
+  in one place and a destructive action in the other. "Close the day" is the app's own
+  word for this — the closer, the closing card — and stays unmistakably an action, which
+  the departing note above it depends on. Do not soften it further.
+- **The closing card's confirm and its warning are never below the fold.** It is the one
+  card with a destructive button, and "Clear the ticks" out of sight is how someone taps
+  it without reading what it takes away. This used to be written as "the card must fit
+  without scrolling", which is not a promise that can be kept: a full day on a 320px-tall
+  screen does not fit, and the card simply grew past the bottom of the window — three
+  pixels at 360x640, further at 320x568. **The guard could not see it.** With nothing
+  capping the height, a card's `scrollHeight` and `clientHeight` are the same number by
+  construction, so `expect(content).toBeLessThanOrEqual(box)` passed on every day it was
+  ever given, and the only real assertion ran at 1280x900 where nothing was going to fail.
+  So the card is capped at the window and `.sheet-body` scrolls inside it, while the
+  departing note and both buttons sit **outside** that scroller and are always on screen.
+  `scoring.spec.ts` measures the confirm and the note against the viewport at five sizes,
+  and it fails without the cap. Adding a row to this card means re-running it.
+- **`.sheet-body` takes a tab stop only while it actually scrolls.** Nothing inside it is
+  focusable — the buttons are outside, which is the point — so a scroller with no way in
+  is content a mouse can reach and a keyboard cannot. Axe calls it
+  `scrollable-region-focusable` and caught it the day the scroller appeared. Always-on
+  would put a stop that leads nowhere in front of the buttons on almost every day, so
+  `keyboardScrollable()` measures on open; `scrollHeight` is layout and so, unlike a
+  bounding box, is not disturbed by the card's entry animation.
 - **Reordering is one step, applied repeatedly.** `reorder()` moves a row a single
   place and **is its own inverse**, so repeating it reaches any position. Everything else
   is a way of asking for that step — `Alt`+arrows, the `⋯` menu, and the drag, which just
@@ -389,6 +613,18 @@ Invariants worth defending in review:
   its own command — `Tab` / `Shift-Tab`, or the menu's "Into" / "Out of". The `⋯` menu
   prints `Alt+↑` beside "Move up", so **those two must stay the same command**; scoping
   one and not the other makes the hint a lie.
+- **Deleting a row lives in the `⋯` menu, not on the row.** A ✕ beside the `⋯` held a
+  25.6px column open on every row for an action taken in bursts and then not again:
+  `opacity: 0` hides a control on a pointer device, it does not un-reserve its space, and
+  on touch it was simply always there. Measured, giving it back is a fifth of a nested
+  row's label on a phone (156.7px → 191.9px) and nearly a third of a counted one's
+  (114.5 → 149.7). It was also the last row control that had not moved into the menu.
+  **It deletes on the press.** The "destructive actions confirm in place" rule below is
+  about the settings sheet; a confirm step inside a menu is the dialog-on-a-dialog that
+  rule exists to prevent, and one level of undo — toast, plus the exit animation, which
+  `Ctrl-Z` cancels outright — is what makes one press safe enough. A group's entry names
+  what it takes with it, for the reason the one-off entry names its consequence: the
+  items do not come back on their own.
 - **Three routes reach the `important` field, and they must stay one meaning**: a
   trailing `!` in the composer, the same when editing the text, and the `⋯` menu's
   "Mark important" / "Unmark important". The menu exists because the other two mean
@@ -404,6 +640,16 @@ Invariants worth defending in review:
   delete one character. `isGroupInput()` is shared with `parse` so the preview and the
   outcome cannot disagree. The composer is also **emptied before the state is applied**,
   since the render triggered by the apply reads it.
+- **The strike is a background across the run, not a bar positioned over it.** It was one
+  absolutely positioned `::after`, which an inline span that wraps does not have: it
+  resolved against the union of both lines, landing between them and reaching only as far
+  as the first, so a finished row whose text wrapped — any task of a normal length on a
+  phone — read as underlined on line one and untouched on line two. It is now a gradient
+  sized from 0% to 100%, left at `box-decoration-break: slice` **deliberately**: sliced,
+  the gradient is laid across the whole run and each line paints its own piece, so the
+  wipe travels through line one and on into line two as one stroke. `clone` also fixes
+  the wrapping but gives each line its own stroke and they travel at once — two pens
+  rather than one. Both were rendered mid-wipe on both engines before choosing.
 - **A row's label is its name and none of the marks.** All three of the things the
   composer parses leave the text on the way in, and each is shown by something built for
   it: `!` is the accent edge, `~` is the tag, `[n]` is the tally. The bracket was the odd
@@ -474,6 +720,7 @@ src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]", "!" and "~" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
+src/words.ts      every sentence the day is reported in, pure and DOM-free
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, the two day cards and the rail and gates they share,
                   drawer, row menu, drag, inline edit, focus trap, confetti, dom
@@ -582,6 +829,13 @@ nothing in CI checks that they are current — so they are your job:
   or group markup, or to spacing in the list. The script builds, serves, and
   captures both themes into `.github/`. It is deterministic: re-running with no
   visual change rewrites the same bytes, so it never creates a noisy diff.
+- **The seeded day is a claim about what the picture shows, so check it against
+  the app and not against the diff.** It goes in through `normalize()`, which
+  means it goes through `settle()` — a group's mark written on the group alone
+  is derived straight back off, and the screenshot silently stopped showing the
+  accent bar it exists to show. Determinism is why nothing caught it: a seed
+  that renders the wrong thing renders it byte-identically for months. Adding a
+  mark to the model means adding it to the seed, spelled out on the items too.
 - **Run `npm run icons` if the ring mark changes.**
 
 A screenshot diff is not worth gating in CI — across machines it is all font

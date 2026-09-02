@@ -27,6 +27,20 @@ function reached(score: DayScore): Arming {
   };
 }
 
+/**
+ * The highest moment this day has reached, or null when it has reached none.
+ *
+ * The closing card's ceremony is scaled by this, so the reward is proportional
+ * rather than unconditional: a day that earned nothing gets no shower, which is
+ * the same rule that keeps `verdictOf` silent on an unfinished day. Shared with
+ * {@link cross} rather than written out again, because "which moment" having two
+ * definitions is how a card comes to celebrate something the ring did not.
+ */
+export function highest(score: DayScore): Milestone | null {
+  const now = reached(score);
+  return [...MILESTONES].reverse().find((milestone) => now[milestone]) ?? null;
+}
+
 /** Armed for everything not currently reached, spent for everything that is. */
 const armFor = (now: Arming): Arming => ({
   cleared: !now.cleared,

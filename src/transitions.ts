@@ -307,6 +307,41 @@ export function reorder(
 export const isFinished = (node: Node): boolean =>
   node.kind === "task" ? isDone(node) : node.items.length > 0 && node.items.every(isDone);
 
+/**
+ * Where the pile of finished rows begins: the trailing run of them.
+ *
+ * **Positional, never `isFinished` over the whole list.** A row is finished for
+ * half a second before the tidy moves it — that delay is the reward playing out
+ * — so asking "is this row done?" would send it to the pile the instant it was
+ * ticked, and the fold-and-travel would become a teleport. Asking "where does
+ * the finished run start?" only answers differently once `sink` has actually
+ * moved something.
+ *
+ * `list.length` when nothing is resting at the foot, which is what a caller
+ * reads as "there is no pile".
+ */
+export function pileFrom(list: Node[]): number {
+  let at = list.length;
+  while (at > 0 && isFinished(list[at - 1] as Node)) at--;
+  return at;
+}
+
+/**
+ * Whether the row `id` names — or the group holding it — has settled into the
+ * pile.
+ *
+ * The pile is in the order the rows were finished in, and that order is earned
+ * rather than arranged: nothing down there may be reordered or re-nested. Read
+ * through the owning group on purpose, so a task inside a finished group is
+ * settled too — while a finished task inside an *unfinished* group is not, because
+ * its group is still up in the day's work and moves as one block.
+ */
+export function inPile(state: State, id: string, from: number): boolean {
+  const rowId = ownerOf(state, id)?.id ?? id;
+  const at = state.list.findIndex((node) => node.id === rowId);
+  return at >= 0 && at >= from;
+}
+
 /** The row `id` names, if it is one of the list's own — never a nested task. */
 export const findRow = (state: State, id: string): Node | undefined =>
   state.list.find((node) => node.id === id);

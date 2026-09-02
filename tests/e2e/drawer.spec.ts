@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, settle } from "./helpers";
+import { addItem, clearStorage, settle, seedStorage } from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
@@ -258,6 +258,25 @@ test("erasing takes two presses and is undoable", async ({ page }) => {
   await page.locator(".toast-action").click();
   await expect(page.locator(".group", { hasText: "Morning" })).toBeVisible();
   await expect(page.locator(".list .task")).toHaveCount(2);
+});
+
+/*
+ * A list of nothing but empty groups has no items, and "Erase 0 items?" both
+ * understates what goes and reads as a bug. The groups are the thing.
+ */
+test("the erase confirm names groups when there are no items to name", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [
+      { kind: "group", id: "g1", title: "Morning", collapsed: false, items: [] },
+      { kind: "group", id: "g2", title: "Work", collapsed: false, items: [] },
+    ],
+  });
+  await page.locator("#databtn").click();
+  await page.locator('[data-act="erase"]').click();
+
+  await expect(page.locator(".confirmbar-text")).toHaveText("Erase 2 groups?");
 });
 
 test("cancelling the erase leaves the list alone", async ({ page }) => {

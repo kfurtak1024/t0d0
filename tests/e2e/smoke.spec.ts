@@ -1,9 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { clearStorage, addItem } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
 });
+
+/**
+ * Delete a row through the ⋯ menu, which is the only route to it.
+ *
+ * It used to be a ✕ on the row, which cost every row a 25.6px column whether or
+ * not it was visible — a fifth of a nested label on a phone. Undo is what makes
+ * one press safe enough to need no confirm, and these tests lean on that.
+ */
+const deleteRow = async (page: Page, row: Locator): Promise<void> => {
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: /^Delete/ }).click();
+};
 
 test("adds, ticks, and reports progress", async ({ page }) => {
   await addItem(page, "shopping");
@@ -61,6 +73,39 @@ test("a row's label is its name, and none of the marks", async ({ page }) => {
  * and the arrow keys do not exist on a phone, and a plain item has no count
  * label to tap, so the tick itself has to go both ways.
  */
+/**
+ * A finished row is struck through on every line it occupies.
+ *
+ * The strike used to be one absolutely positioned bar, which an inline span
+ * that wraps does not have: it resolved against the union of both lines,
+ * landing between them and reaching only as far as the first. A finished row
+ * whose text wrapped — any task of a normal length on a phone — read as
+ * underlined on line one and untouched on line two.
+ *
+ * Asserted through the run rather than by reading pixels: the strike is now a
+ * background laid across the whole inline run, so covering it is the same fact
+ * as covering every line of it. `rects` proves the label really did wrap, which
+ * is the condition that used to break it.
+ */
+test("a finished row is struck through across a wrapped label", async ({ page }) => {
+  await page.setViewportSize({ width: 380, height: 700 });
+  await addItem(page, "walk the dog before it rains today");
+  const line = page.locator(".task .label .line");
+
+  const before = await line.evaluate((el) => ({
+    rects: el.getClientRects().length,
+    size: getComputedStyle(el).backgroundSize,
+  }));
+  expect(before.rects, "the label has to wrap for this to mean anything").toBeGreaterThan(1);
+  expect(before.size).toBe("0% 1.5px");
+
+  await page.locator(".task .tick").click();
+  await expect(page.locator(".task")).toHaveClass(/done/);
+  await expect
+    .poll(() => line.evaluate((el) => getComputedStyle(el).backgroundSize))
+    .toBe("100% 1.5px");
+});
+
 test("tapping a finished plain item unticks it", async ({ page }) => {
   await addItem(page, "shopping");
   const row = page.locator(".task", { hasText: "shopping" });
@@ -157,8 +202,7 @@ test("deleting is undoable", async ({ page }) => {
   await addItem(page, "shopping");
   const row = page.locator(".task", { hasText: "shopping" });
 
-  await row.hover();
-  await row.locator(".kill").click();
+  await deleteRow(page, row);
   await expect(page.locator(".list .task")).toHaveCount(0);
 
   await page.locator(".toast-action").click();
@@ -166,16 +210,96 @@ test("deleting is undoable", async ({ page }) => {
 });
 
 /*
+ * The row carries no ✕ of its own. It cost every row a 25.6px column whether or
+ * not it was visible — opacity hides a control, it does not un-reserve its
+ * space — which on a phone was a fifth of a nested row's label and a third of a
+ * counted one's.
+ */
+test("a row has no delete button of its own", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "shopping");
+
+  await expect(page.locator(".list .kill")).toHaveCount(0);
+  await expect(page.locator(".list .dots")).toHaveCount(2);
+});
+
+/*
+ * A group takes its items with it, and they do not come back on their own — so
+ * the entry says so, the same way the one-off entry names its consequence
+ * rather than its mark.
+ */
+test("the menu's delete entry names what a group takes with it", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "eat breakfast");
+  await addItem(page, "walk the dog");
+
+  await page.locator(".ghead > .dots").click();
+  await expect(page.getByRole("menuitem", { name: /^Delete/ })).toHaveText(
+    "Delete group and 2 items",
+  );
+  await page.keyboard.press("Escape");
+
+  // A plain row has nothing to take with it, so it just says Delete.
+  await page.locator(".items > .task").first().locator(".dots").click();
+  await expect(page.getByRole("menuitem", { name: /^Delete/ })).toHaveText("Delete");
+});
+
+test("an empty group says only that it is a group", async ({ page }) => {
+  await addItem(page, "# Later");
+
+  await page.locator(".ghead > .dots").click();
+  await expect(page.getByRole("menuitem", { name: /^Delete/ })).toHaveText("Delete group");
+});
+
+/*
  * The toast offers the undo and then gets out of the way. Nothing else takes it
  * down, so if the countdown stops working it would sit over the composer for
  * the rest of the session.
  */
+/*
+ * A nested row leaves the same way a root one does. `#rows` holds only the top
+ * level, so looking for the row there found nothing for a task inside a group
+ * and it vanished outright — the CSS had dressed it for the exit all along.
+ */
+test("a row inside a group leaves with the same animation as one outside", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "eat breakfast");
+
+  const row = page.locator(".items > .task", { hasText: "eat breakfast" });
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: /^Delete/ }).click();
+
+  await expect(row).toHaveClass(/leaving/);
+  await expect(page.locator(".items > .task")).toHaveCount(0);
+});
+
+test("undo during a nested row's exit puts it back", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "eat breakfast");
+  await addItem(page, "walk the dog");
+
+  const row = page.locator(".items > .task", { hasText: "eat breakfast" });
+  await row.locator(".dots").click();
+  await page.getByRole("menuitem", { name: /^Delete/ }).click();
+
+  /*
+   * Undo has to land *inside* the exit, or this says nothing: undo puts the row
+   * back either way, and only the pending state tells the two apart. Without
+   * the row being found at all there is no pending delete and no class.
+   */
+  await expect(row).toHaveClass(/leaving/);
+  await page.keyboard.press("Control+z");
+
+  await expect(row).toBeVisible();
+  await expect(row).not.toHaveClass(/leaving/);
+  await expect(page.locator(".items > .task")).toHaveCount(2);
+});
+
 test("the toast takes itself away", async ({ page }) => {
   await addItem(page, "shopping");
   const row = page.locator(".task", { hasText: "shopping" });
 
-  await row.hover();
-  await row.locator(".kill").click();
+  await deleteRow(page, row);
   await expect(page.locator("#toast")).toBeVisible();
 
   /*
@@ -324,8 +448,7 @@ test("undo during the delete animation puts the item back", async ({ page }) => 
   await addItem(page, "beta");
 
   const row = page.locator(".task", { hasText: "alpha" });
-  await row.hover();
-  await row.locator(".kill").click();
+  await deleteRow(page, row);
   await page.keyboard.press("Control+z"); // inside the exit animation
 
   await expect(page.locator(".task", { hasText: "alpha" })).toBeVisible();
@@ -351,8 +474,7 @@ test("deleting the last undone item still finishes the day", async ({ page }) =>
   });
 
   const row = page.locator(".task", { hasText: "not yet" });
-  await row.hover();
-  await row.locator(".kill").click();
+  await deleteRow(page, row);
 
   await expect(page.locator("#frac")).toHaveText("1 of 1");
   await expect

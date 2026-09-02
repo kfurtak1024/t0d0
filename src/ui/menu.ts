@@ -7,6 +7,12 @@ export interface MenuItem {
   disabled?: boolean;
   /** Stay open afterwards, for actions worth repeating (move up, move down). */
   keepOpen?: boolean;
+  /**
+   * Reads as destructive. The row's ✕ used to carry this on its own, in its own
+   * colour; moved in here it would otherwise sit in a list of benign commands
+   * looking like one of them.
+   */
+  danger?: boolean;
   onSelect: () => void;
 }
 
@@ -155,6 +161,7 @@ export class RowMenu {
         button.type = "button";
         button.setAttribute("role", "menuitem");
         button.disabled = item.disabled ?? false;
+        if (item.danger) button.classList.add("danger");
 
         const label = document.createElement("span");
         label.textContent = item.label;
@@ -203,7 +210,14 @@ export class RowMenu {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       const step = event.key === "ArrowDown" ? 1 : -1;
-      const next = (at + step + items.length) % items.length;
+      /*
+       * `at` is -1 when the menu itself holds the focus rather than one of its
+       * entries, which `refresh` can leave behind. Wrapping arithmetic reads
+       * that as "before the first" and sends Up to the *second* to last; from
+       * nowhere in particular, either arrow should land on the end it points at.
+       */
+      const next =
+        at < 0 ? (step > 0 ? 0 : items.length - 1) : (at + step + items.length) % items.length;
       items[next]?.focus();
       return;
     }
