@@ -92,6 +92,19 @@ Invariants worth defending in review:
 - **The warm band of the rainbow is lifted by `--ring-lift`.** Yellow is inherently a
   light colour; held at `--ring-l` an OKLCH yellow renders olive and red→green reads as
   mud. This was checked by rendering the sweep, not by eye-balling the numbers.
+- **The confetti is painted in the ring's own colour, converted rather than
+  approximated.** A canvas takes a CSS colour but cannot resolve a `var()`, so
+  `oklchToRgb` in `src/render/ring.ts` does the conversion and `ringOklch` is
+  the single formula `dayStroke` also spells out as a `calc()`. It replaced
+  `hsl()` fed the ring's **OKLCH hue number** — a different colour space, with
+  neither the theme's lightness nor its chroma reaching the canvas at all: the
+  blue milestone showered `rgb(124, 75, 221)`, a purple, while the ring beside
+  it turned `rgb(60, 114, 203)`. The tokens are read per burst so a theme
+  changed in Settings is honoured, and out-of-gamut channels are clipped, which
+  is what the browser does displaying the same `oklch()` — so the clip is the
+  ring's clip and not a second approximation. The conversion is checked against
+  Chromium painting the same colour into a canvas and reading the pixel back;
+  `tests/ring.test.ts` pins all eight landmarks, both themes.
 - **All three moments are celebrated**, each once, on the transition into it, re-arming
   when the list falls back below. The arming lives in `src/milestones.ts` as a pure
   machine over `DayScore`; `app.ts` only owns what a celebration looks like. One tick can cross two gates at once — the last
@@ -348,6 +361,13 @@ Invariants worth defending in review:
 - **The card names the next landmark, which is not the same as praising you.** The closing
   card deliberately says nothing to an unfinished day; this one always says what the next
   tick buys, because a card opened mid-morning that said nothing would be opened once.
+  **Each branch of `nextLine` counts what its own gate is waiting on**, which is two
+  numbers and not one: past the bar with the marked work done, the outstanding-important
+  count is zero _by construction_ — that is what `succeeded` means — so the line offering
+  a clean sweep has to read the unfinished total instead. Sharing one figure had it say
+  "0 things left for a clean sweep" on every day that cleared the bar without finishing,
+  which is the day the card is most often opened on. `tests/words.test.ts` walks every
+  branch; `stands.spec.ts` proves the card hands both counts over.
 - **The rail shows the stretch not yet reached as dimmed, and a gate's mark is drawn over
   everything — the dot included.** Both came from the same measured failure: at 95% of the
   way to the bar, an 18px dot with a 3px halo covered the bar's mark completely, in the
@@ -356,12 +376,35 @@ Invariants worth defending in review:
   rail, and the dimming is what turns "did it clear that gate?" into something you look at
   rather than judge by a dot's centre. Six treatments were rendered before this one; a
   smaller dot alone does not fix it, because the halo is what hides the mark.
+- **The day's sentences live in `src/words.ts`, not in the cards that print
+  them.** They are pure functions over a `DayScore` and a couple of counts, and
+  `src/ui/**` and `app.ts` are excluded from coverage because Playwright owns
+  the rendering layer — so a pure function that drifted in there was measured by
+  nothing, and checked only by whichever browser test happened to assert its
+  text. That is how `nextLine` kept a branch nobody had ever asked. The
+  exclusion list is a claim that the excluded code needs a browser; anything
+  decidable without a DOM has to sit outside it. The **numbers** are shared in
+  `progress.ts` and the **words are not** — `barSoFar` and `barAtClose` are the
+  same figure in two voices, one looking forward and one reporting a day that
+  is over, and keeping both in one file is what makes that contrast visible.
 - **Both day cards wear the same rail and the same gates**, from `src/ui/rail.ts` and
   `src/ui/gates.ts`. Two copies would be two rainbows able to drift from `dayStroke` and
   from each other, and the rail's whole claim is that it cannot disagree with the ring.
   The _numbers_ are shared; the **words are not** — one card is looking forward ("one more
   clears the bar") and the other is reporting a day that is over ("short of the bar"), so
   each passes in its own note.
+- **The close names what got done, not only how much.** The card reported a bare number,
+  named what was still outstanding through the gates, and then wiped the evidence — so
+  the one ritual the app exists for was a record of what you missed. `summarise().finished`
+  names the work, and `didHeading` counts it; the pips are the finished green the ring and
+  the frame already end on, against the gates' `--flag` red, so the two lists read as the
+  two halves of one report. It replaced a list of cleared _group_ titles, which said less
+  about a day than the rows themselves do. Silent when nothing got done, for the reason
+  `verdictOf` is silent on an unfinished day: an empty "Got done" is worse than no heading.
+- **Both lists are capped by one rule.** `shortlist()` in `words.ts` names the first four
+  and counts the rest, for the gates and for the close alike — the card is bounded, so a
+  list that grew with the day is exactly what would push the confirm off it, and two
+  different caps would be the same kind of statement made in two voices.
 - **The closing card carries them because it is the one card that erases something.** A
   day that finished 5 of 6 with the marked item outstanding used to read as a good day and
   then clear the evidence: the number is honest and says nothing about _which_ thing was
@@ -371,10 +414,26 @@ Invariants worth defending in review:
   both halves.
 - **An empty list gets no gates and no rail**, not "Everything 0 of 0" — reachable through
   the stale-day card, which opens on a day left overnight whose list has since been emptied.
-- **The closing card must fit without scrolling.** It is the one card with a destructive
-  button, and "Clear the ticks" below the fold is how someone taps it without reading it.
-  Measured in `scoring.spec.ts` the way `drawer.spec.ts` measures the settings sheet;
-  adding a row to this card means re-running it.
+- **The closing card's confirm and its warning are never below the fold.** It is the one
+  card with a destructive button, and "Clear the ticks" out of sight is how someone taps
+  it without reading what it takes away. This used to be written as "the card must fit
+  without scrolling", which is not a promise that can be kept: a full day on a 320px-tall
+  screen does not fit, and the card simply grew past the bottom of the window — three
+  pixels at 360x640, further at 320x568. **The guard could not see it.** With nothing
+  capping the height, a card's `scrollHeight` and `clientHeight` are the same number by
+  construction, so `expect(content).toBeLessThanOrEqual(box)` passed on every day it was
+  ever given, and the only real assertion ran at 1280x900 where nothing was going to fail.
+  So the card is capped at the window and `.sheet-body` scrolls inside it, while the
+  departing note and both buttons sit **outside** that scroller and are always on screen.
+  `scoring.spec.ts` measures the confirm and the note against the viewport at five sizes,
+  and it fails without the cap. Adding a row to this card means re-running it.
+- **`.sheet-body` takes a tab stop only while it actually scrolls.** Nothing inside it is
+  focusable — the buttons are outside, which is the point — so a scroller with no way in
+  is content a mouse can reach and a keyboard cannot. Axe calls it
+  `scrollable-region-focusable` and caught it the day the scroller appeared. Always-on
+  would put a stop that leads nowhere in front of the buttons on almost every day, so
+  `keyboardScrollable()` measures on open; `scrollHeight` is layout and so, unlike a
+  bounding box, is not disturbed by the card's entry animation.
 - **Reordering is one step, applied repeatedly.** `reorder()` moves a row a single
   place and **is its own inverse**, so repeating it reaches any position. Everything else
   is a way of asking for that step — `Alt`+arrows, the `⋯` menu, and the drag, which just
@@ -474,6 +533,7 @@ src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]", "!" and "~" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
+src/words.ts      every sentence the day is reported in, pure and DOM-free
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, the two day cards and the rail and gates they share,
                   drawer, row menu, drag, inline edit, focus trap, confetti, dom
@@ -582,6 +642,13 @@ nothing in CI checks that they are current — so they are your job:
   or group markup, or to spacing in the list. The script builds, serves, and
   captures both themes into `.github/`. It is deterministic: re-running with no
   visual change rewrites the same bytes, so it never creates a noisy diff.
+- **The seeded day is a claim about what the picture shows, so check it against
+  the app and not against the diff.** It goes in through `normalize()`, which
+  means it goes through `settle()` — a group's mark written on the group alone
+  is derived straight back off, and the screenshot silently stopped showing the
+  accent bar it exists to show. Determinism is why nothing caught it: a seed
+  that renders the wrong thing renders it byte-identically for months. Adding a
+  mark to the model means adding it to the seed, spelled out on the items too.
 - **Run `npm run icons` if the ring mark changes.**
 
 A screenshot diff is not worth gating in CI — across machines it is all font
