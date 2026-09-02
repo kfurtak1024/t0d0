@@ -210,7 +210,14 @@ export class RowMenu {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       const step = event.key === "ArrowDown" ? 1 : -1;
-      const next = (at + step + items.length) % items.length;
+      /*
+       * `at` is -1 when the menu itself holds the focus rather than one of its
+       * entries, which `refresh` can leave behind. Wrapping arithmetic reads
+       * that as "before the first" and sends Up to the *second* to last; from
+       * nowhere in particular, either arrow should land on the end it points at.
+       */
+      const next =
+        at < 0 ? (step > 0 ? 0 : items.length - 1) : (at + step + items.length) % items.length;
       items[next]?.focus();
       return;
     }

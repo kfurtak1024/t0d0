@@ -66,6 +66,29 @@ test("the ⋯ menu moves focus with the arrow keys, and wraps", async ({ page })
   await expect(kill).toBeFocused();
 });
 
+/*
+ * From the menu itself rather than from one of its entries — where `refresh`
+ * can leave the focus — each arrow should land on the end it points at. The
+ * wrapping arithmetic read "before the first" as index -1 and sent Up to the
+ * second to last.
+ */
+test("arrowing from the menu itself lands on the end it points at", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  await menuOf(page, "beta").click();
+  const entries = page.getByRole("menuitem");
+  const last = entries.last();
+
+  await page.locator(".rowmenu").focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(last).toBeFocused();
+
+  await page.locator(".rowmenu").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(entries.first()).toBeFocused();
+});
+
 test("Home and End reach the ends of the ⋯ menu", async ({ page }) => {
   await addItem(page, "alpha");
   await addItem(page, "beta");
