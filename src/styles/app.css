@@ -533,28 +533,35 @@ body.dragging-row {
   padding: 0.1rem 0;
 }
 
+/*
+  The strike wipes across the words, not the width of the row.
+
+  A background rather than a positioned bar. The bar was one absolutely
+  positioned box, which an inline span that wraps does not have: on a phone,
+  where a task of any length takes two lines, it resolved against the union of
+  both — landing between them and reaching only as far as the first, so a
+  finished row read as *underlined on line one and untouched on line two*.
+
+  Left at `box-decoration-break: slice`, deliberately. Sliced, the gradient is
+  laid across the whole run and each line paints its own piece, so the wipe
+  travels through line one and on into line two as a single stroke. `clone`
+  also fixes the wrapping, but gives each line a stroke of its own and they
+  travel at once — two pens rather than one. Both were rendered mid-wipe, on
+  both engines, before choosing.
+*/
 .label .line {
-  position: relative;
+  background-image: linear-gradient(
+    color-mix(in oklab, currentcolor 55%, transparent),
+    color-mix(in oklab, currentcolor 55%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-position: 0 55%;
+  background-size: 0% 1.5px;
+  transition: background-size 0.3s var(--ease);
 }
 
-/* The strike wipes across the words, not the width of the row. */
-.label .line::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  height: 1.5px;
-  width: 100%;
-  background: currentcolor;
-  border-radius: 2px;
-  transform: scaleX(0);
-  transform-origin: left;
-  opacity: 0.55;
-  transition: transform 0.3s var(--ease);
-}
-
-.done .label .line::after {
-  transform: scaleX(1);
+.done .label .line {
+  background-size: 100% 1.5px;
 }
 
 .done .label {

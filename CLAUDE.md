@@ -560,6 +560,16 @@ Invariants worth defending in review:
   delete one character. `isGroupInput()` is shared with `parse` so the preview and the
   outcome cannot disagree. The composer is also **emptied before the state is applied**,
   since the render triggered by the apply reads it.
+- **The strike is a background across the run, not a bar positioned over it.** It was one
+  absolutely positioned `::after`, which an inline span that wraps does not have: it
+  resolved against the union of both lines, landing between them and reaching only as far
+  as the first, so a finished row whose text wrapped — any task of a normal length on a
+  phone — read as underlined on line one and untouched on line two. It is now a gradient
+  sized from 0% to 100%, left at `box-decoration-break: slice` **deliberately**: sliced,
+  the gradient is laid across the whole run and each line paints its own piece, so the
+  wipe travels through line one and on into line two as one stroke. `clone` also fixes
+  the wrapping but gives each line its own stroke and they travel at once — two pens
+  rather than one. Both were rendered mid-wipe on both engines before choosing.
 - **A row's label is its name and none of the marks.** All three of the things the
   composer parses leave the text on the way in, and each is shown by something built for
   it: `!` is the accent edge, `~` is the tag, `[n]` is the tally. The bracket was the odd
