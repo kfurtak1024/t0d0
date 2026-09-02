@@ -229,7 +229,7 @@ describe("dayHue", () => {
 });
 
 describe("summarise", () => {
-  it("reports done, total, and which groups cleared", () => {
+  it("reports done, total, and what actually got finished", () => {
     const s = state([
       group("Morning", [task("a", 1), task("b", 1)]),
       group("Work", [task("c", 0)]),
@@ -238,13 +238,13 @@ describe("summarise", () => {
     expect(summarise(s, 0, 0.7)).toMatchObject({
       done: 3,
       total: 4,
-      clearedGroups: ["Morning"],
+      finished: ["a", "b", "d"],
       elapsedMs: null,
     });
   });
 
-  it("does not count an empty group as cleared", () => {
-    expect(summarise(state([group("Empty", [])]), 0, 0.7).clearedGroups).toEqual([]);
+  it("names nothing on a day with an empty group and no work", () => {
+    expect(summarise(state([group("Empty", [])]), 0, 0.7).finished).toEqual([]);
   });
 
   it("reports elapsed time once the day has opened", () => {

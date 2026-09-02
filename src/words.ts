@@ -24,6 +24,52 @@ const plural = (n: number, one: string, many: string): string =>
   `${String(n)} ${n === 1 ? one : many}`;
 
 /**
+ * How many rows a card names before it stops listing them and counts the rest.
+ *
+ * The cards are bounded — the closing one especially, since the button that
+ * destroys something has to stay on screen — so every list on them is capped
+ * rather than allowed to grow with the day.
+ */
+export const NAMED = 4;
+
+export interface Shortlist {
+  /** The rows to name, in the order the list keeps them. */
+  named: string[];
+  /** How many were left unnamed. Zero when they all fit. */
+  more: number;
+}
+
+/**
+ * The first few of something, and a count of the rest.
+ *
+ * One rule rather than two: the gates name what is still outstanding and the
+ * closing card names what got done, and a card that capped those differently
+ * would be saying the same kind of thing in two voices.
+ */
+export function shortlist(texts: string[], cap = NAMED): Shortlist {
+  return { named: texts.slice(0, cap), more: Math.max(0, texts.length - cap) };
+}
+
+/** What a capped list says about the rows it did not name. */
+export const andMore = (more: number): string => `and ${String(more)} more`;
+
+/**
+ * What the day's work amounted to, for the card that ends it.
+ *
+ * The card already names what is still outstanding, through the gates. Until
+ * this it named nothing you had finished — it reported a bare number and then
+ * cleared the evidence, so the one ritual the app exists for said what you
+ * missed and never what you did. Recognition is the whole product; the count
+ * alone is not it.
+ *
+ * Silent on a day with nothing done, for the same reason `verdictOf` is silent
+ * on an unfinished one: an empty "Got done" heading is a worse thing to read
+ * than no heading at all.
+ */
+export const didHeading = (done: number): string =>
+  done === 0 ? "" : `Got done — ${plural(done, "thing", "things")}`;
+
+/**
  * How long the day has been open, without naming a unit nobody asked for.
  *
  * No suffix: the cards differ on what follows — "in" while the day runs,

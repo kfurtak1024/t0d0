@@ -1329,15 +1329,63 @@ body.dragging-row {
   display: none;
 }
 
-.sheet .cleared {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
+/*
+  What got done, named — the mirror of the gates directly above it.
+
+  Deliberately quieter than a gate: those are the day's two obligations and
+  carry their own panel, while this is a recital of work already behind you.
+  It wears the gates' own item list so the two halves of the report read as
+  one card rather than two.
+*/
+.sheet .did {
+  width: 100%;
+  text-align: left;
+  margin-top: 0.85rem;
 }
 
-.sheet .cleared li {
-  font-size: 0.85rem;
+.sheet .did[hidden] {
+  display: none;
+}
+
+.sheet .did-title {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+}
+
+.sheet .did .gitems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+}
+
+.sheet .did .gitems li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
   color: var(--muted);
+}
+
+/*
+  Green rather than the gates' --flag: this pip marks work that is finished,
+  and it is the hue the ring and the finished frame already end on, so a done
+  row says the same thing here as it does in the list behind the card.
+*/
+.sheet .did .gitems .pip {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: oklch(var(--ring-l) var(--ring-c) 150);
+}
+
+.sheet .did .gmore {
+  font-size: 0.75rem;
+  color: var(--faint);
+  padding-left: 0.95rem;
 }
 
 .sheet .dur {

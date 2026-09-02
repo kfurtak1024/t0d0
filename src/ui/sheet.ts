@@ -1,10 +1,10 @@
 import { summarise } from "../progress";
 import { departing } from "../transitions";
-import { barAtClose, departingNote, elapsed, verdictOf } from "../words";
+import { barAtClose, departingNote, didHeading, elapsed, verdictOf } from "../words";
 import { keyboardScrollable, need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
-import { dayGates } from "./gates";
+import { dayGates, namedList } from "./gates";
 import { Rail } from "./rail";
 
 /**
@@ -26,7 +26,7 @@ export class DaySheet {
   #verdict: HTMLElement;
   #rail = new Rail();
   #gates: HTMLElement;
-  #cleared: HTMLElement;
+  #did: HTMLElement;
   #departing: HTMLElement;
   #elapsed: HTMLElement;
   #panel: HTMLElement;
@@ -40,7 +40,7 @@ export class DaySheet {
     this.#label = need(veil, ".of");
     this.#verdict = need(veil, ".verdict");
     this.#gates = need(veil, "#closegates");
-    this.#cleared = need(veil, ".cleared");
+    this.#did = need(veil, ".did");
     this.#departing = need(veil, ".departing");
     this.#elapsed = need(veil, ".dur");
     this.#body = need(veil, ".sheet-body");
@@ -77,13 +77,19 @@ export class DaySheet {
     // An empty list has no gates to report and no rail worth reading.
     this.#rail.element.hidden = summary.total === 0;
 
-    this.#cleared.replaceChildren(
-      ...summary.clearedGroups.map((title) => {
-        const li = document.createElement("li");
-        li.textContent = `${title} cleared`;
-        return li;
-      }),
-    );
+    /*
+     * What the day actually came to, named. It sits under the gates on
+     * purpose: those say what is still owed, and reading only those at the
+     * moment the ticks are wiped made the close a list of what went undone.
+     */
+    const heading = didHeading(summary.done);
+    this.#did.hidden = heading === "";
+    if (heading !== "") {
+      const title = document.createElement("p");
+      title.className = "did-title";
+      title.textContent = heading;
+      this.#did.replaceChildren(title, namedList(summary.finished));
+    }
 
     this.#elapsed.textContent =
       summary.elapsedMs === null ? "" : `${elapsed(summary.elapsedMs)} since you started`;

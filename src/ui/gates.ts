@@ -1,8 +1,6 @@
 import { isDone, outstandingImportant, partition, stepsToBar } from "../progress";
 import type { State, Task } from "../types";
-
-/** How many rows of marked work a card names before it stops listing them. */
-const NAMED = 4;
+import { andMore, shortlist } from "../words";
 
 /**
  * The day's two gates, as both cards report them.
@@ -59,25 +57,7 @@ function gate(name: string, count: string, note: string, items: Task[]): HTMLEle
   head.append(title, number);
   box.append(head);
 
-  if (items.length > 0) {
-    const list = document.createElement("ul");
-    list.className = "gitems";
-    for (const task of items.slice(0, NAMED)) {
-      const row = document.createElement("li");
-      const pip = document.createElement("span");
-      pip.className = "pip";
-      pip.setAttribute("aria-hidden", "true");
-      row.append(pip, document.createTextNode(task.text));
-      list.append(row);
-    }
-    if (items.length > NAMED) {
-      const more = document.createElement("li");
-      more.className = "gmore";
-      more.textContent = `and ${String(items.length - NAMED)} more`;
-      list.append(more);
-    }
-    box.append(list);
-  }
+  if (items.length > 0) box.append(namedList(items.map((task) => task.text)));
 
   if (note !== "") {
     const line = document.createElement("p");
@@ -86,4 +66,32 @@ function gate(name: string, count: string, note: string, items: Task[]): HTMLEle
     box.append(line);
   }
   return box;
+}
+
+/**
+ * A capped list of row names, with the rest counted.
+ *
+ * Shared with the closing card's "Got done", which is the same shape of thing
+ * said about the other half of the day — so the two cannot end up capping or
+ * phrasing it differently.
+ */
+export function namedList(texts: string[]): HTMLElement {
+  const { named, more } = shortlist(texts);
+  const list = document.createElement("ul");
+  list.className = "gitems";
+  for (const text of named) {
+    const row = document.createElement("li");
+    const pip = document.createElement("span");
+    pip.className = "pip";
+    pip.setAttribute("aria-hidden", "true");
+    row.append(pip, document.createTextNode(text));
+    list.append(row);
+  }
+  if (more > 0) {
+    const rest = document.createElement("li");
+    rest.className = "gmore";
+    rest.textContent = andMore(more);
+    list.append(rest);
+  }
+  return list;
 }

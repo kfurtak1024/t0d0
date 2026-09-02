@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { outstandingImportant, scoreDay, stepsToBar, summarise } from "../src/progress";
 import {
+  andMore,
   barAtClose,
   barSoFar,
   departingNote,
+  didHeading,
   elapsed,
   endLabel,
+  NAMED,
   nextLine,
+  shortlist,
   verdictOf,
 } from "../src/words";
 import type { State, Task } from "../src/types";
@@ -262,5 +266,55 @@ describe("the two bar notes", () => {
   it("report whichever bar the preference names", () => {
     expect(barSoFar(0, 0.5)).toContain("set at 50%");
     expect(barAtClose(2, 1)).toBe("short of the bar, set at 100%");
+  });
+});
+
+/*
+ * The cap the cards list under. One rule for both halves of the report: the
+ * gates name what is still owed, "Got done" names what is behind you, and a
+ * card that capped those differently would say the same kind of thing twice
+ * in two voices.
+ */
+describe("shortlist", () => {
+  const rows = (n: number): string[] => Array.from({ length: n }, (_, i) => `row ${String(i)}`);
+
+  it("names everything while everything fits", () => {
+    expect(shortlist(rows(NAMED))).toEqual({ named: rows(NAMED), more: 0 });
+    expect(shortlist([])).toEqual({ named: [], more: 0 });
+  });
+
+  it("counts the rest once it stops naming them", () => {
+    const { named, more } = shortlist(rows(NAMED + 3));
+    expect(named).toHaveLength(NAMED);
+    expect(more).toBe(3);
+  });
+
+  it("keeps the order the list keeps", () => {
+    expect(shortlist(["c", "a", "b"], 2).named).toEqual(["c", "a"]);
+  });
+
+  it("never reports a negative remainder", () => {
+    expect(shortlist(rows(1), 9).more).toBe(0);
+  });
+
+  it("says what it left out", () => {
+    expect(andMore(3)).toBe("and 3 more");
+    expect(andMore(1)).toBe("and 1 more");
+  });
+});
+
+describe("didHeading", () => {
+  it("counts the day's work in the heading itself", () => {
+    expect(didHeading(1)).toBe("Got done — 1 thing");
+    expect(didHeading(7)).toBe("Got done — 7 things");
+  });
+
+  /*
+   * Silent on a day with nothing done, for the same reason `verdictOf` is
+   * silent on an unfinished one: an empty "Got done" heading reads worse than
+   * no heading at all.
+   */
+  it("says nothing at all when nothing got done", () => {
+    expect(didHeading(0)).toBe("");
   });
 });

@@ -146,7 +146,15 @@ export function dayHue(score: DayScore, bar: number): number {
 export interface DaySummary {
   done: number;
   total: number;
-  clearedGroups: string[];
+  /**
+   * What actually got finished, named, in the order the list keeps them.
+   *
+   * The count above says how much; this says what. The closing card reports
+   * both, because a number is not recognition — and the card's other list
+   * names what is still outstanding, so naming only that made the one ritual
+   * the app exists for a record of what you missed.
+   */
+  finished: string[];
   elapsedMs: number | null;
   /** The verdict the card reports before it clears anything. */
   score: DayScore;
@@ -154,13 +162,12 @@ export interface DaySummary {
 
 export function summarise(state: State, now: number, bar: number): DaySummary {
   const tasks = allTasks(state.list);
+  const finished = tasks.filter(isDone);
   return {
-    done: tasks.filter(isDone).length,
+    done: finished.length,
     total: tasks.length,
     score: scoreDay(state, bar),
-    clearedGroups: state.list
-      .filter((node) => node.kind === "group" && node.items.length > 0 && node.items.every(isDone))
-      .map((node) => (node as { title: string }).title),
+    finished: finished.map((task) => task.text),
     elapsedMs: state.openedAt === null ? null : Math.max(0, now - state.openedAt),
   };
 }

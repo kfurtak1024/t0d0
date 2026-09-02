@@ -362,6 +362,66 @@ test("the closing card names what held the day back", async ({ page }) => {
  * The card grew, and it is the one card with a destructive button. "Clear the
  * ticks" below the fold is how someone taps it without reading what it says.
  */
+/**
+ * The close names what got done, not only how much of it.
+ *
+ * The card's other list names what is still outstanding, so before this the one
+ * ritual the app exists for reported a bare number and a record of what you
+ * missed, then wiped the evidence. The count says how much; this says what.
+ */
+test("the closing card names what actually got done", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [
+      { kind: "task", id: "a", text: "eat breakfast", target: 1, count: 1 },
+      { kind: "task", id: "b", text: "walk the dog", target: 1, count: 1 },
+      { kind: "task", id: "c", text: "water plants", target: 1, count: 0 },
+    ],
+  });
+  await page.locator("#closeday").click();
+
+  const did = page.locator("#veil .did");
+  await expect(did).toBeVisible();
+  await expect(did.locator(".did-title")).toHaveText("Got done — 2 things");
+  await expect(did.locator(".gitems li")).toHaveText(["eat breakfast", "walk the dog"]);
+  // What is still to do belongs to the gates, not here.
+  await expect(did).not.toContainText("water plants");
+});
+
+test("it caps the list and counts the rest, like the gates above it", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: Array.from({ length: 7 }, (_, i) => ({
+      kind: "task",
+      id: `t${String(i)}`,
+      text: `thing ${String(i)}`,
+      target: 1,
+      count: 1,
+    })),
+  });
+  await page.locator("#closeday").click();
+
+  const rows = page.locator("#veil .did .gitems li");
+  await expect(rows).toHaveCount(5);
+  await expect(rows.nth(4)).toHaveText("and 3 more");
+  await expect(page.locator("#veil .did .did-title")).toHaveText("Got done — 7 things");
+});
+
+/*
+ * The same silence `verdictOf` keeps on an unfinished day: an empty "Got done"
+ * heading is a worse thing to read at the close than no heading at all.
+ */
+test("it says nothing at all on a day with nothing done", async ({ page }) => {
+  await addItem(page, "water plants");
+  await addItem(page, "shopping");
+  await page.locator("#closeday").click();
+
+  await expect(page.locator("#veil .score")).toHaveText("0 of 2");
+  await expect(page.locator("#veil .did")).toBeHidden();
+});
+
 test("the closing card does not scroll on a roomy window", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await addItem(page, "call the bank!");
