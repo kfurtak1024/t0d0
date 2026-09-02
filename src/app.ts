@@ -343,7 +343,7 @@ export class App {
 
     const { openedAt } = this.#state;
     if (openedAt !== null && Date.now() - openedAt > STALE_MS) {
-      this.#sheet.show(this.#state, Date.now(), this.#bar);
+      this.#sheet.show(this.#state, this.#bar);
     }
   }
 
@@ -992,7 +992,7 @@ export class App {
     });
 
     this.#closer.addEventListener("click", () => {
-      this.#sheet.show(this.#state, Date.now(), this.#bar);
+      this.#sheet.show(this.#state, this.#bar);
     });
     /*
      * The ring reports; the closer ends the day. Two cards, and only one of
@@ -1000,7 +1000,7 @@ export class App {
      * than a second thing to press next to the closer.
      */
     this.#ringButton.addEventListener("click", () => {
-      if (hasDay(this.#state)) this.#stands.show(this.#state, Date.now(), this.#bar);
+      if (hasDay(this.#state)) this.#stands.show(this.#state, this.#bar);
     });
     (el("#databtn") as HTMLButtonElement).addEventListener("click", () => {
       this.#drawer.show();

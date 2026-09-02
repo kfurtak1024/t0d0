@@ -1,6 +1,6 @@
 import { summarise, type DayScore, type DaySummary } from "../progress";
 import { departing } from "../transitions";
-import { barAtClose, departingNote, didHeading, elapsed, verdictOf } from "../words";
+import { barAtClose, departingNote, didHeading, verdictOf } from "../words";
 import { keyboardScrollable, need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
@@ -41,7 +41,6 @@ export class DaySheet {
   #gates: HTMLElement;
   #did: HTMLElement;
   #departing: HTMLElement;
-  #elapsed: HTMLElement;
   #panel: HTMLElement;
   #body: HTMLElement;
   #release: (() => void) | null = null;
@@ -65,7 +64,6 @@ export class DaySheet {
     this.#gates = need(veil, "#closegates");
     this.#did = need(veil, ".did");
     this.#departing = need(veil, ".departing");
-    this.#elapsed = need(veil, ".dur");
     this.#body = need(veil, ".sheet-body");
     this.#body.insertBefore(this.#rail.element, this.#gates);
 
@@ -101,8 +99,8 @@ export class DaySheet {
     return !this.#veil.hidden;
   }
 
-  show(state: State, now: number, bar: number): void {
-    const summary = summarise(state, now, bar);
+  show(state: State, bar: number): void {
+    const summary = summarise(state, bar);
     this.#done = `${String(summary.done)} of ${String(summary.total)}`;
     this.#score.textContent = this.#done;
     this.#label.textContent =
@@ -130,9 +128,6 @@ export class DaySheet {
       title.textContent = heading;
       this.#did.replaceChildren(title, namedList(summary.finished));
     }
-
-    this.#elapsed.textContent =
-      summary.elapsedMs === null ? "" : `${elapsed(summary.elapsedMs)} since you started`;
 
     const note = departingNote(departing(state).map((task) => task.text));
     this.#departing.textContent = note;

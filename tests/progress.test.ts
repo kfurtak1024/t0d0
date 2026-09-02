@@ -236,26 +236,21 @@ describe("summarise", () => {
       group("Work", [task("c", 0)]),
       task("d", 1),
     ]);
-    expect(summarise(s, 0, 0.7)).toMatchObject({
+    expect(summarise(s, 0.7)).toMatchObject({
       done: 3,
       total: 4,
       finished: ["a", "b", "d"],
-      elapsedMs: null,
     });
   });
 
   it("names nothing on a day with an empty group and no work", () => {
-    expect(summarise(state([group("Empty", [])]), 0, 0.7).finished).toEqual([]);
-  });
-
-  it("reports elapsed time once the day has opened", () => {
-    expect(summarise(state([task("a")], 1000), 61_000, 0.7).elapsedMs).toBe(60_000);
+    expect(summarise(state([group("Empty", [])]), 0.7).finished).toEqual([]);
   });
 
   it("carries the day's verdict, so the card can report before it clears", () => {
     const s = state([key("ship", 1), task("a", 1), task("b", 1), task("c", 1), task("d", 0)]);
-    expect(summarise(s, 0, 0.7).score).toMatchObject({ cleared: true, succeeded: true });
-    expect(summarise(s, 0, 0.9).score).toMatchObject({ cleared: true, succeeded: false });
+    expect(summarise(s, 0.7).score).toMatchObject({ cleared: true, succeeded: true });
+    expect(summarise(s, 0.9).score).toMatchObject({ cleared: true, succeeded: false });
   });
 });
 

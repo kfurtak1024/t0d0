@@ -70,19 +70,6 @@ export const didHeading = (done: number): string =>
   done === 0 ? "" : `Got done — ${plural(done, "thing", "things")}`;
 
 /**
- * How long the day has been open, without naming a unit nobody asked for.
- *
- * No suffix: the cards differ on what follows — "in" while the day runs,
- * "since you started" once it is over — so the sentence belongs to the caller
- * and only the duration is shared.
- */
-export function elapsed(ms: number): string {
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 60) return `${String(minutes)} min`;
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60).padStart(2, "0")}m`;
-}
-
-/**
  * What the closer says about the day so far.
  *
  * The ring reports the same thing in hue, and hue is not a channel everyone

@@ -155,12 +155,17 @@ export interface DaySummary {
    * the app exists for a record of what you missed.
    */
   finished: string[];
-  elapsedMs: number | null;
   /** The verdict the card reports before it clears anything. */
   score: DayScore;
 }
 
-export function summarise(state: State, now: number, bar: number): DaySummary {
+/**
+ * No clock. How long a day took is not something this app has an opinion about,
+ * and the cards said it only because `openedAt` happened to be there —
+ * `openedAt` stays, because the stale-day card still needs to know a day was
+ * left overnight, but nothing reports it back at you.
+ */
+export function summarise(state: State, bar: number): DaySummary {
   const tasks = allTasks(state.list);
   const finished = tasks.filter(isDone);
   return {
@@ -168,7 +173,6 @@ export function summarise(state: State, now: number, bar: number): DaySummary {
     total: tasks.length,
     score: scoreDay(state, bar),
     finished: finished.map((task) => task.text),
-    elapsedMs: state.openedAt === null ? null : Math.max(0, now - state.openedAt),
   };
 }
 

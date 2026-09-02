@@ -1,6 +1,6 @@
 import { allTasks, outstandingImportant, stepsToBar, summarise } from "../progress";
 import type { State } from "../types";
-import { barSoFar, elapsed, nextLine } from "../words";
+import { barSoFar, nextLine } from "../words";
 import { keyboardScrollable, need } from "./dom";
 import { trapFocus } from "./focus";
 import { renderGates } from "./gates";
@@ -21,7 +21,6 @@ export class StandsSheet {
   #rail = new Rail();
   #next: HTMLElement;
   #gates: HTMLElement;
-  #dur: HTMLElement;
   #body: HTMLElement;
   #release: (() => void) | null = null;
 
@@ -32,7 +31,6 @@ export class StandsSheet {
     this.#of = need(veil, ".of");
     this.#next = need(veil, "#standsnext");
     this.#gates = need(veil, "#standsgates");
-    this.#dur = need(veil, "#standsdur");
     this.#body = need(veil, ".sheet-body");
     this.#body.insertBefore(this.#rail.element, this.#gates);
 
@@ -48,8 +46,8 @@ export class StandsSheet {
     return !this.#veil.hidden;
   }
 
-  show(state: State, now: number, bar: number): void {
-    const summary = summarise(state, now, bar);
+  show(state: State, bar: number): void {
+    const summary = summarise(state, bar);
     const { score } = summary;
 
     this.#score.textContent = `${String(summary.done)} of ${String(summary.total)}`;
@@ -65,9 +63,6 @@ export class StandsSheet {
       stepsToBar(state, bar),
     );
     this.#gates.replaceChildren(...renderGates(state, bar, (steps) => barSoFar(steps, bar)));
-
-    this.#dur.textContent = summary.elapsedMs === null ? "" : `${elapsed(summary.elapsedMs)} in`;
-    this.#dur.hidden = summary.elapsedMs === null;
 
     this.#veil.hidden = false;
     // After the content is in and the box has a height to measure.

@@ -19,8 +19,15 @@ These are decisions, not defaults. Changing one is a conversation, not a refacto
   its place.
 - **No network at runtime.** No fonts, analytics, CDNs, telemetry, or API calls. The CSP
   meta tag enforces this — if a change needs an exception, the change is wrong.
-- **No dates.** `openedAt` is the only timestamp in the app, and it exists solely so the
-  end-of-day card can report elapsed time. Nothing rolls over, expires, or resets itself.
+- **No dates, and no clock.** `openedAt` is the only timestamp in the app, and the one
+  thing that reads it is the stale check: a day left open past `STALE_MS` is met with its
+  own summary in the morning. Nothing rolls over, expires, or resets itself, and **nothing
+  reports how long the day has taken** — both cards used to end on "3h 30m in" and
+  "6h 00m since you started", which measured the day rather than the work in it. Removing
+  that took `elapsedMs` out of `DaySummary`, `elapsed()` out of `words.ts` and the `now`
+  argument out of `summarise()` and both cards' `show()`; `openedAt` stays because the
+  stale check is a different question. Do not add a duration anywhere — it is the one
+  number this app has decided not to keep.
 - **No history.** Ticks are cleared, never archived. No streaks, no yesterday, no stats
   beyond the current list. A one-off removed at the close is deleted, not filed away —
   deleting is not archiving, which is why `once` does not breach this.

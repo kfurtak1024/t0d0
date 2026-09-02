@@ -23,6 +23,9 @@ const t = (id: string, text: string, important: boolean, count = 0, target = 1) 
 /** One marked item done of three, and the rest one short of a 70% bar. */
 const A_DAY = {
   v: 1,
+  // Recent, so the stale-day card does not open over this one. Nothing reports
+  // how long the day has taken; `openedAt` only says whether it was left
+  // overnight.
   openedAt: Date.now() - 90 * 60_000,
   list: [
     {
@@ -61,11 +64,26 @@ test("the ring opens the day's card, and the card only reports", async ({ page }
   // The marked work still to do, named, so the card says what to do next.
   await expect(page.locator(".stands .gate").first()).toContainText("book the tickets");
   await expect(page.locator(".stands .gate").first()).toContainText("reply to Dana");
-  await expect(page.locator("#standsdur")).toHaveText("1h 30m in");
 
   // Nothing here can change the list: one way out, and it is not a confirm.
   await expect(page.locator(".stands button")).toHaveCount(1);
   await expect(page.locator(".stands .dismiss")).toHaveText("Back to the list");
+});
+
+/*
+ * No clock on either card. How long the day has taken is not something this app
+ * has an opinion about; `openedAt` survives only so a day left overnight can be
+ * met with its own summary in the morning.
+ */
+test("neither day card reports how long the day has taken", async ({ page }) => {
+  await seedStorage(page, A_DAY);
+  await open(page);
+  await expect(page.locator(".stands")).not.toContainText(/\d+h \d+m|\d+ min/);
+  await page.keyboard.press("Escape");
+
+  await page.locator("#closeday").click();
+  await expect(page.locator("#veil .sheet")).toBeVisible();
+  await expect(page.locator("#veil .sheet")).not.toContainText(/\d+h \d+m|\d+ min/);
 });
 
 test("both gates are reported, because the day turns on both", async ({ page }) => {

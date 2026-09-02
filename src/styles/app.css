@@ -1496,12 +1496,6 @@ body.dragging-row {
   padding-left: 0.95rem;
 }
 
-.sheet .dur {
-  font-size: 0.8rem;
-  color: var(--faint);
-  margin-top: 0.6rem;
-}
-
 /*
   Sits directly above the one destructive button on the card, in the danger
   colour, because it names what that button takes away for good. Not a warning
@@ -1830,14 +1824,6 @@ body.dragging-row {
   font-size: 0.78rem;
   color: var(--faint);
   padding-left: calc(var(--r-card) / 3 + 0.45rem);
-}
-
-.stands .dur {
-  margin-top: 1rem;
-}
-
-.stands .dur[hidden] {
-  display: none;
 }
 
 .sheet .dismiss {

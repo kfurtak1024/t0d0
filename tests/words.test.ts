@@ -6,7 +6,6 @@ import {
   barSoFar,
   departingNote,
   didHeading,
-  elapsed,
   endLabel,
   NAMED,
   nextLine,
@@ -40,7 +39,7 @@ const scoreOf = (state: State, bar = 0.7) => scoreDay(state, bar);
 
 /** The card's own call, so the test cannot pass by handing in numbers by hand. */
 const lineFor = (state: State, bar = 0.7): string => {
-  const summary = summarise(state, 0, bar);
+  const summary = summarise(state, bar);
   return nextLine(
     scoreOf(state, bar),
     {
@@ -50,25 +49,6 @@ const lineFor = (state: State, bar = 0.7): string => {
     stepsToBar(state, bar),
   );
 };
-
-describe("elapsed", () => {
-  it("counts in whole minutes below the hour", () => {
-    expect(elapsed(0)).toBe("0 min");
-    expect(elapsed(45 * 60_000)).toBe("45 min");
-    expect(elapsed(59 * 60_000 + 20_000)).toBe("59 min");
-  });
-
-  it("switches to hours and pads the minutes", () => {
-    expect(elapsed(60 * 60_000)).toBe("1h 00m");
-    expect(elapsed(90 * 60_000)).toBe("1h 30m");
-    expect(elapsed(9 * 60 * 60_000 + 5 * 60_000)).toBe("9h 05m");
-  });
-
-  /* No suffix here: the two cards say "in" and "since you started". */
-  it("names no unit the caller did not ask for", () => {
-    expect(elapsed(90 * 60_000)).not.toContain("in");
-  });
-});
 
 describe("endLabel", () => {
   it("says the biggest true thing and stops", () => {
