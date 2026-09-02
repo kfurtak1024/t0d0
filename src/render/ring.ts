@@ -180,7 +180,9 @@ export function makeRing(size: number, width: number, target: number): Ring {
 }
 
 /**
- * `count` may be fractional for meter rings (group and overall progress).
+ * `count` may be fractional, which is how the day ring reports a mean rather
+ * than a tally. Only that ring does: a group carries a `2/3` tally in text and
+ * has never had a ring of its own.
  *
  * `colour` overrides the row sweep, which is how the day's ring wears the
  * rainbow while every row keeps the indigo→green one that matches its frame.

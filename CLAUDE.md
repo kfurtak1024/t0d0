@@ -60,9 +60,17 @@ Invariants worth defending in review:
 - **`list` is one ordered array.** Position is the ordering. Ungrouped tasks sit at the
   root beside groups; there is no implicit "Inbox".
 - **Progress is `mean(count / target)`** over tasks, so one `[20]` item cannot swamp the
-  ring. Empty groups are excluded from totals and render no ring.
+  ring. Empty groups are excluded from the totals. A group has no ring of its own and
+  never has had one — it carries a `2/3` tally in text — so the only fractional ring in
+  the app is the day's.
+- **A count and a proportion are different questions, and the header asks both.** The arc
+  and `#pct` report `progress()` — the mean — while `#frac` counts the rows that are
+  finished, so a list holding a part-done `[3]` reads "48%" beside "3 of 7" and the two
+  are both right. This is the same pairing a gate makes, where the bar fills to the mean
+  and the tally beside it counts: partial work moves the proportion and not the count.
+  (This line used to claim `#frac` and `#pct` reported the same thing. They never have.)
 - **The arc measures the list; the colour judges the day.** They answer different
-  questions and must not be conflated: `3 of 7` is what the arc and `#pct` report, while
+  questions and must not be conflated: the arc reports how much is done, while
   the hue reports `scoreDay()` — a list can be most of the way done and still have an
   important item outstanding, and the ring has to say so rather than average it away.
 - **The day succeeds on two gates, not one number.** Every important thing finished,
