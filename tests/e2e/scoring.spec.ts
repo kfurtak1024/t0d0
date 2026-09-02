@@ -504,45 +504,47 @@ const A_MIXED_DAY = {
 test("the closing card counts up and grows its bars", async ({ page }) => {
   await seedStorage(page, A_MIXED_DAY);
 
-  // Sampled inside the page: a screenshot or a round trip eats the timeline.
-  const trace = await page.evaluate(async () => {
-    const frames: { score: string; bars: number[] }[] = [];
+  /*
+   * Scrubbed, not sampled.
+   *
+   * Reading whatever frame happens to come first measures when the *sampler*
+   * started, not whether the card travels: WebKit spends around 300ms painting
+   * this card, and the first frame there already showed the bars 73% along.
+   * Driving the animations by hand asks the question directly and gets the same
+   * answer on every engine.
+   */
+  const shot = await page.evaluate(() => {
     document.getElementById("closeday")?.click();
-    const started = performance.now();
-    await new Promise<void>((done) => {
-      const tick = (): void => {
-        frames.push({
-          score: document.querySelector("#veil .score")?.textContent ?? "",
-          bars: [...document.querySelectorAll("#veil .gfill")].map((el) =>
-            Math.round(parseFloat(getComputedStyle(el).width)),
-          ),
-        });
-        if (performance.now() - started < 1200) requestAnimationFrame(tick);
-        else done();
-      };
-      requestAnimationFrame(tick);
-    });
-    return frames;
+    const opened = document.querySelector("#veil .score")?.textContent ?? "";
+
+    const bars = [...document.querySelectorAll<HTMLElement>("#veil .gfill")];
+    const runs = bars.flatMap((bar) => bar.getAnimations());
+    for (const run of runs) run.pause();
+
+    const at = (time: number): number[] => {
+      for (const run of runs) run.currentTime = time;
+      return bars.map((bar) => Math.round(parseFloat(getComputedStyle(bar).width)));
+    };
+    const ends = Math.max(
+      ...runs.map((run) => Number(run.effect?.getComputedTiming().endTime ?? 0)),
+    );
+    return { opened, runs: runs.length, start: at(0), middle: at(ends / 2), finish: at(ends) };
   });
 
-  const first = trace[0];
-  const last = trace[trace.length - 1];
+  // The score is pinned before anything moves, so it cannot flash its answer.
+  expect(shot.opened).toBe("0 of 6");
+  expect(shot.runs).toBe(2);
 
-  /*
-   * The property is that the numbers travel, not that any one frame holds a
-   * particular value: a loaded runner can drop the first frame, and asserting
-   * the animation had not moved by then would be a test that fails on a busy
-   * machine rather than on a broken card.
-   */
-  expect(last?.score).toBe("5 of 6");
-  for (const width of last?.bars ?? []) expect(width).toBeGreaterThan(0);
+  // Each bar begins at nothing and grows the whole way.
+  expect(shot.start).toEqual([0, 0]);
+  shot.middle.forEach((width, i) => {
+    expect(width).toBeGreaterThan(shot.start[i] ?? 0);
+    expect(width).toBeLessThan(shot.finish[i] ?? 0);
+  });
 
-  // It begins well short of where it ends...
-  const grew = (first?.bars ?? []).every((width, i) => width < (last?.bars[i] ?? 0) / 2);
-  expect(grew, `first frame ${JSON.stringify(first)} vs last ${JSON.stringify(last)}`).toBe(true);
-
-  // ...and genuinely passes through the middle rather than jumping.
-  expect(trace.some((f) => f.score !== first?.score && f.score !== last?.score)).toBe(true);
+  // And left to itself it arrives at the day.
+  await expect(page.locator("#veil .score")).toHaveText("5 of 6");
+  for (const width of shot.finish) expect(width).toBeGreaterThan(0);
 });
 
 /*

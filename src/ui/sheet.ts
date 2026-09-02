@@ -50,6 +50,7 @@ export class DaySheet {
   /** Everything the current run owns, so any of it can be cut short at once. */
   #playing: Animation[] = [];
   #countRaf = 0;
+  #startRaf = 0;
   #cheer: ReturnType<typeof setTimeout> | undefined;
   /** What the score reads when it has finished arriving. */
   #done: string | null = null;
@@ -193,15 +194,33 @@ export class DaySheet {
     });
 
     if (!this.#rail.element.hidden) this.#playing.push(...this.#rail.play(0, BARS_MS));
-    this.#countUp(summary.done, summary.total);
 
-    // Last, so the shower arrives on a card that has finished arriving.
-    this.#cheer = setTimeout(
-      () => {
-        this.#celebrate(summary.score);
-      },
-      BARS_MS + bars.length * STAGGER_MS,
-    );
+    /*
+     * Held at the start, then let go on the first painted frame — not at the
+     * press.
+     *
+     * WebKit spends around 300ms getting this card on screen the first time
+     * (the veil's blur, the card's own entry), and an animation whose clock
+     * started at the press has by then already run most of its course:
+     * measured, the bars stood 73% of the way along before a single frame had
+     * been painted, so the reveal was over before it was ever seen. Everything
+     * is created paused, which `fill: "backwards"` pins at its first keyframe,
+     * so nothing shows a value it has not travelled to — the score included,
+     * which is why that is written out here rather than inside the tween.
+     */
+    for (const animation of this.#playing) animation.pause();
+    this.#score.textContent = `0 of ${String(summary.total)}`;
+    this.#startRaf = requestAnimationFrame(() => {
+      for (const animation of this.#playing) animation.play();
+      this.#countUp(summary.done, summary.total);
+      // Last, so the shower arrives on a card that has finished arriving.
+      this.#cheer = setTimeout(
+        () => {
+          this.#celebrate(summary.score);
+        },
+        BARS_MS + bars.length * STAGGER_MS,
+      );
+    });
   }
 
   /** Count the score up to what it already says. */
@@ -214,7 +233,6 @@ export class DaySheet {
       this.#score.textContent = `${String(Math.round(done * eased))} of ${String(total)}`;
       if (k < 1) this.#countRaf = requestAnimationFrame(step);
     };
-    this.#score.textContent = `0 of ${String(total)}`;
     this.#countRaf = requestAnimationFrame(step);
   }
 
@@ -227,6 +245,7 @@ export class DaySheet {
    * left at whatever frame it reached.
    */
   #land(): void {
+    cancelAnimationFrame(this.#startRaf);
     for (const animation of this.#playing) animation.finish();
     this.#playing = [];
     cancelAnimationFrame(this.#countRaf);

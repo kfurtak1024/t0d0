@@ -457,6 +457,27 @@ Invariants worth defending in review:
   path but this one skipped, and cutting the run short is `finish()` on a list of
   animations rather than a re-render. Only this card plays it — the stands card is a
   status check, and a flourish every time you glance at the day would wear out in a week.
+- **The reveal starts on the first painted frame, not on the press.** WebKit spends around
+  300ms getting this card on screen the first time — the veil's blur, the card's own
+  entry — and an animation whose clock started at the press has by then already run most
+  of its course: measured, the bars stood 73% along before a single frame had been
+  painted, so on Safari the reveal was over before it was ever seen. Everything is created
+  **paused**, which `fill: "backwards"` pins at its first keyframe, and let go on one
+  `requestAnimationFrame`. The score is written out as "0 of n" in the same breath, since
+  it is the one value not held by an animation and would otherwise flash its answer.
+- **Test the reveal by scrubbing it, never by sampling frames.** Reading whichever frame
+  arrives first measures when the _sampler_ started, not whether the card travels, and it
+  is a different number on every engine — Chromium's first frame landed at 7ms and
+  WebKit's at ~330ms, which is what made the sampled version fail on CI and pass here.
+  `scoring.spec.ts` pauses the animations and drives `currentTime` to nothing, halfway and
+  the end, which asks the question directly and gets the same answer everywhere.
+- **The two day cards put the score and its label on one line.** Two lines cost a whole
+  row of the card's height, and the gate bars spent it: measured on an iPhone 13 (a 664px
+  viewport, not the 844px screen), an ordinary day needed 445px of a 416px box and 29 of
+  those were the bars. The sizes still differ — the closing card keeps the big number
+  because it is the moment, `.stands` takes it to a quiet 1.55rem — but the label sits
+  beside it on both. Adding a row to the closing card means re-measuring this on the small
+  viewport, not on a desktop one.
 - **Any press lands the reveal at once.** This is the one card with a destructive button,
   and an animation you have to sit through before you can read what "Clear the ticks"
   takes away is a worse problem than a card that does not move. The listener is on the

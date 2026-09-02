@@ -1319,6 +1319,21 @@ body.dragging-row {
   color: var(--faint);
 }
 
+/*
+  The score and its label on one line, on both cards.
+
+  Two lines cost a whole row of height, and the gate bars have since spent it:
+  measured on an iPhone, an ordinary day needed 445px of a 416px box, and 29 of
+  those were the bars. The cards still read differently — the size below is the
+  closing card's, and `.stands` takes it down to a quiet 1.55rem.
+*/
+.glance {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
 .sheet .score {
   font-size: 2.6rem;
   font-weight: 700;
@@ -1331,7 +1346,6 @@ body.dragging-row {
 .sheet .of {
   font-size: 0.9rem;
   color: var(--muted);
-  margin-bottom: 0.5rem;
 }
 
 /* The day's verdict, above the list of what got cleared. Absent rather than
@@ -1506,9 +1520,6 @@ body.dragging-row {
   gates below are what the card is actually for.
 */
 .stands .glance {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
   gap: 0.4rem;
   margin: 0.1rem 0 0.2rem;
 }
