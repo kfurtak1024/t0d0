@@ -121,11 +121,19 @@
       >
         <div class="sheet-body">
           <h2 id="standstitle">Where the day stands</h2>
-          <p class="score" id="standsscore">0 of 0</p>
-          <p class="of">done</p>
-          <!-- The rail goes in above this line; see the note on the closing card. -->
-          <p class="next" id="standsnext"></p>
+          <!-- One line, and a quiet one. This card is a status check rather than
+               an event, so the number anchors it without shouting and the gates
+               below are the content; the closing card keeps the big number,
+               because there it is the moment. -->
+          <p class="glance">
+            <span class="score" id="standsscore">0 of 0</span> <span class="of">done</span>
+          </p>
+          <!-- The rail goes in above the gates; see the note on the closing card. -->
           <div class="gates" id="standsgates"></div>
+          <!-- Last, not in the middle. It names the next landmark, which is
+               what you do *after* reading where you are — and stated above the
+               gates it was a bold restatement of the one directly beneath it. -->
+          <p class="next" id="standsnext"></p>
           <p class="dur" id="standsdur"></p>
         </div>
         <button class="dismiss" type="button">Back to the list</button>

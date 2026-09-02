@@ -1444,8 +1444,34 @@ body.dragging-row {
   gap: 0;
 }
 
+/*
+  The card's anchor, on one line and at a size that does not compete.
+
+  It reported the day five times over: this number, the rail's dot, a bold
+  two-line "what next", and then both gates saying the halves it is the sum of.
+  Nothing was wrong; nothing was subordinate either, so all five shouted at
+  once. The number stays because a card wants an anchor — demoted, because the
+  gates below are what the card is actually for.
+*/
+.stands .glance {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.1rem 0 0.2rem;
+}
+
 .stands .score {
-  margin-top: 0.2rem;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 0;
+}
+
+.stands .of {
+  font-size: 0.85rem;
+  color: var(--faint);
+  margin-bottom: 0;
 }
 
 /* The rail sits under the score on both cards, and hides itself on a day with
@@ -1552,12 +1578,19 @@ body.dragging-row {
   margin-top: 0.1rem;
 }
 
+/*
+  What the next tick buys, read after the gates rather than over them.
+
+  It used to sit above them in --ink at 650, which put the loudest sentence on
+  the card immediately above the two panels that restate it — "2 important
+  things left" is the Important gate's own tally, subtracted.
+*/
 .stands .next {
-  font-size: 0.95rem;
-  font-weight: 650;
-  color: var(--ink);
-  line-height: 1.35;
-  margin: 0.85rem 0 0.15rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0.9rem 0 0;
 }
 
 /* Both gates, because the day turns on both and the ring can only show one. */

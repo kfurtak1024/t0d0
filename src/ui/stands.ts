@@ -34,7 +34,7 @@ export class StandsSheet {
     this.#gates = need(veil, "#standsgates");
     this.#dur = need(veil, "#standsdur");
     this.#body = need(veil, ".sheet-body");
-    this.#body.insertBefore(this.#rail.element, this.#next);
+    this.#body.insertBefore(this.#rail.element, this.#gates);
 
     need(veil, ".dismiss").addEventListener("click", () => {
       this.hide();

@@ -410,6 +410,14 @@ Invariants worth defending in review:
   name changes to "Everything" when it stands alone; an empty second gate is vacuously
   met) and every one of them is decidable without a DOM, so they belong where coverage
   reaches. `tests/progress.test.ts` pins them.
+- **The day-stands card is a status check; the closing card is the event.** The stands
+  card reported the day five times over — a 42px "4 of 8", the rail's dot, a bold two-line
+  "what next", and both gates saying the halves that number is the sum of. Nothing was
+  wrong and nothing was subordinate, so all five shouted at once. So its number is one
+  quiet line, "what next" moved **below** the gates (stated above them it was a loud
+  restatement of the panel directly beneath it), and the gates are the content. The
+  closing card keeps the big number on purpose: there it is the moment, and the two cards
+  reading differently is what tells them apart.
 - **Both day cards wear the same rail and the same gates**, from `src/ui/rail.ts` and
   `src/ui/gates.ts`. Two copies would be two rainbows able to drift from `dayStroke` and
   from each other, and the rail's whole claim is that it cannot disagree with the ring.
