@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, shape } from "./helpers";
+import { addItem, buildList, clearStorage, seedStorage, shape } from "./helpers";
 
 /**
  * Reordering has two front doors — the ⋯ menu for a thumb and Alt+Arrow for a
@@ -15,9 +15,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("the ⋯ menu moves a row up and down", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
-  await addItem(page, "gamma");
+  await buildList(page, ["alpha", "beta", "gamma"]);
 
   await menuOf(page, "gamma").click();
   await page.getByRole("menuitem", { name: "Move up" }).click();
@@ -35,9 +33,7 @@ test("the ⋯ menu moves a row up and down", async ({ page }) => {
  * coverage set, and the specs here only ever clicked its entries.
  */
 test("the ⋯ menu moves focus with the arrow keys, and wraps", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
-  await addItem(page, "gamma");
+  await buildList(page, ["alpha", "beta", "gamma"]);
 
   // A middle row, so both moves are live and every entry is usable.
   await menuOf(page, "beta").click();
@@ -73,8 +69,7 @@ test("the ⋯ menu moves focus with the arrow keys, and wraps", async ({ page })
  * second to last.
  */
 test("arrowing from the menu itself lands on the end it points at", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   await menuOf(page, "beta").click();
   const entries = page.getByRole("menuitem");
@@ -90,9 +85,7 @@ test("arrowing from the menu itself lands on the end it points at", async ({ pag
 });
 
 test("Home and End reach the ends of the ⋯ menu", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
-  await addItem(page, "gamma");
+  await buildList(page, ["alpha", "beta", "gamma"]);
 
   await menuOf(page, "beta").click();
   await page.keyboard.press("End");
@@ -106,8 +99,7 @@ test("Home and End reach the ends of the ⋯ menu", async ({ page }) => {
  * finger — which means the keyboard has to step over it rather than into it.
  */
 test("the arrow keys skip a spent move rather than landing on it", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   // The top row: "Move up" is there but spent.
   await menuOf(page, "alpha").click();
@@ -128,8 +120,7 @@ test("the arrow keys skip a spent move rather than landing on it", async ({ page
 test("a spent move stays in place, disabled, rather than moving under the finger", async ({
   page,
 }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   await menuOf(page, "beta").click();
   const up = page.getByRole("menuitem", { name: "Move up" });
@@ -141,8 +132,7 @@ test("a spent move stays in place, disabled, rather than moving under the finger
 });
 
 test("Alt+Arrow reorders the focused row and keeps the focus on it", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   const tick = page.locator(".task", { hasText: "beta" }).locator(".tick");
   await tick.focus();
@@ -162,9 +152,7 @@ test("Alt+Arrow reorders the focused row and keeps the focus on it", async ({ pa
  * separately, with Tab / Shift-Tab or the menu's own entry.
  */
 test("Alt+Arrow moves an item within its group and stops at the ends", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await addItem(page, "walk the dog");
+  await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
 
   const tick = page.locator(".task", { hasText: "eat breakfast" }).locator(".tick");
   await tick.focus();
@@ -182,10 +170,7 @@ test("Alt+Arrow moves an item within its group and stops at the ends", async ({ 
 });
 
 test("a root item steps past a whole group rather than into it", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await page.locator("#dest").selectOption("");
-  await addItem(page, "loose");
+  await buildList(page, ["# Morning", "  eat breakfast", "loose"]);
 
   await page.locator(".list > .task", { hasText: "loose" }).locator(".tick").focus();
   await page.keyboard.press("Alt+ArrowUp");
@@ -194,9 +179,7 @@ test("a root item steps past a whole group rather than into it", async ({ page }
 });
 
 test("Shift+Tab is what takes an item out of its group", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await addItem(page, "walk the dog");
+  await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
 
   await page.locator(".task", { hasText: "eat breakfast" }).locator(".tick").focus();
   await page.keyboard.press("Shift+Tab");
@@ -205,10 +188,7 @@ test("Shift+Tab is what takes an item out of its group", async ({ page }) => {
 });
 
 test("a group moves as one block", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await page.locator("#dest").selectOption("");
-  await addItem(page, "loose");
+  await buildList(page, ["# Morning", "  eat breakfast", "loose"]);
 
   await page.locator(".group").locator(".chev").focus();
   await page.keyboard.press("Alt+ArrowDown");
@@ -217,9 +197,7 @@ test("a group moves as one block", async ({ page }) => {
 });
 
 test("the menu's moves are level-scoped, with leaving as its own entry", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await addItem(page, "walk the dog");
+  await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
 
   await menuOf(page, "eat breakfast").click();
   // Top of its group: down is available, up is spent — it will not pop out.
@@ -231,10 +209,7 @@ test("the menu's moves are level-scoped, with leaving as its own entry", async (
 });
 
 test("the menu offers the group above by name, and nesting is undoable", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await page.locator("#dest").selectOption("");
-  await addItem(page, "loose");
+  await buildList(page, ["# Morning", "  eat breakfast", "loose"]);
 
   await menuOf(page, "loose").click();
   await page.getByRole("menuitem", { name: "Into “Morning”" }).click();
@@ -258,8 +233,7 @@ test("the menu closes on Escape and hands focus back to its ⋯", async ({ page 
 });
 
 test("a reordered list survives a reload", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   await menuOf(page, "beta").click();
   await page.getByRole("menuitem", { name: "Move up" }).click();

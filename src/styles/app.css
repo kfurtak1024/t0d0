@@ -1496,23 +1496,6 @@ body.dragging-row {
   padding-left: 0.95rem;
 }
 
-/*
-  Sits directly above the one destructive button on the card, in the danger
-  colour, because it names what that button takes away for good. Not a warning
-  the eye can skip: --danger clears 4.5:1 on the card, which the a11y spec
-  pins.
-*/
-.sheet .departing {
-  margin-top: 0.9rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--danger);
-}
-
-.sheet .departing[hidden] {
-  display: none;
-}
-
 .sheet button {
   margin-top: 1.3rem;
   width: 100%;

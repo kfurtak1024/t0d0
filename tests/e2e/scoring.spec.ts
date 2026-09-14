@@ -815,15 +815,13 @@ for (const [width, height] of [
   [320, 568],
   [740, 360],
 ] as const) {
-  test(`the confirm and its warning stay on screen at ${String(width)}x${String(height)}`, async ({
-    page,
-  }) => {
+  test(`both buttons stay on screen at ${String(width)}x${String(height)}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await seedStorage(page, HEAVY);
     await page.locator("#closeday").click();
-    await expect(page.locator("#veil .departing")).toBeVisible();
+    await expect(page.locator("#veil .confirm")).toBeVisible();
 
-    for (const selector of ["#veil .confirm", "#veil .departing"]) {
+    for (const selector of ["#veil .confirm", "#veil .dismiss"]) {
       const box = await page.locator(selector).boundingBox();
       expect(box, selector).not.toBeNull();
       expect(box?.y ?? -1, `${selector} above the top`).toBeGreaterThanOrEqual(0);

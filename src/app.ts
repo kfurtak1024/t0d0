@@ -195,8 +195,16 @@ export class App {
             ) ?? null,
         );
       },
+      /*
+       * One-way. A group's `+` used to toggle, so pressing it on the group you
+       * were already aiming at threw the aim back to the root — and the press
+       * that did it looks exactly like the press that set it. The destination
+       * is a place, not a switch: pressing `+` on a group can only ever mean
+       * "put it here". The `#dest` row is the way back to the top level, and it
+       * is on screen whenever there is a group to aim at.
+       */
       aim: (id) => {
-        this.#destId = this.#destId === id ? null : id;
+        this.#destId = id;
         this.#render();
         this.#input.focus();
       },
@@ -354,14 +362,14 @@ export class App {
     if (!before) return;
     const wasDone = isDone(before);
     /*
-     * The row this tick belongs to: the task itself, or the group holding it —
-     * the same row `#tidy` would have sent down, so the same one has to come
-     * back up. Read before the change, because whether it *was* finished is
-     * what says there is anything to come back from.
+     * What `#tidy` would have sent down, read before the change — because
+     * whether a row *was* finished is what says there is anything to come back
+     * from. Two rows, the same two the tidy queues: the task itself, and the
+     * group around it when the last tick completed it.
      */
-    const rowId = T.ownerOf(this.#state, id)?.id ?? id;
-    const rowBefore = T.findRow(this.#state, rowId);
-    const wasFinished = rowBefore !== undefined && T.isFinished(rowBefore);
+    const owner = T.ownerOf(this.#state, id);
+    const ownerBefore = owner ? T.findRow(this.#state, owner.id) : undefined;
+    const ownerFinished = ownerBefore !== undefined && T.isFinished(ownerBefore);
 
     let next = T.bump(this.#state, id, delta, Date.now());
     const after = T.findTask(next, id);
@@ -369,11 +377,20 @@ export class App {
 
     /*
      * An untick's rise rides on the same change as the tick, so one press is
-     * one state change: one render, one milestone check, and the row travels
+     * one state change: one render, one milestone check, and the rows travel
      * under the same FLIP pass rather than a second one chasing the first.
+     *
+     * One untick can undo two journeys — the row climbing back up its group,
+     * and the group climbing back up the list — and the two arrays are
+     * independent, so the order they are asked in does not matter.
      */
-    const rowAfter = T.findRow(next, rowId);
-    if (wasFinished && rowAfter && !T.isFinished(rowAfter)) next = this.#untidy(next, rowId);
+    if (after !== undefined && wasDone && !isDone(after)) {
+      next = this.#untidy(next, id);
+      if (owner && ownerFinished) {
+        const ownerAfter = T.findRow(next, owner.id);
+        if (ownerAfter && !T.isFinished(ownerAfter)) next = this.#untidy(next, owner.id);
+      }
+    }
 
     /*
      * Before the apply, not after. A crossed milestone fires its own pattern
@@ -415,15 +432,16 @@ export class App {
   /**
    * Send what a tick just finished down out of the way, if the preference is on.
    *
-   * A tick inside a group tidies the group, and only once the whole group is
-   * done — one item finishing is not the group finishing. A tick on a root item
-   * tidies that row itself. Either way the row lands below the work that is
-   * left, and a group folds shut on its way.
+   * A tick tidies the row it landed on, wherever that row sits: a root item
+   * drops past the work left in the list, a nested one past the work left in its
+   * group. Once the last item lands, the group has its own journey to make on
+   * top of that — so a tick can put two rows on the queue, and the transition is
+   * what knows which. Either way a row ends below the work that is left, and a
+   * group folds shut on its way.
    */
   #tidy(taskId: string): void {
     if (!this.#prefs.autoCollapseDone) return;
-    const id = T.rowToTidy(this.#state, taskId);
-    if (id !== null) this.#queueTidy(id);
+    for (const id of T.rowsToTidy(this.#state, taskId)) this.#queueTidy(id);
   }
 
   /**

@@ -149,12 +149,20 @@ Invariants worth defending in review:
   until it has played out. Folding a group by hand cancels that group's pending
   tidy, and only that one. The fold and the drop are **one state change**, so
   the card travels under FLIP instead of vanishing here and reappearing there.
-- **A new group lands above the first finished row**, not at the end of the list. It is
-  work, so it goes with the work — appending it buried a group you had just made under
-  the ticks, and the first thing you did with it was drag it back up. With nothing
-  finished there is nothing to go in front of, so it appends, which is where it always
-  landed. Root tasks still append: the composer aims at a new group, so an item you add
-  next goes inside it rather than needing a place of its own.
+- **Everything new lands at the top** — of the list, or of the group the composer is
+  aimed at. What you have just typed is the freshest thing you have to do, and it goes
+  where you can see it rather than at the end of a list running off the screen behind the
+  composer. It also settles what appending never could: a row pushed onto the end landed
+  **under the finished pile**, which left an unfinished row at the foot of the list, and
+  `pileFrom` stops at the first row that is not finished — so every row the tidy had sent
+  down jumped back above the ending the moment you added anything. A new group already
+  dodged that by landing above the first finished row; the top is that rule with nothing
+  left to special-case.
+- **Typing a list in reading order therefore builds it in reverse, and that is accepted.**
+  It is the price of the rule above and was weighed against it, not overlooked. The e2e
+  helper `buildList()` says the arrangement it wants and does the typing — reversing the
+  root rows, and each group's items after the group that has to exist first — so only
+  `composer.spec.ts` is written in terms of which way round the typing goes.
 - **The day's work sits above the ending; what is finished with sits below it.** On a
   good day the pile put the whole of itself between your last piece of work and the button
   that closes the day — measured, 593px, and "End day" off screen on a phone _and_ on an
@@ -185,7 +193,12 @@ Invariants worth defending in review:
   still work: they say something about the row rather than about where it sits. It reads
   through the _owning_ row, so a task in a finished group is settled with it while a
   finished task in an unfinished group is not — its group is still work and moves as one
-  block.
+  block. **A group's own finished run is deliberately not a second pile.** A nested row
+  that has sunk was put there by the machine the same way, so freezing it would be the
+  consistent thing — but a group has one `<ul>` and no ending block, so there is no
+  boundary on screen to explain why the row now refuses to move, and a control that
+  silently stops working is worse than an order you can disturb. Moving, nesting and
+  `Shift+Tab` all still work on a finished nested row.
 - **Show the pile before the patch; hide it only after.** FLIP measures where a row landed
   the moment the patch returns, and a `display: none` container has no box — so the first
   row to sink into an empty pile was handed its own position minus a zero rect and told to
@@ -197,19 +210,36 @@ Invariants worth defending in review:
   while the split returns to the end and the row travels from the pile back into the work.
   Keyed on the list alone, that journey happened instantly. `#render` compares the split
   with the last one and animates on its own account.
-- **A finished row sinks to the foot of the unfinished list**, stopping above
-  the run of finished rows already resting there — the pile keeps the order it
-  was earned rather than each arrival burying the last. A ticked root item and a
-  finished group travel alike; nested tasks stay put, because a group moves as
-  one block. `sink()` gets there by repeating the same level-scoped `reorder()`
-  step, not by computing an index.
+- **A finished row sinks to the foot of the work around it**, stopping above the run of
+  finished rows already resting there — the pile keeps the order it was earned rather
+  than each arrival burying the last. `sink()` gets there by repeating the same
+  level-scoped `reorder()` step, not by computing an index.
+- **"The work around it" is the same rule at either depth.** A ticked root item and a
+  finished group settle at the foot of the list; a ticked _nested_ item settles at the
+  foot of its own group, and stops at the group's edge rather than escaping it. Nested
+  tasks used to stay exactly where they were ticked, on the grounds that a group moves as
+  one block — which is still true of the group's journey through the list, and was never
+  a reason for the order _inside_ it to be the one place in the app where a finished row
+  did not get out of the way. `siblingsOf()` is the only thing that knows about the
+  depth: it hands `sink()` and `rise()` either `group.items` or `state.list`, and the
+  walk above it is unchanged.
+- **A tick can queue two rows, and `rowsToTidy()` is what knows.** Always the row itself,
+  plus the group when that tick completed it — the group then has its own journey to make
+  down the list. It returned a single id and chose the group over the task, which is
+  exactly how a finished row in a part-done group came to sit still. Queueing a task
+  inside an already-complete group is harmless: every sibling is finished, so the walk
+  stops on its first look.
 - **An untick brings the row back, by the mirror rule.** `rise()` is `sink()` reflected:
-  the same level-scoped step, repeated while the row _above_ is finished, so the row
-  comes to rest directly under the last of the work. Unticking says "this is still to
-  do", and leaving it buried in the pile makes that a lie. It is **not** a general
-  inverse of `sink()` and must not become one: a row that sank past _unfinished_ work
-  keeps its new place, because remembering where it came from would be a second idea of
-  where a row belongs — the thing `reorder()` exists to prevent.
+  the same level-scoped step over the same siblings, repeated while the row _above_ is
+  finished, so the row comes to rest directly under the last of the work — inside its
+  group when that is where it sank from. One untick can undo two journeys, the row
+  climbing back up its group and the group climbing back up the list, and `#bump` asks
+  for both on one state change; the two arrays are independent, so the order does not
+  matter. Unticking says "this is still to do", and leaving it buried in the pile makes
+  that a lie. It is **not** a general inverse of `sink()` and must not become one: a row
+  that sank past _unfinished_ work keeps its new place, because remembering where it came
+  from would be a second idea of where a row belongs — the thing `reorder()` exists to
+  prevent.
 - **The rise is immediate where the tidy waits.** The delay protects the reward: the
   tick landing is the point, so nothing moves over it until it has played out. An untick
   is a correction with no reward to protect, and a row that took half a second to come
@@ -219,7 +249,12 @@ Invariants worth defending in review:
   whatever finished rows are already below it, so sending the upper one first
   strands it on top of a sibling that has not travelled yet. Ordering by
   position is what makes two ticks in one breath land where the same two ticks
-  spread over a minute would.
+  spread over a minute would. **Depth is part of that order**, not a rule beside it:
+  `tidyAt()` keys a row by its root row and then by its place inside it, so two ticks in
+  one breath inside a group land the same way. A group and its own items can arrive in
+  the same batch and nothing visible turns on which goes first — but a nested id has to
+  be _ordered_ rather than dropped, which is what reading it off `state.list` as position
+  -1 used to do.
 - **Closing the day reopens every fold.** The folds were earned by ticks that
   `clearTicks()` has just wiped; leaving them shut opens tomorrow on a list
   hiding most of itself.
@@ -366,15 +401,22 @@ Invariants worth defending in review:
   the call and `re-derives the group mark it just changed the membership of` fails.
 - **A group cannot be one-off, and does not need to be.** A one-off group would ask the
   question `important` needed the whole two-way `settle()` to answer — whether the mark
-  belongs to the card or to everything under it. A group emptied by departures stays,
-  with the mark it was given: it is a heading you might refill, the same rule that keeps
-  `# Work!` marked before its first item lands.
-- **The closer names what it will not bring back.** Ticks return tomorrow; a removed
-  one-off does not, and undo is one level that does not survive a reload — so the loss
-  is stated above the button rather than discovered in the morning. Named while naming
-  is short, counted once it would not be, and **one line either way**: this is the card
-  that must fit without scrolling, and a note that grew with the day would be the thing
-  that pushed the confirm under the fold. `tests/e2e/oneoff.spec.ts` re-measures the fit.
+  belongs to the card or to everything under it. It does not need to be because a group
+  whose items all depart empties itself, and the close then takes the empty group too.
+- **The close takes away every empty group**, not only the ones its departures emptied.
+  A heading with nothing under it says nothing about tomorrow, and leaving it opens the
+  morning on furniture. This is the one place the rule differs from `settle()`'s, which
+  keeps the mark an empty group was given: during the day `# Work!` is a promise about a
+  group you have not filled yet, and the close is where promises expire. One level of
+  undo covers a heading you meant to keep. It runs **after** `settle()`, since a group
+  about to leave has nothing to say about anything.
+- **The closer does not warn about the one-offs it removes.** It used to, in a `.departing`
+  line above the button, on the grounds that undo is one level that does not survive a
+  reload. The argument against it won: the mark is deliberate and the row wears its tag
+  all day, so the warning told you something you had already said — and a card whose
+  every close repeats a caution you do not need is a card you stop reading. If it ever
+  needs saying again, say it on the rows themselves in "Got done", not in a second line
+  competing with the button. `departingNote()` and `departing()` went with it.
 - **`raw()` is an inverse over the states `parse` can reach, which is the contract.** A
   line ending in `!` _is_ an important line, so text ending in a bang only ever comes
   with the mark set — there is no spelling of an unimportant task called "Sale!", and
@@ -577,21 +619,22 @@ Invariants worth defending in review:
   obvious warmer choice and is taken: it is the lowest verdict on the main screen, shown
   directly above the button that opens this card, so the same words would be a judgement
   in one place and a destructive action in the other. "Close the day" is the app's own
-  word for this — the closer, the closing card — and stays unmistakably an action, which
-  the departing note above it depends on. Do not soften it further.
-- **The closing card's confirm and its warning are never below the fold.** It is the one
-  card with a destructive button, and "Clear the ticks" out of sight is how someone taps
-  it without reading what it takes away. This used to be written as "the card must fit
+  word for this — the closer, the closing card — and stays unmistakably an action. Do
+  not soften it further: nothing else on the card now says that something is about to be
+  destroyed, so the button's own word is carrying it alone.
+- **The closing card's buttons are never below the fold.** It is the one card with a
+  destructive button, and a confirm out of sight is how someone taps it without reading
+  what it takes away. This used to be written as "the card must fit
   without scrolling", which is not a promise that can be kept: a full day on a 320px-tall
   screen does not fit, and the card simply grew past the bottom of the window — three
   pixels at 360x640, further at 320x568. **The guard could not see it.** With nothing
   capping the height, a card's `scrollHeight` and `clientHeight` are the same number by
   construction, so `expect(content).toBeLessThanOrEqual(box)` passed on every day it was
   ever given, and the only real assertion ran at 1280x900 where nothing was going to fail.
-  So the card is capped at the window and `.sheet-body` scrolls inside it, while the
-  departing note and both buttons sit **outside** that scroller and are always on screen.
-  `scoring.spec.ts` measures the confirm and the note against the viewport at five sizes,
-  and it fails without the cap. Adding a row to this card means re-running it.
+  So the card is capped at the window and `.sheet-body` scrolls inside it, while both
+  buttons sit **outside** that scroller and are always on screen. `scoring.spec.ts`
+  measures them against the viewport at five sizes, and it fails without the cap. Adding
+  a row to this card means re-running it.
 - **`.sheet-body` takes a tab stop only while it actually scrolls.** Nothing inside it is
   focusable — the buttons are outside, which is the point — so a scroller with no way in
   is content a mouse can reach and a keyboard cannot. Axe calls it

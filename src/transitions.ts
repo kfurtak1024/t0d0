@@ -52,29 +52,35 @@ export function add(state: State, input: string, destId: string | null, now: num
   const next = clone(state);
   open(next, now);
 
+  /*
+   * The top, wherever it lands. What you have just typed is the freshest thing
+   * you have to do and the most likely thing you meant to look at, so it goes
+   * where you can see it rather than at the end of a list that runs off the
+   * screen behind the composer.
+   *
+   * It also settles what appending never could: a new row pushed onto the end
+   * landed *under* the finished pile, which put an unfinished row at the foot
+   * of the list and collapsed the split — `pileFrom` stops at the first row
+   * that is not finished, so every row you had tidied away jumped back above
+   * "End day" the moment you added anything. A group already dodged this by
+   * landing above the first finished row; the top is that rule with nothing
+   * left to special-case.
+   *
+   * The cost is real and accepted: typing a list top-to-bottom now builds it
+   * bottom-to-top.
+   */
   if (node.kind === "group") {
-    /*
-     * A new group is work, so it lands with the work: above the first finished
-     * row rather than under the pile of things already done. Adding one at the
-     * end of a tidied list otherwise buried it, and the first thing you had to
-     * do with a group you had just made was drag it back up past the ticks.
-     *
-     * With nothing finished there is nothing to go in front of, so it appends —
-     * which is where it has always landed.
-     */
-    const pile = next.list.findIndex(isFinished);
-    if (pile < 0) next.list.push(node);
-    else next.list.splice(pile, 0, node);
+    next.list.unshift(node);
     return { state: next, destId: node.id, added: node };
   }
 
   const target = destId === null ? undefined : findGroup(next, destId);
   if (target) {
-    target.items.push(node);
+    target.items.unshift(node);
     target.collapsed = false;
     settle(next);
   } else {
-    next.list.push(node);
+    next.list.unshift(node);
   }
   return { state: next, destId, added: node };
 }
@@ -347,6 +353,21 @@ export const findRow = (state: State, id: string): Node | undefined =>
   state.list.find((node) => node.id === id);
 
 /**
+ * The rows `id` sits among, and where it sits: a group's items when it is
+ * nested, the list itself when it is not.
+ *
+ * {@link sink} and {@link rise} are the same walk at either level, which is the
+ * whole reason this exists. A finished row goes to the foot of the work around
+ * it, and inside a group the work around it *is* the group — the rule does not
+ * change with the depth, only the array it reads.
+ */
+function siblingsOf(state: State, id: string): { rows: Node[]; at: number } {
+  const owner = ownerOf(state, id);
+  const rows: Node[] = owner ? owner.items : state.list;
+  return { rows, at: rows.findIndex((node) => node.id === id) };
+}
+
+/**
  * Drop a finished row to the foot of the unfinished list.
  *
  * It stops above the run of finished rows already resting at the bottom, so the
@@ -355,18 +376,22 @@ export const findRow = (state: State, id: string): Node | undefined =>
  * on one screen for longer.
  *
  * A ticked task and a finished group travel the same way — the list does not
- * care which kind of row is done with. Nested tasks stay put: a group is one
- * block, and shuffling inside it would move rows nobody was looking at.
+ * care which kind of row is done with — and so does a ticked task inside a
+ * group, which settles at the foot of *its own* items. The rule is the same one
+ * at either depth: get out of the way of the work that is left. It stops at the
+ * group's edge rather than escaping it, because the group is still one block as
+ * far as the list is concerned; only the order inside it has changed.
  *
  * Built out of the same single step everything else uses — one level-scoped
  * `reorder` at a time — rather than computing a destination index. A second idea
- * of where a row belongs is exactly what that step exists to avoid.
+ * of where a row belongs is exactly what that step exists to avoid, and it is
+ * what lets `siblingsOf` be the only thing that knows about the depth.
  */
 export function sink(state: State, id: string): State {
   let next = state;
   for (;;) {
-    const index = next.list.findIndex((node) => node.id === id);
-    const below = index < 0 ? undefined : next.list[index + 1];
+    const { rows, at } = siblingsOf(next, id);
+    const below = at < 0 ? undefined : rows[at + 1];
     if (!below || isFinished(below)) return next;
 
     const stepped = reorder(next, id, "down", "level");
@@ -394,8 +419,8 @@ export function sink(state: State, id: string): State {
 export function rise(state: State, id: string): State {
   let next = state;
   for (;;) {
-    const index = next.list.findIndex((node) => node.id === id);
-    const above = index <= 0 ? undefined : next.list[index - 1];
+    const { rows, at } = siblingsOf(next, id);
+    const above = at <= 0 ? undefined : rows[at - 1];
     if (!above || !isFinished(above)) return next;
 
     const stepped = reorder(next, id, "up", "level");
@@ -407,15 +432,41 @@ export function rise(state: State, id: string): State {
 }
 
 /**
- * Which row a finished tick should tidy: the task itself, or the group holding
- * it — and a group only once the whole of it is done, because one item
- * finishing is not the group finishing. Null when there is nothing to send down
- * yet.
+ * Which rows a finished tick should tidy.
+ *
+ * Always the task itself — a ticked row gets out of the way of the work around
+ * it wherever it sits, and inside a group that means the foot of the group. And
+ * the group *as well*, once the whole of it is done, because one item finishing
+ * is not the group finishing: the group then has its own journey to make, down
+ * past the work left in the list.
+ *
+ * Both, rather than one or the other. This used to return a single id and chose
+ * the group over the task, which is why a finished row in a part-done group sat
+ * exactly where it was ticked while every other finished row in the app moved.
+ * Queueing the task inside an already-complete group is harmless — its siblings
+ * are all finished, so the walk stops on its first look.
  */
-export function rowToTidy(state: State, taskId: string): string | null {
+export function rowsToTidy(state: State, taskId: string): string[] {
   const owner = ownerOf(state, taskId);
-  if (!owner) return taskId;
-  return owner.items.every(isDone) ? owner.id : null;
+  if (!owner) return [taskId];
+  return owner.items.every(isDone) ? [taskId, owner.id] : [taskId];
+}
+
+/**
+ * Where a row sits for the purpose of ordering a batch of tidies: which root
+ * row it belongs to, then where it sits inside it.
+ *
+ * A root row takes `item: -1` so that a group sorts *after* its own items under
+ * the descending order below — the nested rows settle inside the group, and
+ * then the group carries them down the list. Null for an id the list has since
+ * lost.
+ */
+function tidyAt(state: State, id: string): { row: number; item: number } | null {
+  const owner = ownerOf(state, id);
+  const rowId = owner?.id ?? id;
+  const row = state.list.findIndex((node) => node.id === rowId);
+  if (row < 0) return null;
+  return { row, item: owner ? owner.items.findIndex((task) => task.id === id) : -1 };
 }
 
 /**
@@ -427,19 +478,28 @@ export function rowToTidy(state: State, taskId: string): string | null {
  * ends up in an order nobody earned. Ordering by position is what makes two
  * ticks in one breath land where the same two ticks spread over a minute would.
  *
+ * Depth is part of that order rather than a rule beside it — two ticks in one
+ * breath inside a group have to land where two ticks spread over a minute
+ * would, exactly as they do at the root. A group and its own items can arrive
+ * in the same batch; nothing visible turns on which of those goes first, since
+ * a queued group means every sibling is already finished, but a nested id has
+ * to be *ordered* rather than dropped, which is what reading it as position -1
+ * used to do.
+ *
  * Each row is re-checked on the way past: the list may have moved on since the
  * tick — the row unticked, deleted, or dragged somewhere else — and a queued
  * intention is not a licence to move something that is no longer done.
  */
 export function tidyAll(state: State, ids: Iterable<string>): State {
   const order = [...ids]
-    .map((id) => ({ id, at: state.list.findIndex((node) => node.id === id) }))
-    .filter((row) => row.at >= 0)
-    .sort((a, b) => b.at - a.at);
+    .map((id) => ({ id, at: tidyAt(state, id) }))
+    .filter((row): row is { id: string; at: { row: number; item: number } } => row.at !== null)
+    .sort((a, b) => b.at.row - a.at.row || b.at.item - a.at.item);
 
   let next = state;
   for (const { id } of order) {
-    const row = findRow(next, id);
+    // A nested row is not one of the list's own, and `findRow` will not see it.
+    const row = findRow(next, id) ?? findTask(next, id);
     if (!row || !isFinished(row)) continue;
     next = sink(row.kind === "group" ? collapse(next, id) : next, id);
   }
@@ -499,11 +559,6 @@ export function move(state: State, id: string, dir: MoveDirection): State {
   return next;
 }
 
-/** The one-off items this close would take away: marked, and actually finished. */
-export function departing(state: State): Task[] {
-  return allTasks(state.list).filter((task) => task.once && isDone(task));
-}
-
 /**
  * End of day: take away the finished one-offs, zero every count, unfold every
  * group, keep the curated list, forget the start time.
@@ -513,9 +568,18 @@ export function departing(state: State): Task[] {
  * would make the mark a trapdoor rather than a convenience. It is one-off; it
  * has not been done once yet.
  *
+ * **An empty group goes with them.** A heading with nothing under it says
+ * nothing about tomorrow — whether it was emptied tonight by departing one-offs
+ * or never filled at all — and leaving it opens the morning on furniture. This
+ * is the one place the rule differs from `settle`'s, which keeps the mark an
+ * empty group was given: during the day `# Work!` is a promise about a group
+ * you have not filled yet, and the close is where promises expire. One level of
+ * undo covers a heading you meant to keep.
+ *
  * Removing an item changes a group's membership, so the group marks are
  * re-derived on the way out — the same obligation every other transition that
- * touches membership carries.
+ * touches membership carries. Before the empty ones are dropped, since a group
+ * about to leave has nothing to say about anything.
  */
 export function clearTicks(state: State): State {
   const next = clone(state);
@@ -526,6 +590,7 @@ export function clearTicks(state: State): State {
     if (node.kind === "group") node.items = node.items.filter((task) => !goes(task));
   }
   settle(next);
+  next.list = next.list.filter((node) => node.kind === "task" || node.items.length > 0);
 
   for (const task of allTasks(next.list)) task.count = 0;
   // Folds were earned by yesterday's ticks, and those are gone. Leaving them
