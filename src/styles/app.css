@@ -162,10 +162,26 @@
   scroll-margin: 1rem 0 calc(var(--composer-h, 8rem) + 1rem);
 }
 
+/*
+  The entry, and only for the rows that are actually entering.
+
+  `@starting-style` applies whenever an element is newly rendered, and moving a
+  node with `insertBefore` counts as that: the browser discards the element's
+  style and starts it over. So every row the keyed patch relocated replayed this
+  — fading up from nothing and sliding 8px — which is wrong twice over. Wrong to
+  the eye, because a row changing places is not arriving. And wrong to FLIP,
+  which measures where each row landed the moment the patch returns and was
+  handed a box under `scale(0.97) translateY(-8px)` at opacity 0: measured on a
+  three-row group, the rows moving up were told to travel 46.85px where the gap
+  between rows is 39.44, and 5.85px sideways in a list that has no sideways.
+
+  `.entering` is the patch saying which rows are new, instead of the browser
+  inferring it from an insertion that means two different things.
+*/
 @starting-style {
-  .list > .task,
-  .list > .group,
-  .items > .task {
+  .list > .task.entering,
+  .list > .group.entering,
+  .items > .task.entering {
     opacity: 0;
     transform: translateY(-8px) scale(0.97);
   }

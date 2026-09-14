@@ -87,6 +87,50 @@ describe("KeyedList", () => {
     expect(created).toBe(2);
   });
 
+  /*
+   * The entry belongs to a row that is arriving, and the browser cannot tell
+   * one kind of insertion from the other: `@starting-style` applies to anything
+   * newly rendered, and `insertBefore` on a connected node counts. So the patch
+   * says which rows are new, and a relocated one must not be caught by it — the
+   * row would replay an arrival it had already made, and FLIP would measure it
+   * mid-entry and send it off from the wrong place.
+   */
+  it("marks the rows it creates as entering, and only those", () => {
+    const list = new KeyedList(container, create);
+    list.patch([
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
+    ]);
+    expect([...container.children].map((el) => el.className)).toEqual(["entering", "entering"]);
+
+    // The next patch establishes them: they have been rendered once, so the
+    // starting style can no longer reach them and the marker has done its job.
+    list.patch([
+      { id: "b", text: "B" },
+      { id: "a", text: "A" },
+      { id: "c", text: "C" },
+    ]);
+    const classOf = (id: string): string =>
+      [...container.children].find((el) => el.getAttribute("data-id") === id)?.className ?? "?";
+
+    // `b` and `a` were moved, not created.
+    expect(classOf("a")).toBe("");
+    expect(classOf("b")).toBe("");
+    expect(classOf("c")).toBe("entering");
+  });
+
+  it("stops marking a row that leaves before the next patch", () => {
+    const list = new KeyedList(container, create);
+    list.patch([{ id: "a", text: "A" }]);
+    const a = container.firstElementChild as HTMLElement;
+    expect(a.className).toBe("entering");
+
+    list.patch([]);
+    list.patch([{ id: "b", text: "B" }]);
+    // Detached, and never touched again — the marker goes with the node.
+    expect(a.isConnected).toBe(false);
+  });
+
   it("inserts into the middle without disturbing its neighbours", () => {
     const list = new KeyedList(container, create);
     list.patch([

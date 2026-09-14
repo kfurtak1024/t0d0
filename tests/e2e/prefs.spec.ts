@@ -344,9 +344,11 @@ test("a preference is not carried in a backup", async ({ page }) => {
  * position minus a zero rect and told to start 76px across and 94px down from
  * where it belonged — a diagonal entrance from the bottom-right of the page.
  *
- * Asserted as "travels vertically" rather than on an exact number: the small
- * horizontal component belongs to every reorder in the app, pile or not, and
- * predates this. What must not come back is the order-of-magnitude one.
+ * The travel is now straight down. This used to be asserted loosely — "mostly
+ * vertical", under 30px sideways — on the belief that a small horizontal
+ * component belonged to every reorder in the app. It did not: it was the entry
+ * style replaying on a row the patch had merely moved, and `scale(0.97)` on a
+ * 390px row is 5.85px of it. With that fixed there is no sideways left to allow.
  */
 test("the first finished row travels down to the pile, not in from a corner", async ({ page }) => {
   await buildList(page, ["alpha", "beta"]);
@@ -381,7 +383,67 @@ test("the first finished row travels down to the pile, not in from a corner", as
   expect(
     Math.abs(furthest?.x ?? 0),
     `travelled sideways: ${JSON.stringify(furthest)}`,
-  ).toBeLessThan(30);
+  ).toBeLessThan(0.5);
+});
+
+/*
+ * A row the patch merely moved must not be handed the entry style.
+ *
+ * `@starting-style` applies to any element that is newly rendered, and moving a
+ * node with `insertBefore` counts — so every relocated row replayed the arrival
+ * it had already made, and FLIP, which measures the moment the patch returns,
+ * read those boxes through `scale(0.97) translateY(-8px)` at opacity 0. The
+ * rows sliding up to fill a ticked row's place were told to travel further than
+ * the gap between them and to come in from the side, which is the strange
+ * little jump this pins.
+ *
+ * Asserted against the list's own measured pitch rather than a constant, so it
+ * says "one row" on any engine and at any font size.
+ */
+test("a row moving to fill a gap travels exactly one row, and not sideways", async ({ page }) => {
+  await buildList(page, ["# Morning", "  one", "  two", "  three"]);
+  await settle(page);
+
+  const pitch = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll<HTMLElement>(".items > li")];
+    const [a, b] = [rows[0]?.getBoundingClientRect(), rows[1]?.getBoundingClientRect()];
+    return (b?.top ?? 0) - (a?.top ?? 0);
+  });
+  expect(pitch).toBeGreaterThan(10);
+
+  const moves = await page.evaluate(async () => {
+    const seen: Record<string, { x: number; y: number }> = {};
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const real = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, frames, options) {
+      const first = (frames as Keyframe[] | null)?.[0]?.["transform"];
+      const found = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(String(first ?? ""));
+      const label = (this as HTMLElement).querySelector(".label")?.textContent;
+      if (found && label) seen[label] = { x: Number(found[1]), y: Number(found[2]) };
+      return real.call(this, frames, options);
+    };
+
+    const rows = [...document.querySelectorAll<HTMLElement>(".items > li")];
+    rows
+      .find((row) => row.querySelector(".label")?.textContent === "one")
+      ?.querySelector<HTMLElement>(".tick")
+      ?.click();
+    await new Promise((done) => setTimeout(done, 1200));
+    Element.prototype.animate = real;
+    return seen;
+  });
+
+  // The two below it each come up exactly one row, straight.
+  for (const label of ["two", "three"]) {
+    const move = moves[label];
+    expect(move, `${label} should have travelled`).toBeDefined();
+    expect(move?.y ?? 0, `${label} vertical`).toBeCloseTo(pitch, 0);
+    expect(Math.abs(move?.x ?? 0), `${label} sideways`).toBeLessThan(0.5);
+  }
+
+  // And the ticked row goes the other way, past both of them.
+  expect(moves["one"]?.y ?? 0).toBeCloseTo(-2 * pitch, 0);
+  expect(Math.abs(moves["one"]?.x ?? 0)).toBeLessThan(0.5);
 });
 
 /*

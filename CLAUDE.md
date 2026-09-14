@@ -199,6 +199,20 @@ Invariants worth defending in review:
   boundary on screen to explain why the row now refuses to move, and a control that
   silently stops working is worse than an order you can disturb. Moving, nesting and
   `Shift+Tab` all still work on a finished nested row.
+- **An entry animation belongs to a row that is arriving, and the browser cannot tell
+  the difference.** `@starting-style` applies to any element that is newly rendered, and
+  moving a node with `insertBefore` counts as that — the element's style is discarded and
+  started over. So every row the keyed patch relocated replayed the arrival it had
+  already made: it faded up from nothing and slid 8px, and FLIP, which measures the
+  moment the patch returns, read those boxes through `scale(0.97) translateY(-8px)` at
+  opacity 0. Measured on a three-row group, the rows coming up to fill a ticked row's
+  place were told to travel 46.85px where the gap between rows is 39.44, and 5.85px
+  sideways in a list that has no sideways. `KeyedList` now marks the rows it **creates**
+  with `.entering` and the `@starting-style` block is scoped to that, so the patch says
+  which rows are new instead of the browser inferring it from an insertion that means two
+  different things. The marker is cleared at the top of the next patch — the first moment
+  it is safe, since the row has been through a style resolution by then, and the moment
+  it matters, since a row about to be moved must not still claim to be arriving.
 - **Show the pile before the patch; hide it only after.** FLIP measures where a row landed
   the moment the patch returns, and a `display: none` container has no box — so the first
   row to sink into an empty pile was handed its own position minus a zero rect and told to
