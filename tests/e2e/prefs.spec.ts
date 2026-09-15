@@ -1,16 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle, shape } from "./helpers";
+import { addItem, buildList, clearStorage, seedStorage, settle, shape } from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
   await expect(page.locator(".drawer")).toBeVisible();
 };
 
-const aDay = async (page: Page): Promise<void> => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await addItem(page, "walk the dog");
-};
+const aDay = (page: Page): Promise<void> =>
+  buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
 
 const tick = (page: Page, text: string) =>
   page.locator(".task", { hasText: text }).locator(".tick");
@@ -46,9 +43,7 @@ test("folding waits for the tick to land rather than snatching the row away", as
 });
 
 test("a folded group drops below the work that is left", async ({ page }) => {
-  await aDay(page);
-  await page.locator("#dest").selectOption("");
-  await addItem(page, "loose");
+  await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog", "loose"]);
   expect(await shape(page)).toEqual(["# Morning", "  eat breakfast", "  walk the dog", "loose"]);
 
   await tick(page, "eat breakfast").click();
@@ -61,9 +56,7 @@ test("a folded group drops below the work that is left", async ({ page }) => {
 });
 
 test("a ticked root item drops below the work that is left", async ({ page }) => {
-  await addItem(page, "shopping");
-  await addItem(page, "email");
-  await addItem(page, "laundry");
+  await buildList(page, ["shopping", "email", "laundry"]);
 
   await tick(page, "shopping").click();
   await expect.poll(() => shape(page)).toEqual(["email", "laundry", "shopping"]);
@@ -74,11 +67,71 @@ test("a ticked root item drops below the work that is left", async ({ page }) =>
   await expect.poll(() => shape(page)).toEqual(["email", "laundry", "shopping"]);
 });
 
+/*
+ * The same rule one level down. A finished row gets out of the way of the work
+ * around it, and inside a group the work around it is the group — a row that sat
+ * exactly where it was ticked while every other finished row in the app moved
+ * was the odd one out.
+ */
+test("a ticked item drops to the foot of its own group", async ({ page }) => {
+  await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog", "  water plants"]);
+
+  await tick(page, "eat breakfast").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["# Morning", "  walk the dog", "  water plants", "  eat breakfast"]);
+
+  // The group is only part done, so it has not folded and has not travelled
+  // itself: one item finishing is not the group finishing.
+  await expect(page.locator(".group", { hasText: "Morning" })).not.toHaveClass(/collapsed/);
+});
+
+test("a group's finished rows keep the order they were earned in", async ({ page }) => {
+  await buildList(page, ["# Morning", "  wash up", "  post mail", "  book train", "  ring mum"]);
+
+  await tick(page, "post mail").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["# Morning", "  wash up", "  book train", "  ring mum", "  post mail"]);
+
+  // `wash up` finished second, so it comes to rest on top of `post mail`
+  // rather than burying it.
+  await tick(page, "wash up").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["# Morning", "  book train", "  ring mum", "  wash up", "  post mail"]);
+});
+
+test("unticking a nested item lifts it back above the group's finished run", async ({ page }) => {
+  await buildList(page, ["# Morning", "  wash up", "  post mail", "  book train"]);
+
+  await tick(page, "post mail").click();
+  await tick(page, "book train").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["# Morning", "  wash up", "  post mail", "  book train"]);
+
+  await tick(page, "book train").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["# Morning", "  wash up", "  book train", "  post mail"]);
+});
+
+test("with tidying off, a nested item stays where it was ticked", async ({ page }) => {
+  await openDrawer(page);
+  await page.locator('[data-pref="autoCollapseDone"]').click();
+  await page.locator(".drawer-close").click();
+
+  await buildList(page, ["# Morning", "  wash up", "  post mail", "  book train"]);
+
+  await tick(page, "wash up").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["# Morning", "  wash up", "  post mail", "  book train"]);
+});
+
 test("two ticks in the same breath both land", async ({ page }) => {
-  await addItem(page, "a");
-  await addItem(page, "b");
-  await addItem(page, "c");
-  await addItem(page, "d");
+  await buildList(page, ["a", "b", "c", "d"]);
 
   // In one turn, so both are certainly queued together rather than depending on
   // how fast the machine got round to the second click. The upper one must not
@@ -103,7 +156,7 @@ test("two ticks in the same breath both land", async ({ page }) => {
  * go hunting for the thing you just put back.
  */
 test("unticking a finished item brings it back above the pile", async ({ page }) => {
-  for (const text of ["still to do", "first done", "second done"]) await addItem(page, text);
+  await buildList(page, ["still to do", "first done", "second done"]);
 
   await tick(page, "first done").click();
   await tick(page, "second done").click();
@@ -114,7 +167,7 @@ test("unticking a finished item brings it back above the pile", async ({ page })
 });
 
 test("it stops under the work rather than climbing to the top", async ({ page }) => {
-  for (const text of ["one", "two", "done it"]) await addItem(page, text);
+  await buildList(page, ["one", "two", "done it"]);
 
   await tick(page, "done it").click();
   await tick(page, "done it").click();
@@ -160,7 +213,7 @@ test("with tidying off, an untick moves nothing either", async ({ page }) => {
   await page.locator('[data-pref="autoCollapseDone"]').click();
   await page.locator(".drawer-close").click();
 
-  for (const text of ["still to do", "first done", "second done"]) await addItem(page, text);
+  await buildList(page, ["still to do", "first done", "second done"]);
   await tick(page, "first done").click();
   await tick(page, "second done").click();
   await tick(page, "second done").click();
@@ -243,7 +296,10 @@ test.describe("with motion turned off", () => {
 
     await page.locator(".group", { hasText: "Morning" }).locator(".chev").click();
     await page.locator("#dest").selectOption("");
+    // Two of them, so the move has somewhere to go: a new row lands at the top,
+    // and the top row has no "up" left to spend.
     await addItem(page, "loose");
+    await addItem(page, "other");
 
     const row = page.locator(".list > .task", { hasText: "loose" });
     await row.locator(".dots").click();
@@ -288,13 +344,14 @@ test("a preference is not carried in a backup", async ({ page }) => {
  * position minus a zero rect and told to start 76px across and 94px down from
  * where it belonged — a diagonal entrance from the bottom-right of the page.
  *
- * Asserted as "travels vertically" rather than on an exact number: the small
- * horizontal component belongs to every reorder in the app, pile or not, and
- * predates this. What must not come back is the order-of-magnitude one.
+ * The travel is now straight down. This used to be asserted loosely — "mostly
+ * vertical", under 30px sideways — on the belief that a small horizontal
+ * component belonged to every reorder in the app. It did not: it was the entry
+ * style replaying on a row the patch had merely moved, and `scale(0.97)` on a
+ * 390px row is 5.85px of it. With that fixed there is no sideways left to allow.
  */
 test("the first finished row travels down to the pile, not in from a corner", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   const travel = await page.evaluate(async () => {
     const moves: { x: number; y: number }[] = [];
@@ -326,7 +383,67 @@ test("the first finished row travels down to the pile, not in from a corner", as
   expect(
     Math.abs(furthest?.x ?? 0),
     `travelled sideways: ${JSON.stringify(furthest)}`,
-  ).toBeLessThan(30);
+  ).toBeLessThan(0.5);
+});
+
+/*
+ * A row the patch merely moved must not be handed the entry style.
+ *
+ * `@starting-style` applies to any element that is newly rendered, and moving a
+ * node with `insertBefore` counts — so every relocated row replayed the arrival
+ * it had already made, and FLIP, which measures the moment the patch returns,
+ * read those boxes through `scale(0.97) translateY(-8px)` at opacity 0. The
+ * rows sliding up to fill a ticked row's place were told to travel further than
+ * the gap between them and to come in from the side, which is the strange
+ * little jump this pins.
+ *
+ * Asserted against the list's own measured pitch rather than a constant, so it
+ * says "one row" on any engine and at any font size.
+ */
+test("a row moving to fill a gap travels exactly one row, and not sideways", async ({ page }) => {
+  await buildList(page, ["# Morning", "  one", "  two", "  three"]);
+  await settle(page);
+
+  const pitch = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll<HTMLElement>(".items > li")];
+    const [a, b] = [rows[0]?.getBoundingClientRect(), rows[1]?.getBoundingClientRect()];
+    return (b?.top ?? 0) - (a?.top ?? 0);
+  });
+  expect(pitch).toBeGreaterThan(10);
+
+  const moves = await page.evaluate(async () => {
+    const seen: Record<string, { x: number; y: number }> = {};
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const real = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, frames, options) {
+      const first = (frames as Keyframe[] | null)?.[0]?.["transform"];
+      const found = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(String(first ?? ""));
+      const label = (this as HTMLElement).querySelector(".label")?.textContent;
+      if (found && label) seen[label] = { x: Number(found[1]), y: Number(found[2]) };
+      return real.call(this, frames, options);
+    };
+
+    const rows = [...document.querySelectorAll<HTMLElement>(".items > li")];
+    rows
+      .find((row) => row.querySelector(".label")?.textContent === "one")
+      ?.querySelector<HTMLElement>(".tick")
+      ?.click();
+    await new Promise((done) => setTimeout(done, 1200));
+    Element.prototype.animate = real;
+    return seen;
+  });
+
+  // The two below it each come up exactly one row, straight.
+  for (const label of ["two", "three"]) {
+    const move = moves[label];
+    expect(move, `${label} should have travelled`).toBeDefined();
+    expect(move?.y ?? 0, `${label} vertical`).toBeCloseTo(pitch, 0);
+    expect(Math.abs(move?.x ?? 0), `${label} sideways`).toBeLessThan(0.5);
+  }
+
+  // And the ticked row goes the other way, past both of them.
+  expect(moves["one"]?.y ?? 0).toBeCloseTo(-2 * pitch, 0);
+  expect(Math.abs(moves["one"]?.x ?? 0)).toBeLessThan(0.5);
 });
 
 /*
@@ -336,8 +453,7 @@ test("the first finished row travels down to the pile, not in from a corner", as
  * alone, that journey was made instantly.
  */
 test("a row lifted back out of the pile travels too", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
   await tick(page, "alpha").click();
   await expect(page.locator("#donelist > .task")).toHaveCount(1);
   await settle(page);

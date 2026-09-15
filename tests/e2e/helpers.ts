@@ -37,6 +37,48 @@ export async function addItem(page: Page, text: string): Promise<void> {
   await page.locator("#input").press("Enter");
 }
 
+/** Point the composer back at the root, when there is a group to point away from. */
+async function aimAtRoot(page: Page): Promise<void> {
+  const dest = page.locator("#dest");
+  if (await dest.isVisible()) await dest.selectOption("");
+}
+
+/**
+ * Type a list so that it *reads* as the shape given — the inverse of
+ * {@link shape}, in the same notation as the unit tests' `rows`.
+ *
+ * The composer lands every new row at the top of whatever it is aimed at, so
+ * typing a list in reading order builds the reverse of it, and a group has to
+ * exist before the items that go in it can be typed. Both of those are the
+ * composer's business, not the business of a spec about dragging or about the
+ * tidy — those say the arrangement they want and let this do the typing. Only
+ * `composer.spec.ts` should care which way round the typing goes.
+ */
+export async function buildList(page: Page, spec: string[]): Promise<void> {
+  const roots: { head: string; items: string[] }[] = [];
+  for (const line of spec) {
+    if (line.startsWith("  ")) {
+      const last = roots[roots.length - 1];
+      if (!last) throw new Error(`nested row with nothing above it: ${line}`);
+      last.items.push(line.trim());
+      continue;
+    }
+    roots.push({ head: line, items: [] });
+  }
+
+  for (const root of [...roots].reverse()) {
+    if (!root.head.startsWith("# ")) {
+      await aimAtRoot(page);
+      await addItem(page, root.head);
+      continue;
+    }
+    // A new group lands at the top and takes the aim, so its items follow it
+    // — in reverse, since each of those lands at the top of the group.
+    await addItem(page, root.head);
+    for (const item of [...root.items].reverse()) await addItem(page, item);
+  }
+}
+
 /**
  * The list as it reads on screen: "# X" is a group, two leading spaces mean
  * nested. Reordering tests are about arrangement, so this lets them assert

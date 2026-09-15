@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, shape } from "./helpers";
+import { addItem, buildList, clearStorage, shape } from "./helpers";
 
 /**
  * Where the composer says the next item is going.
@@ -46,6 +46,30 @@ test("adding a group aims the composer at it", async ({ page }) => {
 });
 
 /*
+ * The destination is a place, not a switch. Pressing `+` on the group you are
+ * already aiming at used to throw the aim back to the root, and the press that
+ * did it is indistinguishable from the press that set it.
+ */
+test("pressing + on the group already aimed at leaves the aim where it is", async ({ page }) => {
+  await addItem(page, "# Morning");
+  await addItem(page, "# Work");
+  const plus = page.locator('.group:has-text("Morning") .plus');
+
+  await plus.click();
+  await expect(page.locator("#dest").locator("option:checked")).toHaveText("Morning");
+
+  await plus.click();
+  await expect(page.locator("#dest").locator("option:checked")).toHaveText("Morning");
+  await expect(plus).toHaveClass(/aimed/);
+
+  // And the row that means it still does: the select is the way back.
+  await page.locator("#dest").selectOption("");
+  await expect(plus).not.toHaveClass(/aimed/);
+  await addItem(page, "loose");
+  expect(await shape(page)).toEqual(["loose", "# Work", "# Morning"]);
+});
+
+/*
  * A group always lands at the root, so naming a group in "Adding to" while the
  * composer holds a `#` would be a promise the app then breaks.
  */
@@ -70,29 +94,34 @@ test("typing a # switches the row to Top level, and giving it up restores the ai
 });
 
 /*
- * A new group is work, so it goes with the work. Landing it at the end of a
- * tidied list buried it under the ticks, and the first thing you did with it
- * was drag it back up.
+ * Everything new lands at the top, so nothing new can land under the pile. A
+ * row pushed onto the end used to land *below* the finished rows, which left an
+ * unfinished row at the foot of the list — and the split is the trailing run of
+ * finished rows, so every row the tidy had sent down jumped back above the
+ * ending the moment you added anything.
  *
  * The finished row has to be one the tidy actually moves, so that awaiting the
  * new shape proves the tidy has run. Ticking the last row instead leaves the
- * tidy pending, and it then sinks that row past the new group — reaching the
- * same arrangement by a route that hides whether the placement works at all.
+ * tidy pending, and the row then travels afterwards — reaching an arrangement
+ * by a route that hides whether the placement works at all.
  */
-test("a new group lands above what is already finished", async ({ page }) => {
-  for (const text of ["first", "second", "third"]) await addItem(page, text);
+test("a new row lands at the top, and leaves the pile where it is", async ({ page }) => {
+  await buildList(page, ["first", "second", "third"]);
 
   await tick(page, "first").click();
   await expect.poll(() => shape(page)).toEqual(["second", "third", "first"]);
+  await expect(page.locator("#donelist > .task")).toHaveCount(1);
 
   await addItem(page, "# Morning");
-  await expect.poll(() => shape(page)).toEqual(["second", "third", "# Morning", "first"]);
+  await expect.poll(() => shape(page)).toEqual(["# Morning", "second", "third", "first"]);
+  // Undisturbed: the finished row is still below the ending, where it settled.
+  await expect(page.locator("#donelist > .task")).toHaveCount(1);
 
   // And the composer is aimed at it, so the next item goes inside.
   await addItem(page, "eat breakfast");
   await expect
     .poll(() => shape(page))
-    .toEqual(["second", "third", "# Morning", "  eat breakfast", "first"]);
+    .toEqual(["# Morning", "  eat breakfast", "second", "third", "first"]);
 });
 
 test("a group typed while one is aimed still lands at the root", async ({ page }) => {

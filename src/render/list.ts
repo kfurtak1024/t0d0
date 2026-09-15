@@ -8,6 +8,16 @@
  * with insertBefore, and only genuinely absent ones are removed.
  */
 
+/**
+ * The marker that says a row is genuinely arriving, not merely changing places.
+ *
+ * `@starting-style` in the stylesheet keys the entry off this rather than off
+ * the insertion itself — see the note beside it. The patch sets it on the rows
+ * it creates and takes it off again on the next patch, by which time the row
+ * has been rendered once and the starting style can no longer apply to it.
+ */
+const ENTERING = "entering";
+
 export interface Keyed<T> {
   /** Stable identity — the id of the task or group this element renders. */
   key: string;
@@ -19,6 +29,8 @@ export class KeyedList<T extends { id: string }> {
   #containers: HTMLElement[];
   #create: (data: T) => Keyed<T>;
   #entries = new Map<string, Keyed<T>>();
+  /** Rows the last patch created, still wearing {@link ENTERING}. */
+  #entering: HTMLElement[] = [];
 
   /**
    * One list may be drawn across more than one container — the day's work above
@@ -42,6 +54,17 @@ export class KeyedList<T extends { id: string }> {
    * container case and the shape this had before.
    */
   patch(data: T[], splitAt = data.length): void {
+    /*
+     * Last patch's arrivals are established now — they have been through a
+     * style resolution, so the starting style can no longer apply to them and
+     * the marker has done its job. Cleared here rather than on a timer or a
+     * frame: this is the first moment it is safe, and it is also the moment it
+     * matters, since a row this patch is about to *move* must not still be
+     * claiming to be arriving.
+     */
+    for (const element of this.#entering) element.classList.remove(ENTERING);
+    this.#entering.length = 0;
+
     const filled = this.#containers.map(() => 0);
 
     for (const [at, item] of data.entries()) {
@@ -52,6 +75,10 @@ export class KeyedList<T extends { id: string }> {
       let entry = this.#entries.get(item.id);
       if (!entry) {
         entry = this.#create(item);
+        // Before it is inserted: the starting style is read at the row's first
+        // style resolution, which the insertion below is what triggers.
+        entry.element.classList.add(ENTERING);
+        this.#entering.push(entry.element);
         this.#entries.set(item.id, entry);
       }
       entry.update(item);
@@ -81,6 +108,7 @@ export class KeyedList<T extends { id: string }> {
 
   clear(): void {
     this.#entries.clear();
+    this.#entering.length = 0;
     for (const container of this.#containers) container.replaceChildren();
   }
 }

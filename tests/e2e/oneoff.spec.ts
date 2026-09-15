@@ -78,17 +78,14 @@ test("the mark survives a reload", async ({ page }) => {
   await expect(page.locator(".task", { hasText: "post the parcel" })).toHaveClass(/oneoff/);
 });
 
-test("the closer names what it is about to remove, and then removes it", async ({ page }) => {
+test("the closer removes what the mark asked it to", async ({ page }) => {
   await addItem(page, "post the parcel~");
   await addItem(page, "water plants");
 
   await page.locator(".task", { hasText: "post the parcel" }).locator(".tick").click();
   await page.locator("#closeday").click();
+  await page.locator("#veil .confirm").click();
 
-  const sheet = page.locator("#veil");
-  await expect(sheet.locator(".departing")).toHaveText("“post the parcel” will be removed.");
-
-  await sheet.locator(".confirm").click();
   await expect(shape(page)).resolves.toEqual(["water plants"]);
 });
 
@@ -100,10 +97,7 @@ test("a one-off nobody got to is still there in the morning", async ({ page }) =
   await page.locator(".task", { hasText: "water plants" }).locator(".tick").click();
 
   await page.locator("#closeday").click();
-  const sheet = page.locator("#veil");
-  await expect(sheet.locator(".departing")).toBeHidden();
-
-  await sheet.locator(".confirm").click();
+  await page.locator("#veil .confirm").click();
   await expect(shape(page)).resolves.toEqual(["post the parcel", "water plants"]);
 });
 
@@ -129,21 +123,45 @@ test("the removal is undoable, and sticks once the page has moved on", async ({ 
   await expect(shape(page)).resolves.toEqual(["water plants"]);
 });
 
-test("the closer counts them once naming them would not fit", async ({ page }) => {
+/*
+ * A heading with nothing under it says nothing about tomorrow, so the close
+ * takes it away — whether its one-offs emptied it tonight or it was never
+ * filled at all. One level of undo covers a heading you meant to keep.
+ */
+test("closing the day takes away the groups it has emptied", async ({ page }) => {
   await seedStorage(page, {
     v: 1,
     openedAt: null,
     list: [
-      { ...task("a"), once: true, count: 1 },
-      { ...task("b"), once: true, count: 1 },
-      { ...task("c"), once: true, count: 1 },
+      {
+        kind: "group",
+        id: "errands",
+        title: "Errands",
+        collapsed: false,
+        important: false,
+        items: [{ ...task("post the parcel"), once: true, count: 1 }],
+      },
+      {
+        kind: "group",
+        id: "keeps",
+        title: "Work",
+        collapsed: false,
+        important: false,
+        items: [{ ...task("review the PR"), count: 1 }],
+      },
+      { kind: "group", id: "bare", title: "Later", collapsed: false, important: false, items: [] },
+      task("water plants"),
     ],
   });
 
   await page.locator("#closeday").click();
-  await expect(page.locator("#veil .departing")).toHaveText(
-    "3 finished one-off items will be removed.",
-  );
+  await page.locator("#veil .confirm").click();
+
+  // Errands lost its only row and goes with it; Later was never filled and goes
+  // too; Work still holds something, so it stays — with its tick cleared.
+  await expect.poll(() => shape(page)).toEqual(["# Work", "  review the PR", "water plants"]);
+  await page.reload();
+  await expect.poll(() => shape(page)).toEqual(["# Work", "  review the PR", "water plants"]);
 });
 
 /*
@@ -215,7 +233,7 @@ test("the card still fits without scrolling once it has a removal to report", as
 
   await page.locator("#closeday").click();
   const panel = page.locator("#veil .sheet");
-  await expect(panel.locator(".departing")).toBeVisible();
+  await expect(panel.locator(".confirm")).toBeVisible();
 
   // `.sheet-body` is the box that scrolls; `.sheet` is capped and holds it, so
   // asking the panel whether it overflows is a question that answers itself.

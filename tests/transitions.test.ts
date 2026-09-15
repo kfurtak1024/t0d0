@@ -79,37 +79,47 @@ describe("add", () => {
   });
 
   /*
-   * A new group is work. Landing it at the very end put it under whatever had
-   * already been ticked off, so the first thing you did with a group you had
-   * just made was drag it back up past the pile.
+   * The top, wherever it lands. What you just typed is the freshest thing you
+   * have to do, and it goes where you can see it rather than at the end of a
+   * list running off the screen behind the composer.
    */
-  it("lands a new group above the first finished row", () => {
-    let state = build(["a", "b"]);
-    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
-    expect(shape(state)).toEqual(["a", "b"]);
-
+  it("lands a new group at the top of the list", () => {
+    let state = rows("a", "b");
     state = T.add(state, "# Morning", null, NOW).state;
     expect(shape(state)).toEqual(["# Morning", "a", "b"]);
   });
 
-  it("counts a cleared group as a finished row to go in front of", () => {
-    let state = build(["# Done", "x"]);
-    state = T.bump(state, taskOf(state, "x").id, 1, NOW);
-    state = T.add(state, "# Fresh", null, NOW).state;
-
-    expect(shape(state)).toEqual(["# Fresh", "# Done", "  x"]);
+  it("lands a new root task at the top too", () => {
+    const state = T.add(rows("a", "b"), "shopping", null, NOW).state;
+    expect(shape(state)).toEqual(["shopping", "a", "b"]);
   });
 
-  it("appends when nothing is finished, as it always did", () => {
-    let state = build(["a", "b"]);
-    state = T.add(state, "# Morning", null, NOW).state;
-    expect(shape(state)).toEqual(["a", "b", "# Morning"]);
+  it("lands a new item at the top of the group it is aimed at", () => {
+    const state = rows("# Morning", "  a", "  b");
+    const next = T.add(state, "eat breakfast", "Morning", NOW).state;
+    expect(shape(next)).toEqual(["# Morning", "  eat breakfast", "  a", "  b"]);
+  });
+
+  /*
+   * The defect the top fixes rather than merely dodges. A row pushed onto the
+   * end landed *under* the finished pile, which left an unfinished row at the
+   * foot of the list — and `pileFrom` stops at the first row that is not
+   * finished, so the whole pile jumped back above the ending the moment you
+   * added anything.
+   */
+  it("never lands under the finished pile", () => {
+    let state = rows("a", "b");
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    state = T.sink(state, taskOf(state, "a").id);
+    expect(T.pileFrom(state.list)).toBe(1);
+
+    state = T.add(state, "shopping", null, NOW).state;
+    expect(shape(state)).toEqual(["shopping", "b", "a"]);
+    expect(T.pileFrom(state.list)).toBe(2);
   });
 
   it("still aims the composer at the group it just made", () => {
-    let state = build(["a"]);
-    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
-    const result = T.add(state, "# Morning", null, NOW);
+    const result = T.add(rows("a"), "# Morning", null, NOW);
 
     expect(result.destId).toBe(groupOf(result.state, "Morning").id);
     // And the next item lands inside it, not beside it.
@@ -117,18 +127,16 @@ describe("add", () => {
     expect(shape(next)).toEqual(["# Morning", "  eat breakfast", "a"]);
   });
 
-  it("appends a root task when nothing is aimed", () => {
-    const state = build(["shopping"]);
-    expect(state.list).toHaveLength(1);
-    expect(state.list[0]).toMatchObject({ kind: "task", text: "shopping" });
-  });
-
-  it("aims at a group the moment it is created, so typing top-to-bottom works", () => {
+  /*
+   * The cost of landing at the top, stated out loud: typing a list in the order
+   * you would read it builds it in the reverse of that order.
+   */
+  it("aims at a group the moment it is created, so a typed list comes out reversed", () => {
     const state = build(["# Morning", "eat breakfast", "walk the dog"]);
     expect(state.list).toHaveLength(1);
     expect(groupOf(state, "Morning").items.map((t) => t.text)).toEqual([
-      "eat breakfast",
       "walk the dog",
+      "eat breakfast",
     ]);
   });
 
@@ -247,10 +255,11 @@ describe("the mark is only a mark", () => {
     // Position is the ordering, and nothing about `important` may second-guess
     // it. A marked row lands where it was typed, steps like any other, and
     // still sinks out of the way once it is finished.
-    let state = build(["a", "b!", "c"]);
+    let state = rows("a", "b", "c");
+    const id = taskOf(state, "b").id;
+    state = T.toggleImportant(state, id);
     expect(texts(state)).toEqual(["a", "b", "c"]);
 
-    const id = taskOf(state, "b").id;
     state = T.reorder(state, id, "up", "level");
     expect(texts(state)).toEqual(["b", "a", "c"]);
 
@@ -329,9 +338,29 @@ describe("rise", () => {
     state = T.rise(state, groupId);
     expect(shape(state)).toEqual(["a", "# Morning", "  x", "f1"]);
   });
+
+  it("brings a nested row back above its group's own finished run", () => {
+    let state = done(rows("# Morning", "  a", "  f1", "  f2"), "f1", "f2");
+    const id = taskOf(state, "f2").id;
+
+    state = T.bump(state, id, -1, NOW);
+    state = T.rise(state, id);
+    expect(shape(state)).toEqual(["# Morning", "  a", "  f2", "  f1"]);
+  });
+
+  it("stops at the group's edge climbing, as sink does falling", () => {
+    // Everything left in the group is finished, so the row goes to its top and
+    // no further — it does not climb out into the list.
+    let state = done(rows("x", "# Morning", "  f1", "  f2"), "f1", "f2");
+    const id = taskOf(state, "f2").id;
+
+    state = T.bump(state, id, -1, NOW);
+    state = T.rise(state, id);
+    expect(shape(state)).toEqual(["x", "# Morning", "  f2", "  f1"]);
+  });
 });
 
-describe("rowToTidy", () => {
+describe("rowsToTidy", () => {
   const done = (state: State, ...items: string[]): State => {
     let next = state;
     for (const text of items) next = T.bump(next, taskOf(next, text).id, 1, NOW);
@@ -341,18 +370,22 @@ describe("rowToTidy", () => {
   it("sends a root task down as itself", () => {
     const state = done(rows("a", "b"), "a");
     const id = taskOf(state, "a").id;
-    expect(T.rowToTidy(state, id)).toBe(id);
+    expect(T.rowsToTidy(state, id)).toEqual([id]);
   });
 
-  it("sends a nested task down as its group, once the group is done", () => {
-    const state = done(rows("# Morning", "  x", "  y"), "x", "y");
-    expect(T.rowToTidy(state, taskOf(state, "x").id)).toBe(groupOf(state, "Morning").id);
-  });
-
-  it("has nothing to send down while the group is only part done", () => {
-    // One item finishing is not the group finishing.
+  it("sends a nested task down inside its group while the group is part done", () => {
+    // One item finishing is not the group finishing — but the item has still
+    // finished, and a finished row gets out of the way of the work around it.
     const state = done(rows("# Morning", "  x", "  y"), "x");
-    expect(T.rowToTidy(state, taskOf(state, "x").id)).toBeNull();
+    expect(T.rowsToTidy(state, taskOf(state, "x").id)).toEqual([taskOf(state, "x").id]);
+  });
+
+  it("sends the group down as well, once its last item lands", () => {
+    const state = done(rows("# Morning", "  x", "  y"), "x", "y");
+    expect(T.rowsToTidy(state, taskOf(state, "y").id)).toEqual([
+      taskOf(state, "y").id,
+      groupOf(state, "Morning").id,
+    ]);
   });
 });
 
@@ -403,6 +436,59 @@ describe("tidyAll", () => {
   it("leaves the list alone when nothing queued can travel", () => {
     const state = rows("a", "b");
     expect(T.tidyAll(state, [])).toBe(state);
+  });
+
+  it("settles a nested row inside its group", () => {
+    const state = done(rows("a", "# Morning", "  x", "  y"), "x");
+    const id = taskOf(state, "x").id;
+
+    expect(shape(T.tidyAll(state, [id]))).toEqual(["a", "# Morning", "  y", "  x"]);
+  });
+
+  /*
+   * The bottom-most-first rule, one level down. Two ticks in one breath inside a
+   * group have to land where the same two ticks spread over a minute would, and
+   * sending the upper one first strands it on a sibling that has not travelled.
+   */
+  it("sends the bottom-most of a group's rows first", () => {
+    const state = done(rows("# Morning", "  a", "  b", "  c", "  d"), "b", "c");
+    const ids = [taskOf(state, "b").id, taskOf(state, "c").id];
+
+    expect(shape(T.tidyAll(state, ids))).toEqual(["# Morning", "  a", "  d", "  b", "  c"]);
+    // Order of the queue must not matter; position is what decides.
+    expect(shape(T.tidyAll(state, [...ids].reverse()))).toEqual([
+      "# Morning",
+      "  a",
+      "  d",
+      "  b",
+      "  c",
+    ]);
+  });
+
+  /*
+   * A finished group and its own items can be queued by the same tick. Nothing
+   * visible turns on which goes first — a queued group means every sibling is
+   * finished, so the items have nowhere left to sink — but the batch still has
+   * to survive being handed both, which it did not when a nested id read as
+   * position -1 and was dropped from the queue outright.
+   */
+  it("takes a group and its items in the same batch", () => {
+    const state = done(rows("a", "# Morning", "  x", "  y", "b"), "x", "y");
+    const ids = [groupOf(state, "Morning").id, taskOf(state, "y").id];
+
+    expect(shape(T.tidyAll(state, ids))).toEqual(["a", "b", "# Morning", "  x", "  y"]);
+    expect(shape(T.tidyAll(state, [...ids].reverse()))).toEqual([
+      "a",
+      "b",
+      "# Morning",
+      "  x",
+      "  y",
+    ]);
+  });
+
+  it("skips a nested id that has left the list", () => {
+    const state = done(rows("# Morning", "  x", "  y"), "x");
+    expect(T.tidyAll(state, ["gone"])).toBe(state);
   });
 });
 
@@ -554,8 +640,8 @@ describe("a group and its items", () => {
   });
 
   it("follows an item moved into it, and again when it leaves", () => {
-    let state = build(["# Morning", "a!"]);
-    state = T.add(state, "loose", null, NOW).state;
+    let state = rows("# Morning", "  a", "loose");
+    state = T.toggleImportant(state, taskOf(state, "a").id);
     expect(groupOf(state, "Morning").important).toBe(true);
 
     // A plain row moving in makes the group's statement untrue.
@@ -590,9 +676,7 @@ describe("remove", () => {
 
 describe("move", () => {
   it("pulls a root task into the group above it", () => {
-    let state = build(["# Morning", "a"]);
-    // Put a task at the root beneath the group.
-    state = T.add(state, "loose", null, NOW).state;
+    let state = rows("# Morning", "  a", "loose");
     const id = taskOf(state, "loose").id;
 
     expect(T.canMove(state, id, "in")).toBe(true);
@@ -611,7 +695,7 @@ describe("move", () => {
   });
 
   it("refuses to move in when no group precedes the task", () => {
-    const state = build(["a", "# Later"]);
+    const state = rows("a", "# Later");
     expect(T.canMove(state, taskOf(state, "a").id, "in")).toBe(false);
     expect(T.move(state, taskOf(state, "a").id, "in")).toBe(state);
   });
@@ -892,9 +976,26 @@ describe("sink", () => {
     expect(shape(state)).toEqual(["c", "a", "b"]);
   });
 
-  it("leaves a nested task alone — a group travels as one block", () => {
-    const state = done(rows("# Morning", "  a", "  b"), "a");
-    expect(T.sink(state, "a")).toBe(state);
+  it("drops a ticked nested task to the foot of its own group", () => {
+    const state = done(rows("# Morning", "  a", "  b", "  c"), "a");
+    expect(shape(T.sink(state, "a"))).toEqual(["# Morning", "  b", "  c", "  a"]);
+  });
+
+  it("stops at the group's edge rather than escaping into the list", () => {
+    // The group is still one block as far as the list is concerned; only the
+    // order inside it has changed.
+    const state = done(rows("# Morning", "  a", "  b", "c"), "a");
+    expect(shape(T.sink(state, "a"))).toEqual(["# Morning", "  b", "  a", "c"]);
+  });
+
+  it("stacks a group's finished items in the order they were ticked", () => {
+    let state = done(rows("# Morning", "  a", "  b", "  c"), "b");
+    state = T.sink(state, "b");
+    expect(shape(state)).toEqual(["# Morning", "  a", "  c", "  b"]);
+
+    // `a` finishes second, so it comes to rest on top of `b`, not under it.
+    state = T.sink(done(state, "a"), "a");
+    expect(shape(state)).toEqual(["# Morning", "  c", "  a", "  b"]);
   });
 
   it("never mutates the state it is given", () => {
@@ -935,26 +1036,6 @@ describe("findRow", () => {
   });
 });
 
-describe("departing", () => {
-  it("names exactly what a close would take away", () => {
-    // The closer says this out loud before the button is pressed, so it has to
-    // agree with clearTicks rather than approximate it.
-    let state = build(["a~", "b~", "c", "# Errands", "  d~"]);
-    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
-    state = T.bump(state, taskOf(state, "c").id, 1, NOW);
-    state = T.bump(state, taskOf(state, "d").id, 1, NOW);
-
-    expect(T.departing(state).map((task) => task.text)).toEqual(["a", "d"]);
-
-    const survivors = texts(T.clearTicks(state));
-    expect(survivors).toEqual(["b", "c"]);
-  });
-
-  it("is empty when nothing finished is marked", () => {
-    expect(T.departing(build(["a~", "b"]))).toEqual([]);
-  });
-});
-
 describe("clearTicks", () => {
   it("zeroes every count, keeps the list, and closes the day", () => {
     let state = build(["# Morning", "a", "make calls [3]"]);
@@ -963,13 +1044,13 @@ describe("clearTicks", () => {
 
     state = T.clearTicks(state);
     expect(allTasks(state.list).every((t) => t.count === 0)).toBe(true);
-    expect(texts(state)).toEqual(["a", "make calls"]);
+    expect(texts(state)).toEqual(["make calls", "a"]);
     expect(state.openedAt).toBeNull();
   });
 
   it("leaves group structure alone", () => {
     const state = T.clearTicks(build(["# Morning", "a", "b"]));
-    expect(shape(state)).toEqual(["# Morning", "  a", "  b"]);
+    expect(shape(state)).toEqual(["# Morning", "  b", "  a"]);
   });
 
   it("takes away a finished one-off", () => {
@@ -983,13 +1064,13 @@ describe("clearTicks", () => {
     // The mark is a convenience, not a trapdoor: an errand you did not do is
     // precisely the thing you most need to see in the morning.
     const state = T.clearTicks(build(["a~", "b"]));
-    expect(texts(state)).toEqual(["a", "b"]);
+    expect(texts(state)).toEqual(["b", "a"]);
   });
 
   it("keeps a finished item that was never marked one-off", () => {
     let state = build(["a", "b"]);
     state = T.bump(state, taskOf(state, "a").id, 1, NOW);
-    expect(texts(T.clearTicks(state))).toEqual(["a", "b"]);
+    expect(texts(T.clearTicks(state))).toEqual(["b", "a"]);
   });
 
   it("takes one out of a group and leaves the group behind", () => {
@@ -1016,14 +1097,31 @@ describe("clearTicks", () => {
     expect(groupOf(state, "Alpha").important).toBe(true);
   });
 
-  it("leaves an emptied group standing, with the mark it was given", () => {
-    // An empty group is a heading you might refill, and `settle` does not
-    // re-read one — the same rule that keeps `# Work!` marked before its first
-    // item lands.
+  it("takes away a group its departing one-offs emptied", () => {
+    // A heading with nothing under it says nothing about tomorrow, and leaving
+    // it opens the morning on furniture.
     let state = build(["# Errands", "  a~"]);
     state = T.bump(state, taskOf(state, "a").id, 1, NOW);
     state = T.clearTicks(state);
-    expect(shape(state)).toEqual(["# Errands"]);
+    expect(shape(state)).toEqual([]);
+  });
+
+  it("takes away a group that was empty all along", () => {
+    // Not only the ones emptied tonight: `# Work!` is a promise about a group
+    // you have not filled, and the close is where promises expire. During the
+    // day `settle` still keeps the mark it was given — this is the one place
+    // that rule stops.
+    let state = rows("# Work", "a");
+    state = T.toggleImportant(state, groupOf(state, "Work").id);
+    expect(groupOf(state, "Work").important).toBe(true);
+
+    expect(shape(T.clearTicks(state))).toEqual(["a"]);
+  });
+
+  it("keeps a group that still holds something", () => {
+    let state = build(["# Errands", "  a~", "  b"]);
+    state = T.bump(state, taskOf(state, "a").id, 1, NOW);
+    expect(shape(T.clearTicks(state))).toEqual(["# Errands", "  b"]);
   });
 
   it("unfolds every group, however it came to be folded", () => {

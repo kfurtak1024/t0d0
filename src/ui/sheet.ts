@@ -1,6 +1,5 @@
 import { summarise, type DayScore, type DaySummary } from "../progress";
-import { departing } from "../transitions";
-import { barAtClose, departingNote, didHeading, verdictOf } from "../words";
+import { barAtClose, didHeading, verdictOf } from "../words";
 import { keyboardScrollable, need } from "./dom";
 import type { State } from "../types";
 import { trapFocus } from "./focus";
@@ -66,7 +65,6 @@ export class DaySheet {
   #rail = new Rail();
   #gates: HTMLElement;
   #did: HTMLElement;
-  #departing: HTMLElement;
   #panel: HTMLElement;
   #body: HTMLElement;
   #release: (() => void) | null = null;
@@ -89,7 +87,6 @@ export class DaySheet {
     this.#verdict = need(veil, ".verdict");
     this.#gates = need(veil, "#closegates");
     this.#did = need(veil, ".did");
-    this.#departing = need(veil, ".departing");
     this.#body = need(veil, ".sheet-body");
     this.#body.insertBefore(this.#rail.element, this.#gates);
 
@@ -161,10 +158,6 @@ export class DaySheet {
        */
       this.#did.replaceChildren(title);
     }
-
-    const note = departingNote(departing(state).map((task) => task.text));
-    this.#departing.textContent = note;
-    this.#departing.hidden = note === "";
 
     this.#veil.hidden = false;
     // After the content is in and the box has a height to measure.

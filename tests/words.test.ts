@@ -4,7 +4,6 @@ import {
   andMore,
   barAtClose,
   barSoFar,
-  departingNote,
   didHeading,
   endLabel,
   NAMED,
@@ -116,28 +115,6 @@ describe("verdictOf", () => {
   it("says nothing at all to an unfinished day", () => {
     expect(verdictOf(scoreOf(listOf(task("a", true, 0), task("b", false, 0))))).toBe("");
     expect(verdictOf(scoreOf(listOf()))).toBe("");
-  });
-});
-
-describe("departingNote", () => {
-  it("says nothing when the close takes nothing away", () => {
-    expect(departingNote([])).toBe("");
-  });
-
-  it("names them while naming them is short", () => {
-    expect(departingNote(["post the parcel"])).toBe("“post the parcel” will be removed.");
-    expect(departingNote(["post the parcel", "call back"])).toBe(
-      "“post the parcel” and “call back” will be removed.",
-    );
-  });
-
-  /* One line either way — this is the card that has to fit without scrolling. */
-  it("counts them once naming them would not fit", () => {
-    expect(departingNote(["a", "b", "c"])).toBe("3 finished one-off items will be removed.");
-    expect(departingNote(Array.from({ length: 9 }, (_, i) => String(i)))).toBe(
-      "9 finished one-off items will be removed.",
-    );
-    expect(departingNote(["a", "b", "c"]).split("\n")).toHaveLength(1);
   });
 });
 

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle, shape, task } from "./helpers";
+import { buildList, clearStorage, seedStorage, settle, shape, task } from "./helpers";
 
 /**
  * Dragging is the reorder step applied repeatedly, so these tests are about the
@@ -38,9 +38,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("dragging a row up past its neighbour reorders the list", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
-  await addItem(page, "gamma");
+  await buildList(page, ["alpha", "beta", "gamma"]);
 
   await settle(page);
   const height = (await page.locator(".list > .task").first().boundingBox())?.height ?? 0;
@@ -50,9 +48,7 @@ test("dragging a row up past its neighbour reorders the list", async ({ page }) 
 });
 
 test("dragging down travels more than one row in a single gesture", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
-  await addItem(page, "gamma");
+  await buildList(page, ["alpha", "beta", "gamma"]);
 
   await settle(page);
   const height = (await page.locator(".list > .task").first().boundingBox())?.height ?? 0;
@@ -67,10 +63,7 @@ test("dragging down travels more than one row in a single gesture", async ({ pag
  * list and the row is re-found by id each move, so the gesture survives it.
  */
 test("a drag survives crossing into a group, where the row is rebuilt", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await page.locator("#dest").selectOption("");
-  await addItem(page, "loose");
+  await buildList(page, ["# Morning", "  eat breakfast", "loose"]);
 
   await settle(page);
   const grip = gripOf(page, "loose");
@@ -237,9 +230,7 @@ test("dropping over a group's items puts the item in", async ({ page }) => {
 });
 
 test("Escape mid-drag puts the list back", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
-  await addItem(page, "gamma");
+  await buildList(page, ["alpha", "beta", "gamma"]);
 
   await settle(page);
   const height = (await page.locator(".list > .task").first().boundingBox())?.height ?? 0;
@@ -255,9 +246,7 @@ test("Escape mid-drag puts the list back", async ({ page }) => {
 
 /* One gesture is one mistake, however many rows it crossed on the way. */
 test("one undo reverses a whole drag, not its last step", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
-  await addItem(page, "gamma");
+  await buildList(page, ["alpha", "beta", "gamma"]);
 
   await settle(page);
   const height = (await page.locator(".list > .task").first().boundingBox())?.height ?? 0;
@@ -272,8 +261,7 @@ test("one undo reverses a whole drag, not its last step", async ({ page }) => {
 });
 
 test("a press on the grip that never moves is not a drag", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   await settle(page);
   const grip = gripOf(page, "beta");
@@ -289,10 +277,7 @@ test("a press on the grip that never moves is not a drag", async ({ page }) => {
 });
 
 test("a whole group drags as one block", async ({ page }) => {
-  await addItem(page, "# Morning");
-  await addItem(page, "eat breakfast");
-  await page.locator("#dest").selectOption("");
-  await addItem(page, "loose");
+  await buildList(page, ["# Morning", "  eat breakfast", "loose"]);
 
   await settle(page);
   const group = page.locator(".group");
@@ -347,8 +332,7 @@ test("the grip is what you hit when you press the grip", async ({ page }) => {
  * holding, dropping the row wherever it had got to.
  */
 test("a stray second finger does not end the drag", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   await settle(page);
   const released = await page.evaluate(() => {
@@ -398,8 +382,7 @@ test("a stray second finger does not end the drag", async ({ page }) => {
 });
 
 test("a touch pointer drags too", async ({ page }) => {
-  await addItem(page, "alpha");
-  await addItem(page, "beta");
+  await buildList(page, ["alpha", "beta"]);
 
   await settle(page);
   const moved = await page.evaluate(() => {

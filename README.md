@@ -35,36 +35,37 @@ page loads it makes no network requests at all, and the Content Security Policy 
 that rather than merely promising it.
 
 - **One persistent list.** It's still there tomorrow. You edit it; nothing expires on its own.
+- **New things land on top**, of the list or of the group you're aiming at — the freshest thing you have to do, where you can see it rather than off the bottom of the screen. Type a list in reading order and it comes out reversed; type it bottom-up and it reads as you meant it.
 - **Groups, one level deep.** Enough to separate _Morning_ from _Work_, not enough to become an outliner.
 - **Counted items.** `make calls [3]` takes three ticks, and partial progress counts. The row reads `make calls` — the target lives in the `0/3` tally beside it, the same way `!` and `~` leave the text and become a mark of their own.
 - **Important items.** A trailing `!` — `call the bank!`, `# Work!` — gives a row an accent edge and a heavier word, and the `⋯` menu marks one without typing. Marking a group marks everything in it, unmarking it clears them again, and marking every item in a group marks the group. A mark and nothing more: it never reorders anything, and it stays on once the row is finished — turning green with the frame around it — so you can still see what you got done.
-- **One-off items.** A trailing `~` — `post the parcel~` — tags a row as not part of the standing list, and the `⋯` menu tags one without typing. Tick it and closing the day takes it away instead of resetting it; leave it undone and it is still there in the morning, because the errand you did not run is the one you most need to see. The closer names what it is about to remove before you press the button.
+- **One-off items.** A trailing `~` — `post the parcel~` — tags a row as not part of the standing list, and the `⋯` menu tags one without typing. Tick it and closing the day takes it away instead of resetting it; leave it undone and it is still there in the morning, because the errand you did not run is the one you most need to see.
 - **A day is scored on two gates.** Everything marked `!` has to be done, _and_ enough of the rest — 70% by default, and Settings → Behaviour moves the bar. So an almost-perfect day with one important thing still open is not a success, while a day with nothing marked is judged on the rest alone.
 - **The day's ring runs a rainbow.** Red at nothing done, **green** the moment the important work lands, **blue** the moment the rest clears the bar, **violet** at everything. All three are celebrated. The arc still measures the whole list — the colour is the verdict on it.
 - **The ring is a button.** Press it and the day's card unrolls that rainbow into a rail, puts a dot where you are on it, marks whichever gates the day actually has, and names what the next tick buys — _one more clears the bar_. It only reports; the closer is still the only thing that ends a day.
 - **A rewarding tick.** Springy rings that sweep indigo → green as each row fills in, a wiping strike-through, and confetti at every milestone.
 - **An ending you can see coming.** The list runs into a verdict and an **End day** button. The words say how it went — _That's the day_ → _The important work is done_ → _That's a good day_ → _Everything done_ — and the button answers in shape: a plain outline at nothing, a green ring the moment the marked work lands and the minimum plan is met, filled once the day is a success. Both, because hue is not a channel everyone has.
 - **An ending worth reaching.** The card counts the score up, grows a bar for each gate, walks the day's dot along the rainbow and stamps a ✓ on whatever you cleared — with a shower sized to what the day actually earned, and none at all for one that earned nothing. Any press lands the whole thing at once, and reduced motion shows it finished on arrival.
-- **An ending.** Closing the day counts off what you actually did — every finished row named in turn over the gate it belongs to, then gone, leaving the tally — before clearing the ticks, so an ordinary 7-of-9 day gets an ending too and not just a perfect one. The same card says what is still outstanding and what it is about to remove for good. Tomorrow opens on the whole list, every fold reopened and the finished one-offs gone.
+- **An ending.** Closing the day counts off what you actually did — every finished row named in turn over the gate it belongs to, then gone, leaving the tally — before clearing the ticks, so an ordinary 7-of-9 day gets an ending too and not just a perfect one. The same card says what is still outstanding. Tomorrow opens on the whole list, every fold reopened, the finished one-offs gone, and any group left standing empty gone with them.
 - **Reorderable, three ways.** Drag by the grip and the row goes where you point, in or out of a group. `Alt`+arrows and the `⋯` menu move it among its own siblings and stop there — changing level is its own command, so a move never re-nests anything behind your back. One undo puts a whole drag back.
 - **Untickable.** Tap a finished item again and it comes back. A counted item counts up instead, and resets from its menu.
-- **Finished work gets out of the way.** Tick something off and it drops past the rest of the day, settling below **End day** with whatever finished before it. A group waits for its last item, then folds shut as it goes. What is down there keeps the order you earned it in — it can be marked, tagged or deleted, but not rearranged — and unticking anything lifts it straight back up into the work. On by default; Settings → Behaviour turns it off, and then the list stays in one piece as you left it.
+- **Finished work gets out of the way.** Tick something off and it drops past the rest of the day, settling below **End day** with whatever finished before it. Inside a group it does the same thing one level down, dropping to the foot of that group's own items. A group waits for its last item, then folds shut and travels as one block. What is down there keeps the order you earned it in — it can be marked, tagged or deleted, but not rearranged — and unticking anything lifts it straight back up into the work. On by default; Settings → Behaviour turns it off, and then the list stays in one piece as you left it.
 - **Offline and installable.** A real PWA; open it with the network off.
 - **Light, dark, or whatever your device says.** Settings → Theme, remembered per browser.
 - **Backups.** Save a `.json` copy, drop one back in. Loading previews what the file holds before replacing anything, and erasing takes two deliberate presses.
 
 ## Using it
 
-| Type this         | To get                                                |
-| ----------------- | ----------------------------------------------------- |
-| `shopping`        | a task                                                |
-| `make calls [3]`  | a task that takes three ticks                         |
-| `# Morning`       | a group above the finished pile, composer aimed at it |
-| `call the bank!`  | an important task — `# Work!` marks a group           |
-| `make calls! [3]` | both; `make calls [3]!` reads the same                |
-| `ship it!!`       | an important `ship it!` — one `!` is the mark         |
-| `post parcel~`    | a one-off: removed at the close, once it is ticked    |
-| `call back!~`     | both marks; `call back~!` reads the same              |
+| Type this         | To get                                               |
+| ----------------- | ---------------------------------------------------- |
+| `shopping`        | a task                                               |
+| `make calls [3]`  | a task that takes three ticks                        |
+| `# Morning`       | a group at the top of the list, composer aimed at it |
+| `call the bank!`  | an important task — `# Work!` marks a group          |
+| `make calls! [3]` | both; `make calls [3]!` reads the same               |
+| `ship it!!`       | an important `ship it!` — one `!` is the mark        |
+| `post parcel~`    | a one-off: removed at the close, once it is ticked   |
+| `call back!~`     | both marks; `call back~!` reads the same             |
 
 | Do this                                             | To                                                                                               |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
