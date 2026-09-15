@@ -114,12 +114,14 @@ src/
 ├─ types.ts parse.ts progress.ts normalize.ts    pure, DOM-free, heavily tested
 ├─ transitions.ts                               every state change as State → State
 ├─ marks.ts milestones.ts                       a group's mark; the moments a change crossed
-├─ words.ts                                     every sentence the day is reported in
+├─ words.ts                                     every sentence the app says about the list
 ├─ storage.ts store.ts                          persistence and one level of undo
 ├─ theme.ts prefs.ts                            appearance and behaviour, own storage keys
 ├─ render/    list flip ring task group context keyed DOM patching, and FLIP
 ├─ ui/        drawer sheet stands rail gates menu drag toast edit focus confetti dom
-└─ styles/    tokens.css base.css app.css
+├─ styles/    tokens.css base.css app.css
+├─ app.ts                                       the one stateful object: wiring and render
+└─ main.ts                                      boot — theme, store, app, and a failure note
 ```
 
 Three pieces are worth knowing about:
@@ -142,7 +144,11 @@ clamps counts into range, drops empty text, regenerates duplicate ids. A corrupt
 yields a working app, not a blank page.
 
 Everything above `render/` is pure, which is why the interesting rules — parsing, the
-progress formula, repair, and every state transition — are covered without a browser.
+progress formula, repair, every state transition, and every sentence the app prints — are
+covered without a browser. `app.ts` is the one place that holds state and touches the
+page, and it is the only large file the unit tests deliberately do not measure: what is
+in there needs a browser, so Playwright owns it. Anything in it that turns out not to
+need one belongs further up.
 
 The motion comes from the platform: `@starting-style` for enter and exit, one shared
 spring expressed as a CSS [`linear()`](./src/styles/tokens.css) easing curve, a
