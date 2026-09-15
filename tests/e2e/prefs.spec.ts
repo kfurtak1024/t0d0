@@ -208,6 +208,49 @@ test("a group comes back up when one of its items is unticked", async ({ page })
     .toEqual(["still to do", "# Morning", "  eat breakfast", "finished first"]);
 });
 
+/*
+ * One untick, two journeys.
+ *
+ * The test above has a group of one, so the row has nowhere to climb inside it
+ * and only the group travels; the one before it has a part-done group, so only
+ * the row travels. Both halves at once is the case `#bump` actually has to ask
+ * twice for — the row climbing back up its own group, and the group climbing
+ * back up the list — and the two arrays are independent, so neither answer
+ * comes free with the other.
+ */
+test("an untick inside a finished group lifts the row and the group", async ({ page }) => {
+  // Seeded already tidied: ticking this into shape would batch both tidies and
+  // never produce a finished group resting under a finished root row.
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now(),
+    list: [
+      { kind: "task", id: "w", text: "still to do", target: 1, count: 0 },
+      { kind: "task", id: "f", text: "finished first", target: 1, count: 1 },
+      {
+        kind: "group",
+        id: "g",
+        title: "Morning",
+        collapsed: false,
+        items: [
+          { kind: "task", id: "e", text: "eat breakfast", target: 1, count: 1 },
+          { kind: "task", id: "p", text: "post mail", target: 1, count: 1 },
+        ],
+      },
+    ],
+  });
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["still to do", "finished first", "# Morning", "  eat breakfast", "  post mail"]);
+
+  // "post mail" rises over the finished sibling above it, and the group it is
+  // in rises over the finished row above *that*.
+  await tick(page, "post mail").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["still to do", "# Morning", "  post mail", "  eat breakfast", "finished first"]);
+});
+
 test("with tidying off, an untick moves nothing either", async ({ page }) => {
   await openDrawer(page);
   await page.locator('[data-pref="autoCollapseDone"]').click();

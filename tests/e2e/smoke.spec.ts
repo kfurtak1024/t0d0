@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clearStorage, addItem } from "./helpers";
+import { clearStorage, addItem, seedStorage, task } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -28,6 +28,33 @@ test("adds, ticks, and reports progress", async ({ page }) => {
 
   await expect(page.locator(".task", { hasText: "shopping" })).toHaveClass(/done/);
   await expect(page.locator("#frac")).toHaveText("1 of 2");
+});
+
+/*
+ * The header asks two questions and they have two answers.
+ *
+ * The arc and `#pct` report `progress()` — the mean of `count / target` over
+ * every task — while `#frac` counts the rows that are actually finished. On a
+ * list of plain items the two agree, which is every other assertion in this
+ * file and is how they came to be mistaken for the same number. Put one
+ * part-counted row in and they part company, and both are still right: a third
+ * of a `[3]` is real progress and is not a finished row.
+ */
+test("a count and a proportion are different questions", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now(),
+    list: [
+      { kind: "task", id: "spread", text: "spread the word", target: 3, count: 1 },
+      ...["a", "b", "c"].map((text) => ({ ...task(text), count: 1 })),
+      ...["d", "e", "f"].map(task),
+    ],
+  });
+
+  // Three of the seven rows are done, and the third of a point the `[3]` has
+  // earned belongs to the mean rather than to the tally.
+  await expect(page.locator("#frac")).toHaveText("3 of 7");
+  await expect(page.locator("#pct")).toHaveText("48%");
 });
 
 test("a counted item needs one tap per unit", async ({ page }) => {
