@@ -513,17 +513,26 @@ Invariants worth defending in review:
   rail, and the dimming is what turns "did it clear that gate?" into something you look at
   rather than judge by a dot's centre. Six treatments were rendered before this one; a
   smaller dot alone does not fix it, because the halo is what hides the mark.
-- **The day's sentences live in `src/words.ts`, not in the cards that print
-  them.** They are pure functions over a `DayScore` and a couple of counts, and
-  `src/ui/**` and `app.ts` are excluded from coverage because Playwright owns
-  the rendering layer — so a pure function that drifted in there was measured by
-  nothing, and checked only by whichever browser test happened to assert its
-  text. That is how `nextLine` kept a branch nobody had ever asked. The
+- **The app's sentences live in `src/words.ts`, not in the code that prints
+  them.** The day's, and what a change to the list has just done to it — the
+  import toast, the delete toast, the ⋯ menu's delete entry. They are pure
+  functions over a `DayScore` and a couple of counts, and `src/ui/**` and
+  `app.ts` are excluded from coverage because Playwright owns the rendering
+  layer — so a pure function that drifted in there was measured by nothing, and
+  checked only by whichever browser test happened to assert its text. That is
+  how `nextLine` kept a branch nobody had ever asked, and how the delete toast
+  and the menu entry that says the same thing came to count their items with
+  two different rules. The
   exclusion list is a claim that the excluded code needs a browser; anything
   decidable without a DOM has to sit outside it. The **numbers** are shared in
   `progress.ts` and the **words are not** — `barSoFar` and `barAtClose` are the
   same figure in two voices, one looking forward and one reporting a day that
   is over, and keeping both in one file is what makes that contrast visible.
+- **One agreement rule, `plural()`, exported.** There were four: one here, one in the
+  drawer, and two written out in `app.ts` — spelled `n === 1 ? "" : "s"` twice and
+  `n > 1 ? "s" : ""` once, which disagree at zero. The `> 1` one printed "0 item" for
+  nobody only because its call site guarded on the count first. Four copies of a rule
+  this small is how one of them comes to be wrong without anybody reading it.
 - **A gate carries a bar, and the bar fills to the mean rather than the tally.**
   "3 of 5" and "12 of 20" read the same until you see them, which is the whole reason a
   number gets a bar. It fills to `progress()` — the measure the ring uses — so a
@@ -799,7 +808,7 @@ src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]", "!" and "~" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
-src/words.ts      every sentence the day is reported in, pure and DOM-free
+src/words.ts      every sentence the app says about the list, pure and DOM-free
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, the two day cards and the rail and gates they share,
                   drawer, row menu, drag, inline edit, focus trap, confetti, dom

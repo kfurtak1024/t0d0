@@ -11,7 +11,7 @@ import { onExternalChange } from "./storage";
 import type { Store } from "./store";
 import * as T from "./transitions";
 import { isGroupInput, raw } from "./parse";
-import { endLabel } from "./words";
+import { deletedNote, deleteLabel, endLabel, importedNote } from "./words";
 import type { Group, Node, State, Task } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
@@ -149,8 +149,7 @@ export class App {
       },
       onReplace: (next) => {
         this.#replace(next, true);
-        const count = allTasks(next.list).length;
-        this.#toast.show(`Imported ${String(count)} item${count === 1 ? "" : "s"}`);
+        this.#toast.show(importedNote(allTasks(next.list).length));
       },
       onErase: () => {
         this.#replace(T.eraseAll(this.#state), true);
@@ -529,14 +528,7 @@ export class App {
   #remove(id: string): void {
     // One at a time: a second delete lands the first rather than racing it.
     this.#flushDelete();
-    const group = T.findGroup(this.#state, id);
-    const label = group
-      ? `Deleted “${group.title}”${
-          group.items.length
-            ? ` and ${String(group.items.length)} item${group.items.length > 1 ? "s" : ""}`
-            : ""
-        }`
-      : "Deleted";
+    const label = deletedNote(T.findGroup(this.#state, id));
 
     const finish = (): void => {
       this.#store.apply(T.remove(this.#state, id), { undoable: true });
@@ -703,14 +695,8 @@ export class App {
      * the items, and they do not come back on their own — the same reason the
      * one-off entry names the consequence rather than the mark.
      */
-    const group = T.findGroup(this.#state, id);
-    const held = group?.items.length ?? 0;
     items.push({
-      label: !group
-        ? "Delete"
-        : held === 0
-          ? "Delete group"
-          : `Delete group and ${String(held)} item${held === 1 ? "" : "s"}`,
+      label: deleteLabel(T.findGroup(this.#state, id)),
       danger: true,
       onSelect: () => {
         this.#remove(id);

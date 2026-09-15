@@ -4,14 +4,19 @@ import {
   andMore,
   barAtClose,
   barSoFar,
+  count,
+  deletedNote,
+  deleteLabel,
   didHeading,
   endLabel,
+  importedNote,
   NAMED,
   nextLine,
+  plural,
   shortlist,
   verdictOf,
 } from "../src/words";
-import type { State, Task } from "../src/types";
+import type { Group, State, Task } from "../src/types";
 
 /**
  * Every sentence the day is reported in.
@@ -273,5 +278,91 @@ describe("didHeading", () => {
    */
   it("says nothing at all when nothing got done", () => {
     expect(didHeading(0)).toBe("");
+  });
+});
+
+/**
+ * The sentences a change to the list says about it.
+ *
+ * They lived in `app.ts` and in the drawer, where coverage does not reach, as
+ * four separate implementations of one agreement rule — two of them spelled
+ * `n === 1 ? "" : "s"` and one `n > 1 ? "s" : ""`, which part company at zero.
+ */
+describe("plural", () => {
+  it("agrees with its count", () => {
+    expect(plural(1, "thing", "things")).toBe("1 thing");
+    expect(plural(2, "thing", "things")).toBe("2 things");
+  });
+
+  /*
+   * The case the two old spellings disagreed on. Nothing reached it, because
+   * the `> 1` call site guarded on the count first — but "0 item" was one
+   * refactor away from being printed.
+   */
+  it("treats zero as plural, which is what English does", () => {
+    expect(plural(0, "thing", "things")).toBe("0 things");
+    expect(count(0, "item")).toBe("0 items");
+  });
+
+  it("makes a regular plural for the drawer's nouns", () => {
+    expect(count(1, "item")).toBe("1 item");
+    expect(count(3, "group")).toBe("3 groups");
+  });
+});
+
+describe("importedNote", () => {
+  it("counts what arrived", () => {
+    expect(importedNote(1)).toBe("Imported 1 item");
+    expect(importedNote(12)).toBe("Imported 12 items");
+  });
+
+  it("says so even when the file was empty", () => {
+    expect(importedNote(0)).toBe("Imported 0 items");
+  });
+});
+
+const groupOf = (title: string, items: Task[]): Group => ({
+  kind: "group",
+  id: title,
+  title,
+  collapsed: false,
+  important: false,
+  items,
+});
+
+/*
+ * A group names what it takes with it, before and after the fact. "Deleted"
+ * alone does not mention the items, and they do not come back on their own.
+ */
+describe("deletedNote and deleteLabel", () => {
+  it("says only that a row went, when it was only a row", () => {
+    expect(deletedNote(undefined)).toBe("Deleted");
+    expect(deleteLabel(undefined)).toBe("Delete");
+  });
+
+  it("names an empty group without promising it held anything", () => {
+    const empty = groupOf("Later", []);
+    expect(deletedNote(empty)).toBe("Deleted “Later”");
+    expect(deleteLabel(empty)).toBe("Delete group");
+  });
+
+  it("counts what a group takes with it", () => {
+    const one = groupOf("Work", [task("a", false, 0)]);
+    expect(deletedNote(one)).toBe("Deleted “Work” and 1 item");
+    expect(deleteLabel(one)).toBe("Delete group and 1 item");
+
+    const several = groupOf("Work", [task("a", false, 0), task("b", false, 0)]);
+    expect(deletedNote(several)).toBe("Deleted “Work” and 2 items");
+    expect(deleteLabel(several)).toBe("Delete group and 2 items");
+  });
+
+  /*
+   * The two say the same thing either side of the press, so a group that reads
+   * "Delete group and 3 items" must not then report something else.
+   */
+  it("agrees with itself before and after", () => {
+    const group = groupOf("Errands", [task("a", false, 0), task("b", false, 0)]);
+    expect(deleteLabel(group)).toContain("2 items");
+    expect(deletedNote(group)).toContain("2 items");
   });
 });
