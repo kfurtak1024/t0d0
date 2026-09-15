@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle } from "./helpers";
 
 /**
  * How the day is scored, end to end. The gates and the rainbow are unit-tested
@@ -820,6 +820,17 @@ for (const [width, height] of [
     await seedStorage(page, HEAVY);
     await page.locator("#closeday").click();
     await expect(page.locator("#veil .confirm")).toBeVisible();
+    /*
+     * After the card has landed, not as it arrives. `.sheet` rides the same
+     * spring as the drawer — `translateY(18px) scale(0.94)` out to an overshoot
+     * of 1.163 — so a box read on the way in is neither the card's real size nor
+     * its real place. Measured at 320x568 the confirm read 210.56x42.61 against
+     * a settled 224x45.33, and which side of the truth a sample falls on depends
+     * on where in the spring it caught it. That is a flake in one direction and
+     * a card that overflows unnoticed in the other, on the one screen with a
+     * destructive button.
+     */
+    await settle(page);
 
     for (const selector of ["#veil .confirm", "#veil .dismiss"]) {
       const box = await page.locator(selector).boundingBox();

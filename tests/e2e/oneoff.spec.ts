@@ -243,7 +243,10 @@ test("the card still fits without scrolling once it has a removal to report", as
   expect(fits).toBe(true);
 
   // And the button it is warning about is on screen, which is the point of the
-  // measurement rather than a property of the box around it.
+  // measurement rather than a property of the box around it. After the card has
+  // landed: `.sheet` arrives on the same overshooting spring as the drawer, so a
+  // box read on the way in is the animated one.
+  await settle(page);
   const box = await panel.locator(".confirm").boundingBox();
   const height = page.viewportSize()?.height ?? 0;
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(height);

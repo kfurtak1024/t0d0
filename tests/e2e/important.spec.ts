@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle } from "./helpers";
 
 /**
  * The `!` mark, end to end. The parser's own rules are unit-tested; what only a
@@ -426,6 +426,15 @@ test("a row's leading control clears the mark beside it", async ({ page }) => {
       },
     ],
   });
+
+  /*
+   * After the rows have arrived. They enter through `@starting-style` at
+   * `scale(0.97)`, and a scaled row is a row whose gaps are 3% narrower — the
+   * clearance measured mid-entry read 5.66 where the settled row gives 6.39,
+   * against a floor of 4. That is a quarter of the margin spent on the
+   * animation, and which quarter depends on the machine.
+   */
+  await settle(page);
 
   const clearance = await page.evaluate(() => {
     const radius = parseFloat(
