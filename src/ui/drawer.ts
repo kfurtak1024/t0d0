@@ -4,6 +4,7 @@ import { allTasks } from "../progress";
 import { icon, type IconName } from "../render/context";
 import type { State } from "../types";
 import { loadTheme, saveTheme, THEMES, type Theme } from "../theme";
+import { count } from "../words";
 import { need } from "./dom";
 import { trapFocus } from "./focus";
 
@@ -13,8 +14,6 @@ const stamp = (date = new Date()): string => {
   const pad = (n: number): string => String(n).padStart(2, "0");
   return `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
-
-const plural = (n: number, word: string): string => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
 
 export interface DrawerHandlers {
   current: () => State;
@@ -149,8 +148,8 @@ export class Drawer {
     const state = this.#handlers.current();
     const items = allTasks(state.list).length;
     const groups = state.list.filter((node) => node.kind === "group").length;
-    const counts = [plural(items, "item")];
-    if (groups > 0) counts.push(plural(groups, "group"));
+    const counts = [count(items, "item")];
+    if (groups > 0) counts.push(count(groups, "group"));
     this.#slot("counts").textContent = counts.join(" · ");
 
     this.#clearStaged();
@@ -284,8 +283,8 @@ export class Drawer {
     this.#pending = next;
     const items = allTasks(next.list).length;
     const groups = next.list.filter((node) => node.kind === "group").length;
-    const parts = [plural(items, "item")];
-    if (groups > 0) parts.push(plural(groups, "group"));
+    const parts = [count(items, "item")];
+    if (groups > 0) parts.push(count(groups, "group"));
     this.#showStaged(name, `${parts.join(" · ")} — this replaces everything in your list.`, true);
   }
 
@@ -319,7 +318,7 @@ export class Drawer {
     const items = allTasks(state.list).length;
     const groups = state.list.filter((node) => node.kind === "group").length;
     this.#need(".confirmbar-text").textContent =
-      items > 0 ? `Erase ${plural(items, "item")}?` : `Erase ${plural(groups, "group")}?`;
+      items > 0 ? `Erase ${count(items, "item")}?` : `Erase ${count(groups, "group")}?`;
     this.#slot("erase-confirm").hidden = false;
     this.#need('[data-act="erase"]').hidden = true;
     this.#need('[data-act="erase-go"]').focus();

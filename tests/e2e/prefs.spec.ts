@@ -208,6 +208,49 @@ test("a group comes back up when one of its items is unticked", async ({ page })
     .toEqual(["still to do", "# Morning", "  eat breakfast", "finished first"]);
 });
 
+/*
+ * One untick, two journeys.
+ *
+ * The test above has a group of one, so the row has nowhere to climb inside it
+ * and only the group travels; the one before it has a part-done group, so only
+ * the row travels. Both halves at once is the case `#bump` actually has to ask
+ * twice for — the row climbing back up its own group, and the group climbing
+ * back up the list — and the two arrays are independent, so neither answer
+ * comes free with the other.
+ */
+test("an untick inside a finished group lifts the row and the group", async ({ page }) => {
+  // Seeded already tidied: ticking this into shape would batch both tidies and
+  // never produce a finished group resting under a finished root row.
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now(),
+    list: [
+      { kind: "task", id: "w", text: "still to do", target: 1, count: 0 },
+      { kind: "task", id: "f", text: "finished first", target: 1, count: 1 },
+      {
+        kind: "group",
+        id: "g",
+        title: "Morning",
+        collapsed: false,
+        items: [
+          { kind: "task", id: "e", text: "eat breakfast", target: 1, count: 1 },
+          { kind: "task", id: "p", text: "post mail", target: 1, count: 1 },
+        ],
+      },
+    ],
+  });
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["still to do", "finished first", "# Morning", "  eat breakfast", "  post mail"]);
+
+  // "post mail" rises over the finished sibling above it, and the group it is
+  // in rises over the finished row above *that*.
+  await tick(page, "post mail").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["still to do", "# Morning", "  post mail", "  eat breakfast", "finished first"]);
+});
+
 test("with tidying off, an untick moves nothing either", async ({ page }) => {
   await openDrawer(page);
   await page.locator('[data-pref="autoCollapseDone"]').click();
@@ -458,21 +501,53 @@ test("a row lifted back out of the pile travels too", async ({ page }) => {
   await expect(page.locator("#donelist > .task")).toHaveCount(1);
   await settle(page);
 
-  const moved = await page.evaluate(async () => {
-    let seen = 0;
+  /*
+   * Asserted against the distance the row actually covered, the way the two
+   * tests above are. Counting `animate()` calls and expecting one was not a
+   * test of travel: it passed for any animation on any element in any
+   * direction, and would have gone on passing the day something else on the
+   * page started animating.
+   */
+  const travel = await page.evaluate(async () => {
+    // Held, not re-queried: the row keeps its element across the crossing —
+    // that identity is the whole reason FLIP can carry it — so the same node
+    // answers for where it was and where it ends up.
+    const row = document.querySelector<HTMLElement>("#donelist > [data-id]");
+    if (!row) throw new Error("nothing in the pile to lift");
+    const top = (): number => row.getBoundingClientRect().top + window.scrollY;
+
+    const before = top();
+    const moves: { x: number; y: number }[] = [];
     // eslint-disable-next-line @typescript-eslint/unbound-method
     const real = Element.prototype.animate;
     Element.prototype.animate = function (this: Element, frames, options) {
-      seen++;
+      const start = (frames as Keyframe[] | null)?.[0]?.["transform"];
+      const found = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(String(start ?? ""));
+      if (found && this === row) moves.push({ x: Number(found[1]), y: Number(found[2]) });
       return real.call(this, frames, options);
     };
 
-    document.querySelector<HTMLElement>("#donelist [data-id] .tick")?.click();
+    row.querySelector<HTMLElement>(".tick")?.click();
     await new Promise((done) => setTimeout(done, 700));
     Element.prototype.animate = real;
-    return seen;
+    return { moves, before, after: top() };
   });
 
-  expect(moved).toBeGreaterThan(0);
+  /*
+   * The list itself is unchanged — `rise` has nowhere to lift the row to with
+   * unfinished work above it — so every pixel of this is the boundary moving:
+   * the row crosses back over the ending block, which is the journey that used
+   * to happen instantly.
+   */
+  const covered = travel.before - travel.after;
+  expect(covered, "the row should have come back up over the ending").toBeGreaterThan(40);
+
+  const move = travel.moves[0];
+  expect(move, "the row itself should have been animated").toBeDefined();
+  // FLIP starts a row at where it used to be, so the first keyframe is exactly
+  // the distance it has to cover, and none of it is sideways.
+  expect(move?.y ?? 0, "vertical").toBeCloseTo(covered, 0);
+  expect(Math.abs(move?.x ?? 0), "sideways").toBeLessThan(0.5);
+
   await expect(page.locator("#donelist")).toBeHidden();
 });

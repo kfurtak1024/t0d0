@@ -179,6 +179,16 @@ Invariants worth defending in review:
   row done?" would drop it into the pile the instant it was ticked, straight over the top
   of that. Measured: ticked at +0, still in the work at +300ms, in the pile at +700ms.
   It also keeps `groupAbove()` honest, since array order and visual order then agree.
+- **Positional is not enough on its own: the split also waits for the queue.** `pileFrom`
+  reads the trailing run, which only starts counting once `sink()` has moved something —
+  so the delay covered every row except the one that needed no journey to reach the pile.
+  A row ticked at the _foot_ of the work was already in that run, and the boundary swept
+  past it on the frame it was ticked: measured, in `#donelist` at +0, +300 and +800ms,
+  the one row the reward never played out over. `App#pileFrom` therefore walks the split
+  back past anything still in `#tidyIds`, and `#bump` fills that queue **before** the
+  apply, since the render the apply triggers is what reads it. `#runTidy` then renders
+  even when `tidyAll` changed nothing, because releasing the queue is itself what moves
+  the boundary — the same "a moved boundary is a rearrangement" rule below.
 - **Only while the tidy is on.** With `autoCollapseDone` off the list is deliberately
   unsorted — `alpha | ✓beta | gamma | ✓delta` — so there is no run at the foot to be a
   boundary, the split is the list's length, and everything stays in one list as before.
@@ -503,17 +513,26 @@ Invariants worth defending in review:
   rail, and the dimming is what turns "did it clear that gate?" into something you look at
   rather than judge by a dot's centre. Six treatments were rendered before this one; a
   smaller dot alone does not fix it, because the halo is what hides the mark.
-- **The day's sentences live in `src/words.ts`, not in the cards that print
-  them.** They are pure functions over a `DayScore` and a couple of counts, and
-  `src/ui/**` and `app.ts` are excluded from coverage because Playwright owns
-  the rendering layer — so a pure function that drifted in there was measured by
-  nothing, and checked only by whichever browser test happened to assert its
-  text. That is how `nextLine` kept a branch nobody had ever asked. The
+- **The app's sentences live in `src/words.ts`, not in the code that prints
+  them.** The day's, and what a change to the list has just done to it — the
+  import toast, the delete toast, the ⋯ menu's delete entry. They are pure
+  functions over a `DayScore` and a couple of counts, and `src/ui/**` and
+  `app.ts` are excluded from coverage because Playwright owns the rendering
+  layer — so a pure function that drifted in there was measured by nothing, and
+  checked only by whichever browser test happened to assert its text. That is
+  how `nextLine` kept a branch nobody had ever asked, and how the delete toast
+  and the menu entry that says the same thing came to count their items with
+  two different rules. The
   exclusion list is a claim that the excluded code needs a browser; anything
   decidable without a DOM has to sit outside it. The **numbers** are shared in
   `progress.ts` and the **words are not** — `barSoFar` and `barAtClose` are the
   same figure in two voices, one looking forward and one reporting a day that
   is over, and keeping both in one file is what makes that contrast visible.
+- **One agreement rule, `plural()`, exported.** There were four: one here, one in the
+  drawer, and two written out in `app.ts` — spelled `n === 1 ? "" : "s"` twice and
+  `n > 1 ? "s" : ""` once, which disagree at zero. The `> 1` one printed "0 item" for
+  nobody only because its call site guarded on the count first. Four copies of a rule
+  this small is how one of them comes to be wrong without anybody reading it.
 - **A gate carries a bar, and the bar fills to the mean rather than the tally.**
   "3 of 5" and "12 of 20" read the same until you see them, which is the whole reason a
   number gets a bar. It fills to `progress()` — the measure the ring uses — so a
@@ -707,6 +726,18 @@ Invariants worth defending in review:
   wipe travels through line one and on into line two as one stroke. `clone` also fixes
   the wrapping but gives each line its own stroke and they travel at once — two pens
   rather than one. Both were rendered mid-wipe on both engines before choosing.
+- **Being a transition, it needs its span kept.** A transition runs on an element that was
+  rendered with the old value, and `writeLabel` rebuilt the `.line` span on every update —
+  so the browser was handed a fresh element already at `100%` and the wipe never played on
+  any row: measured, finished `background-size` on the first frame after the tick and an
+  empty `getAnimations()`. It now writes only when the label is not already that span
+  saying those words, and the check is structural, because inline editing sets the label's
+  `textContent` and destroys the span — a cancelled edit that changed nothing would
+  otherwise keep the right words in the wrong shape and lose the strike on that row for
+  good. The other half was the boundary: a row crossing into `#donelist` is a removal and
+  an insertion, which restarts its style, so the wipe also needed the row to stay put while
+  it played. `smoke.spec.ts` asks the transition rather than sampling a frame — the same
+  lesson the closing card's reveal is scrubbed for.
 - **A row's label is its name and none of the marks.** All three of the things the
   composer parses leave the text on the way in, and each is shown by something built for
   it: `!` is the accent edge, `~` is the tag, `[n]` is the tally. The bracket was the odd
@@ -777,7 +808,7 @@ src/transitions.ts  every state change as State -> State
 src/parse.ts      "# Title", "[n]", "!" and "~" parsing, and the raw() round-trip
 src/progress.ts   the mean(count/target) formula, and how the day is scored
 src/milestones.ts which of the day's moments a change just crossed
-src/words.ts      every sentence the day is reported in, pure and DOM-free
+src/words.ts      every sentence the app says about the list, pure and DOM-free
 src/render/       keyed DOM patching — list, task, group, ring, flip
 src/ui/           toast, the two day cards and the rail and gates they share,
                   drawer, row menu, drag, inline edit, focus trap, confetti, dom

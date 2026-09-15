@@ -11,7 +11,7 @@ import { onExternalChange } from "./storage";
 import type { Store } from "./store";
 import * as T from "./transitions";
 import { isGroupInput, raw } from "./parse";
-import { endLabel } from "./words";
+import { deletedNote, deleteLabel, endLabel, importedNote } from "./words";
 import type { Group, Node, State, Task } from "./types";
 import { Drawer } from "./ui/drawer";
 import { Confetti } from "./ui/confetti";
@@ -149,8 +149,7 @@ export class App {
       },
       onReplace: (next) => {
         this.#replace(next, true);
-        const count = allTasks(next.list).length;
-        this.#toast.show(`Imported ${String(count)} item${count === 1 ? "" : "s"}`);
+        this.#toast.show(importedNote(allTasks(next.list).length));
       },
       onErase: () => {
         this.#replace(T.eraseAll(this.#state), true);
@@ -316,9 +315,29 @@ export class App {
    * With the tidy off the list is deliberately unsorted, so there is no run at
    * the foot to be a boundary: everything is the day's work and everything can
    * still be moved.
+   *
+   * **A row still waiting out its own tick is not in the pile yet.** `pileFrom`
+   * reads the trailing run of finished rows, which is the right rule for a row
+   * that has to travel — it only starts counting once `sink` has moved
+   * something. But a row ticked at the *foot* of the work is already in that
+   * run, so the boundary swept past it on the very frame it was ticked: it
+   * crossed below "End day" at +0ms, where the promise is that nothing moves
+   * over the tick until it has played out. Measured before this, that row was
+   * in `#donelist` at +0, +300 and +800ms; the delay applied to every row
+   * except the one that needed no journey to reach the pile.
+   *
+   * It also cost that row its strike-through. Crossing containers is a removal
+   * and an insertion, so the label's style restarts and the wipe has nothing to
+   * travel from — the same reason the keyed patch has to say which rows are
+   * genuinely arriving.
    */
   get #pileFrom(): number {
-    return this.#prefs.autoCollapseDone ? T.pileFrom(this.#state.list) : this.#state.list.length;
+    if (!this.#prefs.autoCollapseDone) return this.#state.list.length;
+
+    const list = this.#state.list;
+    let split = T.pileFrom(list);
+    while (split < list.length && this.#tidyIds.has((list[split] as Node).id)) split++;
+    return split;
   }
 
   /** The success bar as a fraction, which is what the scoring speaks in. */
@@ -398,12 +417,23 @@ export class App {
      * playing — so the small buzz has to go first or it silences the big one.
      */
     if (justFinished) this.#vibrate(12);
+    /*
+     * Queued before the apply, started after it.
+     *
+     * The render the apply triggers asks where the pile begins, and a row still
+     * waiting out its tick is not in it yet — so the queue has to be populated
+     * by then or a row ticked at the foot of the work crosses on the very frame
+     * it landed. Read off `next` rather than the live state, since whether the
+     * tick completed the group around it is a question about the list as it now
+     * is.
+     */
+    if (justFinished) this.#tidy(next, id);
     this.#store.apply(next);
 
     if (justFinished) {
       const row = this.#rowNode(id);
       if (row && !this.#motion.matches) popRing(row);
-      this.#tidy(id);
+      this.#scheduleTidy();
     }
   }
 
@@ -439,22 +469,26 @@ export class App {
    * what knows which. Either way a row ends below the work that is left, and a
    * group folds shut on its way.
    */
-  #tidy(taskId: string): void {
+  #tidy(state: State, taskId: string): void {
     if (!this.#prefs.autoCollapseDone) return;
-    for (const id of T.rowsToTidy(this.#state, taskId)) this.#queueTidy(id);
+    for (const id of T.rowsToTidy(state, taskId)) this.#tidyIds.add(id);
   }
 
   /**
-   * Queue a row to be tidied, once the tick has finished landing.
+   * Start the clock on whatever is queued.
    *
    * The delay is the point: the tick landing is the reward, so nothing moves
-   * over it until it has played out. Queued rather than scheduled one at a time
-   * because ticking two things in quick succession used to have the second
-   * cancel the first, and the first row then sat there un-tidied. They all wait
-   * out the newest tick and travel together, as one animation.
+   * over it until it has played out. One clock for the whole queue rather than
+   * one per row, because ticking two things in quick succession used to have
+   * the second cancel the first and leave it sitting there un-tidied. They all
+   * wait out the newest tick and travel together, as one animation.
+   *
+   * Separate from {@link #tidy} because the two happen either side of the
+   * apply: what is queued decides where the pile begins, and the clock must not
+   * start until the render that reads it has been and gone.
    */
-  #queueTidy(id: string): void {
-    this.#tidyIds.add(id);
+  #scheduleTidy(): void {
+    if (this.#tidyIds.size === 0) return;
     if (this.#motion.matches) {
       this.#runTidy();
       return;
@@ -475,22 +509,26 @@ export class App {
     this.#tidyIds.clear();
 
     const next = T.tidyAll(this.#state, ids);
-    if (next === this.#state) return;
     this.#animateNext = true;
+    /*
+     * Render even when nothing in the list moved. A row ticked at the foot of
+     * the work has no journey to make — `sink` hands back the state it was
+     * given — but the queue it was just released from is what was holding the
+     * boundary above it, so this is the moment it crosses into the pile. The
+     * render compares the split with the last one and animates the crossing on
+     * its own account.
+     */
+    if (next === this.#state) {
+      this.#render();
+      return;
+    }
     this.#store.apply(next);
   }
 
   #remove(id: string): void {
     // One at a time: a second delete lands the first rather than racing it.
     this.#flushDelete();
-    const group = T.findGroup(this.#state, id);
-    const label = group
-      ? `Deleted “${group.title}”${
-          group.items.length
-            ? ` and ${String(group.items.length)} item${group.items.length > 1 ? "s" : ""}`
-            : ""
-        }`
-      : "Deleted";
+    const label = deletedNote(T.findGroup(this.#state, id));
 
     const finish = (): void => {
       this.#store.apply(T.remove(this.#state, id), { undoable: true });
@@ -657,14 +695,8 @@ export class App {
      * the items, and they do not come back on their own — the same reason the
      * one-off entry names the consequence rather than the mark.
      */
-    const group = T.findGroup(this.#state, id);
-    const held = group?.items.length ?? 0;
     items.push({
-      label: !group
-        ? "Delete"
-        : held === 0
-          ? "Delete group"
-          : `Delete group and ${String(held)} item${held === 1 ? "" : "s"}`,
+      label: deleteLabel(T.findGroup(this.#state, id)),
       danger: true,
       onSelect: () => {
         this.#remove(id);
@@ -934,7 +966,10 @@ export class App {
     const groups = this.#state.list.filter((node): node is Group => node.kind === "group");
     this.#destRow.hidden = groups.length === 0;
 
-    const signature = groups.map((group) => `${group.id} ${group.title}`).join("");
+    // JSON rather than a joined string: a title is free text, so any separator
+    // that can appear in one makes two different lists of groups read alike and
+    // the picker keeps a stale set of options.
+    const signature = JSON.stringify(groups.map((group) => [group.id, group.title]));
     if (this.#dest.dataset["sig"] !== signature) {
       this.#dest.replaceChildren(new Option("Top level", ""));
       for (const group of groups) this.#dest.append(new Option(group.title, group.id));

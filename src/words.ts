@@ -1,8 +1,9 @@
 import type { DayScore } from "./progress";
+import type { Group } from "./types";
 
 /**
- * What the day is reported in: every sentence the two cards and the closer say
- * about how it is going.
+ * Every sentence the app says about the list: how the day is going, on the two
+ * cards and the closer, and what a change to the list has just done to it.
  *
  * It lives here rather than beside the cards that print it because these are
  * pure functions over a `DayScore` and a couple of counts, and `src/ui/**` is
@@ -20,8 +21,20 @@ import type { DayScore } from "./progress";
  * here is what makes that contrast legible in a single place.
  */
 
-const plural = (n: number, one: string, many: string): string =>
+/**
+ * A count and its noun, agreeing.
+ *
+ * Exported because the alternative is what was here before: four
+ * implementations of one rule, in `words.ts`, in `src/ui/drawer.ts`, and twice
+ * inline in `app.ts` — two of them spelled `n === 1 ? "" : "s"` and one of them
+ * `n > 1 ? "s" : ""`, which disagree at zero. The `> 1` version was unreachable
+ * only because its call site happened to guard on the count first.
+ */
+export const plural = (n: number, one: string, many: string): string =>
   `${String(n)} ${n === 1 ? one : many}`;
+
+/** The same, for the regular nouns the drawer counts — items, groups. */
+export const count = (n: number, noun: string): string => plural(n, noun, `${noun}s`);
 
 /**
  * How many rows a card names before it stops listing them and counts the rest.
@@ -159,3 +172,38 @@ export function barSoFar(steps: number, bar: number): string {
 /** How the rest of the list finished against the bar, for a day that is over. */
 export const barAtClose = (steps: number, bar: number): string =>
   steps === 0 ? `past the bar, ${barAt(bar)}` : `short of the bar, ${barAt(bar)}`;
+
+/*
+ * What a change to the list has just done to it.
+ *
+ * These are sentences about the list rather than about the day, but they belong
+ * here for the same reason the day's do: they are decidable without a DOM, and
+ * `app.ts` is excluded from coverage on the claim that what is in there needs a
+ * browser. Building them in the renderer meant the only thing checking their
+ * grammar was whichever end-to-end test happened to assert the text.
+ */
+
+/** The toast after an import. */
+export const importedNote = (items: number): string => `Imported ${count(items, "item")}`;
+
+/**
+ * The toast after a delete, which names what a group took with it.
+ *
+ * "Deleted" alone does not mention the items, and they do not come back on
+ * their own — the same reason the one-off menu entry names its consequence
+ * rather than the mark.
+ */
+export function deletedNote(group: Group | undefined): string {
+  if (!group) return "Deleted";
+  const held = group.items.length;
+  return held === 0
+    ? `Deleted “${group.title}”`
+    : `Deleted “${group.title}” and ${count(held, "item")}`;
+}
+
+/** The ⋯ menu's delete entry, which says the same thing before the fact. */
+export function deleteLabel(group: Group | undefined): string {
+  if (!group) return "Delete";
+  const held = group.items.length;
+  return held === 0 ? "Delete group" : `Delete group and ${count(held, "item")}`;
+}

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clearStorage, addItem } from "./helpers";
+import { clearStorage, addItem, seedStorage, task } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -28,6 +28,33 @@ test("adds, ticks, and reports progress", async ({ page }) => {
 
   await expect(page.locator(".task", { hasText: "shopping" })).toHaveClass(/done/);
   await expect(page.locator("#frac")).toHaveText("1 of 2");
+});
+
+/*
+ * The header asks two questions and they have two answers.
+ *
+ * The arc and `#pct` report `progress()` — the mean of `count / target` over
+ * every task — while `#frac` counts the rows that are actually finished. On a
+ * list of plain items the two agree, which is every other assertion in this
+ * file and is how they came to be mistaken for the same number. Put one
+ * part-counted row in and they part company, and both are still right: a third
+ * of a `[3]` is real progress and is not a finished row.
+ */
+test("a count and a proportion are different questions", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: Date.now(),
+    list: [
+      { kind: "task", id: "spread", text: "spread the word", target: 3, count: 1 },
+      ...["a", "b", "c"].map((text) => ({ ...task(text), count: 1 })),
+      ...["d", "e", "f"].map(task),
+    ],
+  });
+
+  // Three of the seven rows are done, and the third of a point the `[3]` has
+  // earned belongs to the mean rather than to the tally.
+  await expect(page.locator("#frac")).toHaveText("3 of 7");
+  await expect(page.locator("#pct")).toHaveText("48%");
 });
 
 test("a counted item needs one tap per unit", async ({ page }) => {
@@ -104,6 +131,117 @@ test("a finished row is struck through across a wrapped label", async ({ page })
   await expect
     .poll(() => line.evaluate((el) => getComputedStyle(el).backgroundSize))
     .toBe("100% 1.5px");
+});
+
+/*
+ * And it actually wipes, rather than arriving already struck.
+ *
+ * The strike is a `background-size` transition, and a transition needs the
+ * element it runs on to have been rendered with the old value. `writeLabel`
+ * used to rebuild the `.line` span on every update, so the browser was handed a
+ * fresh element already at its finished value: the wipe never played on any
+ * row. The test above could not see it — it polls for the finished state, which
+ * is exactly what a snap also reaches.
+ *
+ * Asked of the transition itself rather than by sampling a frame, for the same
+ * reason the closing card's reveal is scrubbed: which frame a sampler catches
+ * is a different number on every engine.
+ */
+test("the strike wipes across the words rather than arriving struck", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  // `beta` sits above `alpha`, so ticking it leaves it in the day's work.
+  const wipe = await page.evaluate(() => {
+    const row = [...document.querySelectorAll<HTMLElement>(".task")].find(
+      (el) => el.querySelector(".label")?.textContent === "beta",
+    );
+    const line = row?.querySelector<HTMLElement>(".label .line");
+    if (!row || !line) throw new Error("no row to tick");
+
+    row.querySelector<HTMLElement>(".tick")?.click();
+    // Read synchronously: a transition reports its starting value, a snap its
+    // finished one, and the element is the same one either way.
+    return {
+      kept: row.querySelector(".label .line") === line,
+      running: line.getAnimations().map((a) => a.constructor.name),
+      size: getComputedStyle(line).backgroundSize,
+    };
+  });
+
+  expect(wipe.kept, "the span has to survive the tick to transition at all").toBe(true);
+  expect(wipe.running).toContain("CSSTransition");
+  expect(wipe.size, "it starts where it was, not where it is going").toBe("0% 1.5px");
+
+  // And it still gets there.
+  await expect
+    .poll(() =>
+      page
+        .locator(".task", { hasText: "beta" })
+        .locator(".line")
+        .evaluate((el) => getComputedStyle(el).backgroundSize),
+    )
+    .toBe("100% 1.5px");
+});
+
+/*
+ * The row at the foot of the work has the same wipe as any other.
+ *
+ * It is the row with no journey to make: `pileFrom` reads the trailing run of
+ * finished rows, so a tick down there put it in the pile on the very frame it
+ * landed. Crossing into `#donelist` is a removal and an insertion, which
+ * restarts the label's style — so that one row, and only that one, arrived
+ * already struck.
+ */
+test("the last row of the work wipes too, rather than crossing under the tick", async ({
+  page,
+}) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  const wipe = await page.evaluate(() => {
+    const row = [...document.querySelectorAll<HTMLElement>(".task")].find(
+      (el) => el.querySelector(".label")?.textContent === "alpha",
+    );
+    const line = row?.querySelector<HTMLElement>(".label .line");
+    if (!row || !line) throw new Error("no row to tick");
+
+    row.querySelector<HTMLElement>(".tick")?.click();
+    return {
+      parent: row.parentElement?.id ?? "?",
+      running: line.getAnimations().map((a) => a.constructor.name),
+      size: getComputedStyle(line).backgroundSize,
+    };
+  });
+
+  expect(wipe.parent, "it stays in the work while the tick plays out").toBe("list");
+  expect(wipe.running).toContain("CSSTransition");
+  expect(wipe.size).toBe("0% 1.5px");
+
+  // And it does reach the pile, once the tidy lets it go.
+  await expect(page.locator("#donelist .task", { hasText: "alpha" })).toBeVisible();
+});
+
+/*
+ * The delay is the reward playing out, and it covers every row — including the
+ * one already sitting at the foot of the work, which used to cross at +0ms
+ * because it needed no journey to get there.
+ */
+test("a row ticked at the foot of the work waits with the rest", async ({ page }) => {
+  await addItem(page, "alpha");
+  await addItem(page, "beta");
+
+  const where = () =>
+    page
+      .locator(".task", { hasText: "alpha" })
+      .evaluate((el) => el.parentElement?.id ?? "?")
+      .catch(() => "?");
+
+  await page.locator(".task", { hasText: "alpha" }).locator(".tick").click();
+  expect(await where(), "in the work on the frame it was ticked").toBe("list");
+  await page.waitForTimeout(300);
+  expect(await where(), "still in the work while the tick lands").toBe("list");
+  await expect.poll(where, { timeout: 4000 }).toBe("donelist");
 });
 
 test("tapping a finished plain item unticks it", async ({ page }) => {

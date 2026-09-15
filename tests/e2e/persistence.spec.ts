@@ -44,6 +44,35 @@ test("a corrupt store falls back to a usable app instead of a blank page", async
   await expect(page.locator(".task", { hasText: "still works" })).toBeVisible();
 });
 
+/*
+ * "A write that cannot reach storage must say so rather than pretend" is one of
+ * the hard constraints, and it is the only one whose last mile lives in `app.ts`
+ * — which Vitest does not measure, on the grounds that a browser owns it. So
+ * this is the browser owning it. `save()` returning false is unit-tested and the
+ * store's report is too; what nobody was watching is whether any of that reaches
+ * the screen.
+ *
+ * Broken after the boot rather than before it: the app has to load from a store
+ * that works and then lose it, which is what a quota actually feels like.
+ */
+test("a list that cannot be saved says so rather than pretending", async ({ page }) => {
+  await clearStorage(page);
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException("quota", "QuotaExceededError");
+    };
+  });
+
+  await addItem(page, "buy milk");
+
+  await expect(page.locator("#toast")).toBeVisible();
+  await expect(page.locator(".toast-text")).toHaveText(
+    "Can't save — this list will be lost on reload",
+  );
+  // And it is still a working list. It simply will not survive the reload.
+  await expect(page.locator(".task", { hasText: "buy milk" })).toBeVisible();
+});
+
 test("counts stored above their target are repaired on load", async ({ page }) => {
   await seedStorage(page, {
     v: 1,
