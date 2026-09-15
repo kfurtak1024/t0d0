@@ -18,8 +18,32 @@ const RING_SIZE = { root: 26, nested: 24 } as const;
  *
  * The text lives in an inline span so the strike-through spans the words rather
  * than the whole flexed row.
+ *
+ * **Left alone when it already says the right thing.** The strike is a
+ * `background-size` transition on that span, and a transition needs the element
+ * it runs on to have been rendered with the old value — so rebuilding the span
+ * on every update, as this did, handed the browser a brand-new element already
+ * at `100%`. The wipe never played on any row: measured, `background-size` was
+ * at its finished value on the first frame after the tick and `getAnimations()`
+ * was empty. Keeping the span is what gives the transition something to travel
+ * from.
+ *
+ * The check is structural, not just the text. Inline editing sets the label's
+ * `textContent` directly, which destroys the span — so a cancelled edit that
+ * changed nothing leaves the right words in the wrong shape, and comparing the
+ * words alone would keep it and lose the strike on that row for good.
  */
 function writeLabel(el: HTMLElement, task: Task): void {
+  const current = el.firstElementChild;
+  if (
+    el.childNodes.length === 1 &&
+    current instanceof HTMLElement &&
+    current.classList.contains("line") &&
+    current.textContent === task.text
+  ) {
+    return;
+  }
+
   const line = document.createElement("span");
   line.className = "line";
   line.textContent = task.text;
@@ -109,13 +133,13 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     }
   });
   count.addEventListener("click", () => {
-    actions.bump(task.id, -1);
+    actions.bump(current.id, -1);
   });
   dots.addEventListener("click", () => {
-    actions.openMenu(dots, task.id);
+    actions.openMenu(dots, current.id);
   });
   label.addEventListener("click", () => {
-    actions.beginEdit(label, task.id, false);
+    actions.beginEdit(label, current.id, false);
   });
 
   row.append(grip(), tick, label, tag, count, dots);

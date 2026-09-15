@@ -179,6 +179,16 @@ Invariants worth defending in review:
   row done?" would drop it into the pile the instant it was ticked, straight over the top
   of that. Measured: ticked at +0, still in the work at +300ms, in the pile at +700ms.
   It also keeps `groupAbove()` honest, since array order and visual order then agree.
+- **Positional is not enough on its own: the split also waits for the queue.** `pileFrom`
+  reads the trailing run, which only starts counting once `sink()` has moved something —
+  so the delay covered every row except the one that needed no journey to reach the pile.
+  A row ticked at the _foot_ of the work was already in that run, and the boundary swept
+  past it on the frame it was ticked: measured, in `#donelist` at +0, +300 and +800ms,
+  the one row the reward never played out over. `App#pileFrom` therefore walks the split
+  back past anything still in `#tidyIds`, and `#bump` fills that queue **before** the
+  apply, since the render the apply triggers is what reads it. `#runTidy` then renders
+  even when `tidyAll` changed nothing, because releasing the queue is itself what moves
+  the boundary — the same "a moved boundary is a rearrangement" rule below.
 - **Only while the tidy is on.** With `autoCollapseDone` off the list is deliberately
   unsorted — `alpha | ✓beta | gamma | ✓delta` — so there is no run at the foot to be a
   boundary, the split is the list's length, and everything stays in one list as before.
@@ -707,6 +717,18 @@ Invariants worth defending in review:
   wipe travels through line one and on into line two as one stroke. `clone` also fixes
   the wrapping but gives each line its own stroke and they travel at once — two pens
   rather than one. Both were rendered mid-wipe on both engines before choosing.
+- **Being a transition, it needs its span kept.** A transition runs on an element that was
+  rendered with the old value, and `writeLabel` rebuilt the `.line` span on every update —
+  so the browser was handed a fresh element already at `100%` and the wipe never played on
+  any row: measured, finished `background-size` on the first frame after the tick and an
+  empty `getAnimations()`. It now writes only when the label is not already that span
+  saying those words, and the check is structural, because inline editing sets the label's
+  `textContent` and destroys the span — a cancelled edit that changed nothing would
+  otherwise keep the right words in the wrong shape and lose the strike on that row for
+  good. The other half was the boundary: a row crossing into `#donelist` is a removal and
+  an insertion, which restarts its style, so the wipe also needed the row to stay put while
+  it played. `smoke.spec.ts` asks the transition rather than sampling a frame — the same
+  lesson the closing card's reveal is scrubbed for.
 - **A row's label is its name and none of the marks.** All three of the things the
   composer parses leave the text on the way in, and each is shown by something built for
   it: `!` is the accent edge, `~` is the tag, `[n]` is the tally. The bracket was the odd
