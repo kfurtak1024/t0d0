@@ -414,7 +414,7 @@
   touch-action: manipulation;
 }
 
-/* ----------------------------------------------------------------- grip */
+/* ---------------------------------------------------------- a row's grip */
 
 /*
   Six dots drawn in CSS rather than set in a font: the app ships no webfont and
@@ -457,6 +457,8 @@
   inset: -16px -3px -16px -14px;
 }
 
+/* --------------------------------------------------- a row being dragged */
+
 .task.dragging,
 .group.dragging {
   position: relative;
@@ -479,6 +481,8 @@ body.dragging-row {
   user-select: none;
   cursor: grabbing;
 }
+
+/* ----------------------------------------------------- a row's hit areas */
 
 /*
   Hit areas, not paint areas. Every interactive control below the 44px guideline
@@ -513,6 +517,8 @@ body.dragging-row {
 .count::after {
   inset: -12px -8px;
 }
+
+/* ---------------------------------------------------------- a row's ring */
 
 .ring {
   display: block;
@@ -566,6 +572,8 @@ body.dragging-row {
     transform: scale(1);
   }
 }
+
+/* -------------- a row's words: the label, the strike, the tag, the tally */
 
 .label {
   flex: 1;
@@ -673,6 +681,8 @@ body.dragging-row {
   color: var(--ink);
 }
 
+/* ------------------------------------------------------- a row's actions */
+
 /*
   The first action, and so the one that pushes the rest right. The gap used to
   live on the tally, which meant whatever came after it was an action; the mark
@@ -691,17 +701,13 @@ body.dragging-row {
   display: grid;
   place-items: center;
   border-radius: 8px;
+  font-size: 1.05rem;
+  line-height: 1;
   color: var(--faint);
   transition:
     opacity 0.16s,
     color 0.16s,
     background 0.16s;
-}
-
-.plus,
-.dots {
-  font-size: 1.05rem;
-  line-height: 1;
 }
 
 .dots:hover,
