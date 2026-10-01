@@ -196,7 +196,7 @@ export function popRing(row: HTMLElement): void {
   const ring = row.querySelector(".ring");
   if (!ring) return;
   ring.classList.remove("pop");
-  void (ring as HTMLElement).offsetWidth;
+  ring.getBoundingClientRect();
   ring.classList.add("pop");
 }
 
