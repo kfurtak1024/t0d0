@@ -654,3 +654,34 @@ test("editing keeps the [n] visible and round-trips it", async ({ page }) => {
   await expect(label).toContainText("make calls");
   await expect(page.locator(".task .count")).toHaveText("0/3");
 });
+
+/*
+ * A tick is not the only way across the line. Editing the target down past the
+ * count finishes the row, and editing it back up past the count unfinishes it —
+ * and the row has to go where a tick would have sent it either way, or it sits
+ * finished in the work, or unfinished in the pile.
+ */
+test("editing a row finished or unfinished moves it like a tick would", async ({ page }) => {
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [{ ...task("calls"), target: 3, count: 1 }, task("other")],
+  });
+  const row = page.locator(".task", { hasText: "calls" });
+  const label = row.locator(".label");
+  const where = () => row.evaluate((el) => el.parentElement?.id ?? "?");
+
+  await label.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("calls");
+  await page.keyboard.press("Enter");
+  await expect(row).toHaveClass(/done/);
+  await expect.poll(where, { timeout: 4000 }).toBe("donelist");
+
+  await label.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("calls [3]");
+  await page.keyboard.press("Enter");
+  await expect(row).not.toHaveClass(/done/);
+  await expect.poll(where).toBe("list");
+});

@@ -377,6 +377,21 @@ export class App {
   /* --------------------------------------------------------------- actions */
 
   #bump(id: string, delta: number): void {
+    if (!T.findTask(this.#state, id)) return;
+    this.#land(id, T.bump(this.#state, id, delta, Date.now()));
+  }
+
+  /**
+   * Apply a change to one task, with everything finishing or unfinishing it
+   * sets in motion.
+   *
+   * A tick is not the only way across that line. Editing `task [3]` at 1/3
+   * down to `task` clamps the count to the new target and finishes the row,
+   * and `[3]` at 3/3 edited up to `[5]` unfinishes it — so both go through
+   * here, or the edited row is finished and sits in the work, or unfinished
+   * and stuck in the pile.
+   */
+  #land(id: string, change: State, options?: { undoable?: boolean }): void {
     const before = T.findTask(this.#state, id);
     if (!before) return;
     const wasDone = isDone(before);
@@ -390,7 +405,7 @@ export class App {
     const ownerBefore = owner ? T.findRow(this.#state, owner.id) : undefined;
     const ownerFinished = ownerBefore !== undefined && T.isFinished(ownerBefore);
 
-    let next = T.bump(this.#state, id, delta, Date.now());
+    let next = change;
     const after = T.findTask(next, id);
     const justFinished = after !== undefined && !wasDone && isDone(after);
 
@@ -428,7 +443,7 @@ export class App {
      * is.
      */
     if (justFinished) this.#tidy(next, id);
-    this.#store.apply(next);
+    this.#store.apply(next, options);
 
     if (justFinished) {
       const row = this.#rowNode(id);
@@ -787,7 +802,9 @@ export class App {
       (value) => {
         this.#editingId = null;
         this.#endEdit = null;
-        this.#store.apply(T.retitle(this.#state, id, value, isGroup), { undoable: true });
+        const next = T.retitle(this.#state, id, value, isGroup);
+        if (isGroup) this.#store.apply(next, { undoable: true });
+        else this.#land(id, next, { undoable: true });
         this.#render();
       },
       () => {
