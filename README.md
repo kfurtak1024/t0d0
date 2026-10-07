@@ -75,7 +75,7 @@ that rather than merely promising it.
 | Drag the `⠿` grip                                   | move a row, in and out of groups as it travels; `Escape` calls it off                            |
 | Click any text                                      | edit in place, `[3]`, `!` and `~` included; `Enter` commits, `Escape` reverts                    |
 | <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd>            | move the focused row up or down among its siblings                                               |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd>    | with a tick focused, move that item into the group above or back out                             |
+| <kbd>Alt</kbd>+<kbd>→</kbd> <kbd>←</kbd>            | move the focused item into the group above or back out                                           |
 | <kbd>Space</kbd> / <kbd>Enter</kbd>                 | tick the focused item                                                                            |
 | <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | count a focused `[n]` item up or down                                                            |
 | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Z</kbd>         | undo a delete, a move, an import, or a cleared day                                               |

@@ -88,6 +88,18 @@ describe("undo", () => {
     expect(store.undo()).toBe(false);
   });
 
+  it("says what an undo would restore, without restoring it", () => {
+    const store = new Store(state("before"));
+    expect(store.undoTarget).toBeNull();
+
+    store.apply(state("after"), { undoable: true });
+    expect((store.undoTarget?.list[0] as { text: string }).text).toBe("before");
+    expect((store.state.list[0] as { text: string }).text).toBe("after");
+
+    store.undo();
+    expect(store.undoTarget).toBeNull();
+  });
+
   it("is exactly one level deep — undo cannot walk back a history", () => {
     const store = new Store(state("one"));
     store.apply(state("two"), { undoable: true });

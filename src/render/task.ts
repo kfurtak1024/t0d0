@@ -123,6 +123,9 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
     // Enter already toggle; arrows are not a checkbox interaction, and having
     // them tick it made the key table in the README a lie.
     if (current.target <= 1) return;
+    // Alt+arrows belong to the row — they move it — so a counted tick must not
+    // also count on the same press.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
       event.preventDefault();
       actions.bump(current.id, -1);

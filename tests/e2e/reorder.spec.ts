@@ -149,7 +149,7 @@ test("Alt+Arrow reorders the focused row and keeps the focus on it", async ({ pa
 /*
  * Move up and move down stay on the row's own level. A command named after a
  * direction should not also change what an item belongs to — that is asked for
- * separately, with Tab / Shift-Tab or the menu's own entry.
+ * separately, with Alt+→ / Alt+← or the menu's own entry.
  */
 test("Alt+Arrow moves an item within its group and stops at the ends", async ({ page }) => {
   await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
@@ -178,13 +178,43 @@ test("a root item steps past a whole group rather than into it", async ({ page }
   expect(await shape(page)).toEqual(["loose", "# Morning", "  eat breakfast"]);
 });
 
-test("Shift+Tab is what takes an item out of its group", async ({ page }) => {
+test("Alt+← takes an item out of its group, and Alt+→ puts it back", async ({ page }) => {
   await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
+  const tick = page.locator(".task", { hasText: "eat breakfast" }).locator(".tick");
+
+  await tick.focus();
+  await page.keyboard.press("Alt+ArrowLeft");
+  expect(await shape(page)).toEqual(["# Morning", "  walk the dog", "eat breakfast"]);
+  await expect(tick).toBeFocused();
+
+  await page.keyboard.press("Alt+ArrowRight");
+  expect(await shape(page)).toEqual(["# Morning", "  walk the dog", "  eat breakfast"]);
+});
+
+/*
+ * Tab is how a keyboard moves through the page. It used to nest the row under
+ * focus, so tabbing down the list put every root row below a group into it.
+ */
+test("tabbing through the list changes nothing", async ({ page }) => {
+  await buildList(page, ["# Morning", "  eat breakfast", "loose", "also loose"]);
+  const before = await shape(page);
 
   await page.locator(".task", { hasText: "eat breakfast" }).locator(".tick").focus();
-  await page.keyboard.press("Shift+Tab");
+  for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
+  for (let i = 0; i < 12; i++) await page.keyboard.press("Shift+Tab");
 
-  expect(await shape(page)).toEqual(["# Morning", "  walk the dog", "eat breakfast"]);
+  expect(await shape(page)).toEqual(before);
+});
+
+test("Alt+arrows on a counted item move it without counting it", async ({ page }) => {
+  await buildList(page, ["first", "calls [3]"]);
+  const row = page.locator(".task", { hasText: "calls" });
+
+  await row.locator(".tick").focus();
+  await page.keyboard.press("Alt+ArrowUp");
+
+  expect(await shape(page)).toEqual(["calls", "first"]);
+  await expect(row.locator(".count")).toHaveText("0/3");
 });
 
 test("a group moves as one block", async ({ page }) => {

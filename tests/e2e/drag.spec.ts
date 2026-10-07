@@ -421,3 +421,27 @@ test("a touch pointer drags too", async ({ page }) => {
 
   expect(await shape(page)).toEqual(["beta", "alpha"]);
 });
+
+/*
+ * The tidy waits half a second after a tick, and a grip can be grabbed inside
+ * that. It used to fire anyway, carrying the dragged row out of the work list
+ * under the finger: the dragger lost it, and it was left in the pile still
+ * wearing `.dragging` and the offset it had been carried by.
+ */
+test("a row ticked and then dragged is not tidied out from under the finger", async ({ page }) => {
+  await seedStorage(page, { v: 1, openedAt: null, list: [task("a"), task("b"), task("c")] });
+  await settle(page);
+  const row = page.locator('.task[data-id="b"]');
+
+  await row.locator(".tick").click();
+  await drag(page, row.locator(".grip"), 12, { release: false, steps: 4 });
+  await page.waitForTimeout(900);
+  await expect(row).toHaveClass(/dragging/);
+  expect(await row.evaluate((el) => el.parentElement?.id)).toBe("list");
+
+  await page.mouse.up();
+  // And once the finger lifts, the tidy it held back goes.
+  await expect.poll(() => row.evaluate((el) => el.parentElement?.id)).toBe("donelist");
+  await expect(row).not.toHaveClass(/dragging/);
+  expect(await row.getAttribute("style")).toBeFalsy();
+});

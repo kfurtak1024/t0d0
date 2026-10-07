@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { load, onExternalChange, save, STORAGE_KEY } from "../src/storage";
+import { load, onExternalChange, save, STORAGE_KEY, UNREADABLE_KEY } from "../src/storage";
 import type { State } from "../src/types";
 
 const state = (text = "shopping"): State => ({
@@ -79,6 +79,36 @@ describe("load", () => {
 
   it("returns null for JSON that is not a t0d0 state", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ hello: "world" }));
+    expect(load()).toBeNull();
+  });
+
+  /*
+   * A null here sends the app to a blank list whose first save overwrites the
+   * stored one. Whatever could not be read has to be somewhere else by then —
+   * most likely it is a newer build's list, read by an older one.
+   */
+  it("keeps an unreadable list out of the way of the next save", () => {
+    const newer = JSON.stringify({ v: 2, list: [] });
+    localStorage.setItem(STORAGE_KEY, newer);
+
+    expect(load()).toBeNull();
+    save(state("a fresh start"));
+
+    expect(localStorage.getItem(UNREADABLE_KEY)).toBe(newer);
+    expect(localStorage.getItem(STORAGE_KEY)).toContain("a fresh start");
+  });
+
+  it("keeps nothing aside when the list reads fine", () => {
+    save(state());
+    load();
+    expect(localStorage.getItem(UNREADABLE_KEY)).toBeNull();
+  });
+
+  it("still falls back when there is nowhere to keep the copy", () => {
+    localStorage.setItem(STORAGE_KEY, "{ not json");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
     expect(load()).toBeNull();
   });
 

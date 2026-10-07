@@ -864,3 +864,75 @@ test("a stale day with nothing in it opens the card without a rail", async ({ pa
   await expect(page.locator("#veil .track")).toBeHidden();
   await expect(page.locator("#veil .gate")).toHaveCount(0);
 });
+
+/*
+ * A tab left open overnight, or an installed app the phone resumes, never boots
+ * again — so coming back into view has to ask the stale question too. Once per
+ * stale day, though: dismissing the card is an answer, and a card that came back
+ * on every switch of tabs would be arguing with it.
+ */
+test("a day left open in a tab is met with its card on coming back", async ({ page }) => {
+  const now = Date.now();
+  await seedStorage(page, {
+    v: 1,
+    openedAt: now - 60 * 60 * 1000,
+    list: [{ kind: "task", id: "a", text: "a", target: 1, count: 1 }],
+  });
+  const comeBack = (): Promise<void> =>
+    page.evaluate(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+  await comeBack();
+  await expect(page.locator("#veil")).toBeHidden();
+
+  await page.clock.setFixedTime(now + 17 * 60 * 60 * 1000);
+  await comeBack();
+  await expect(page.locator("#veil")).toBeVisible();
+
+  await page.locator("#veil .dismiss").click();
+  await expect(page.locator("#veil")).toBeHidden();
+  await comeBack();
+  await page.waitForTimeout(100);
+  await expect(page.locator("#veil")).toBeHidden();
+});
+
+/*
+ * Undoing a closed day puts back a finished list. The close had re-armed every
+ * moment, so the undo was celebrated as if the day had just been earned again.
+ */
+test("undoing a closed day does not celebrate it a second time", async ({ page }) => {
+  await page.addInitScript(() => {
+    const log: unknown[] = [];
+    (window as unknown as { buzzes: unknown[] }).buzzes = log;
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: (pattern: unknown) => {
+        log.push(pattern);
+        return true;
+      },
+    });
+  });
+  await seedStorage(page, {
+    v: 1,
+    openedAt: null,
+    list: [
+      { kind: "task", id: "a", text: "a", target: 1, count: 1 },
+      { kind: "task", id: "b", text: "b", target: 1, count: 1 },
+    ],
+  });
+  const buzzes = (): Promise<number> =>
+    page.evaluate(() => (window as unknown as { buzzes: unknown[] }).buzzes.length);
+
+  await page.getByRole("button", { name: "End day" }).click();
+  await page.getByRole("button", { name: "Close the day" }).click();
+  await expect(page.locator("#frac")).toHaveText("0 of 2");
+  // The closing card's own shower is scheduled; let it go off before counting.
+  await page.waitForTimeout(2500);
+  const before = await buzzes();
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.locator("#frac")).toHaveText("2 of 2");
+  await page.waitForTimeout(200);
+  expect(await buzzes()).toBe(before);
+});

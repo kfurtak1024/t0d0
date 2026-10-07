@@ -195,8 +195,8 @@ Invariants worth defending in review:
 - **Nothing in the pile is arranged by hand.** It is in the order the rows were finished
   in, which nobody chose, so `inPile()` refuses every reorder: the ⋯ menu omits its move
   and nest entries rather than disabling them (a spent move stays as a dead row because it
-  may come back; these never will), Alt+arrows and Tab return without swallowing the key
-  so focus still moves normally, and the dragger is wired to the work list alone. The
+  may come back; these never will), Alt+↑/↓ return without swallowing the key (Alt+←/→
+  are always swallowed on a row, being browser history otherwise), and the dragger is wired to the work list alone. The
   grips down there are `visibility: hidden` — kept, so a settled row stays in line with
   the work on touch where the grip is in the flow, but not shown, because a handle that
   looks draggable and is not is worse than no handle. Marking, tagging and deleting all
@@ -208,7 +208,7 @@ Invariants worth defending in review:
   consistent thing — but a group has one `<ul>` and no ending block, so there is no
   boundary on screen to explain why the row now refuses to move, and a control that
   silently stops working is worse than an order you can disturb. Moving, nesting and
-  `Shift+Tab` all still work on a finished nested row.
+  `Alt+←` all still work on a finished nested row.
 - **An entry animation belongs to a row that is arriving, and the browser cannot tell
   the difference.** `@starting-style` applies to any element that is newly rendered, and
   moving a node with `insertBefore` counts as that — the element's style is discarded and
@@ -686,9 +686,13 @@ Invariants worth defending in review:
   goes there, into or out of a group included. "Move up" is `"level"`: a command named
   after a direction moves the row among its own siblings and stops at the ends, because
   one that silently re-nested an item would be doing more than it said. Changing level is
-  its own command — `Tab` / `Shift-Tab`, or the menu's "Into" / "Out of". The `⋯` menu
+  its own command — `Alt+→` / `Alt+←`, or the menu's "Into" / "Out of". The `⋯` menu
   prints `Alt+↑` beside "Move up", so **those two must stay the same command**; scoping
   one and not the other makes the hint a lie.
+- **Tab is never a structural edit.** Nesting used to be `Tab` / `Shift+Tab` on a focused
+  tick, so a keyboard user tabbing down the list nested every root row below a group into
+  it, and a screen reader gave no sign. Tab moves focus and nothing else;
+  `reorder.spec.ts` tabs through a list and asserts it is unchanged.
 - **Deleting a row lives in the `⋯` menu, not on the row.** A ✕ beside the `⋯` held a
   25.6px column open on every row for an action taken in bursts and then not again:
   `opacity: 0` hides a control on a pointer device, it does not un-reserve its space, and
