@@ -95,6 +95,8 @@ export class App {
   #shownPct = 0;
   #tweenRaf = 0;
   #storageWarned = false;
+  /** The `openedAt` the stale-day card was last shown for. */
+  #staleSeen: number | null = null;
   /** Rows waiting out the tick that finished them, before they get out of the way. */
   #tidyIds = new Set<string>();
   #tidyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -268,6 +270,8 @@ export class App {
       onEnd: (_id, moved) => {
         if (moved && this.#beforeDrag) this.#store.stageUndo(this.#beforeDrag);
         this.#beforeDrag = null;
+        // Whatever the drag held back goes now.
+        this.#scheduleTidy();
       },
       onCancel: () => {
         // Escape mid-drag means "never mind", so the list goes back untouched
@@ -277,6 +281,7 @@ export class App {
           this.#store.apply(this.#beforeDrag);
         }
         this.#beforeDrag = null;
+        this.#scheduleTidy();
       },
     });
   }
@@ -367,11 +372,36 @@ export class App {
     // Never celebrate on load: every moment already reached starts spent, and
     // arms itself only if the list later falls back below it.
     this.#arm(frame.score);
+    this.#checkStale();
 
+    /*
+     * Not only at boot. A desktop tab left open overnight, or an installed app
+     * the phone resumes rather than relaunches, never boots again — and that is
+     * the ordinary way to meet yesterday's list. Coming back into view is the
+     * same moment as opening the app, so it asks the same question.
+     */
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") this.#checkStale();
+    });
+    addEventListener("pageshow", (event) => {
+      if (event.persisted) this.#checkStale();
+    });
+  }
+
+  /** Meet a day left open past `STALE_MS` with its own summary. */
+  #checkStale(): void {
     const { openedAt } = this.#state;
-    if (openedAt !== null && Date.now() - openedAt > STALE_MS) {
-      this.#sheet.show(this.#state, this.#bar);
-    }
+    if (openedAt === null || Date.now() - openedAt <= STALE_MS) return;
+    // Never over something already in hand: a card on a card, or an edit.
+    if (this.#sheet.isOpen || this.#stands.isOpen || this.#drawer.isOpen) return;
+    if (this.#editingId !== null) return;
+    /*
+     * Once per stale day. Dismissing the card is an answer — "not now" — and a
+     * card that came back on every switch of tabs would be arguing with it.
+     */
+    if (this.#staleSeen === openedAt) return;
+    this.#staleSeen = openedAt;
+    this.#sheet.show(this.#state, this.#bar);
   }
 
   /* --------------------------------------------------------------- actions */
@@ -520,6 +550,14 @@ export class App {
    * rules live with the transition; this only owns the queue and the animation.
    */
   #runTidy(): void {
+    /*
+     * Not under a finger. The tidy would carry the dragged row — or rows around
+     * it — out of the work list mid-gesture, and the dragger, which finds its
+     * row in that list, would lose it and leave it stranded in the pile still
+     * wearing `.dragging`. The queue waits; the drag's end starts it again.
+     */
+    if (this.#beforeDrag !== null) return;
+
     const ids = [...this.#tidyIds];
     this.#tidyIds.clear();
 
@@ -580,7 +618,7 @@ export class App {
    *
    * Level-scoped: a command named after a direction should move the row in that
    * direction, not quietly re-nest it. Changing level is asked for explicitly —
-   * Tab / Shift-Tab, or the menu's "Into" / "Out of". Dragging is the exception,
+   * Alt+→ / Alt+←, or the menu's "Into" / "Out of". Dragging is the exception,
    * because there the pointer is already saying where the row should land.
    */
   #reorder(id: string, dir: T.ReorderDirection): void {
@@ -681,7 +719,7 @@ export class App {
     if (owner) {
       items.push({
         label: `Out of “${owner.title}”`,
-        hint: "Shift+Tab",
+        hint: "Alt+←",
         onSelect: () => {
           this.#move(id, "out");
         },
@@ -689,7 +727,7 @@ export class App {
     } else if (above) {
       items.push({
         label: `Into “${above.title}”`,
-        hint: "Tab",
+        hint: "Alt+→",
         onSelect: () => {
           this.#move(id, "in");
         },
@@ -758,6 +796,14 @@ export class App {
       this.#toast.hide();
       return;
     }
+    /*
+     * Spent before it lands, like an import. Undoing a closed day hands back a
+     * finished list, and with every moment re-armed by the close, the shower
+     * fired again for a day that had already been celebrated once and was only
+     * being put back.
+     */
+    const back = this.#store.undoTarget;
+    if (back) this.#arm(this.#frame(back).score);
     if (this.#store.undo()) this.#toast.hide();
   }
 
@@ -1129,9 +1175,18 @@ export class App {
     const handle = row.classList.contains("group") ? "chev" : "tick";
 
     /*
+     * Alt+←/→ is browser history on Windows and Linux, and on a row it means
+     * nesting — so it is swallowed on any row, whether or not the row can go
+     * anywhere. Passing it through when the move is spent would turn "nothing
+     * to do here" into leaving the app.
+     */
+    const across = event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight");
+    if (across) event.preventDefault();
+
+    /*
      * Nothing in the pile is arranged by hand, whichever route asks for it.
-     * Returned without swallowing the key, so Tab still moves focus down there
-     * the way it does anywhere else — it just stops being a structural edit.
+     * Returned without swallowing anything but the history keys, so focus moves
+     * down there the way it does anywhere else.
      */
     if (this.#settled(id)) return;
 
@@ -1149,15 +1204,17 @@ export class App {
       return;
     }
 
-    // Only the tick is the row's handle for Tab: tabbing off a delete button
-    // must stay a plain focus move, not a structural edit.
-    if (!active.classList.contains("tick")) return;
-
-    if (event.key === "Tab") {
-      const dir = event.shiftKey ? "out" : "in";
-      // Only swallow Tab when there is somewhere to go, so focus can still escape.
+    /*
+     * Changing level is Alt+→ / Alt+←, the sideways half of the same chord.
+     *
+     * It was Tab / Shift+Tab, which is the key keyboard users move *through* a
+     * page with: tabbing down the list nested every root row below a group into
+     * it, one keypress at a time, and a screen reader user had no way to tell.
+     * A structural edit must never sit on the navigation key.
+     */
+    if (across) {
+      const dir = event.key === "ArrowRight" ? "in" : "out";
       if (!T.canMove(this.#state, id, dir)) return;
-      event.preventDefault();
       this.#move(id, dir);
       this.#refocus(id);
     }

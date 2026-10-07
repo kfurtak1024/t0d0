@@ -211,7 +211,7 @@ export type ReorderDirection = "up" | "down";
  * direct manipulation — the pointer is over a place, and that is where the row
  * goes, nesting included. "Move up" is a command about the row you are looking
  * at, and a command that quietly changed an item's nesting would be doing more
- * than it said. Changing level has its own commands: Tab / Shift-Tab, and the
+ * than it said. Changing level has its own commands: Alt+→ / Alt+←, and the
  * menu's "Into" / "Out of".
  */
 export type ReorderScope = "list" | "level";
@@ -519,11 +519,11 @@ export function groupAbove(state: State, id: string): Group | undefined {
   return undefined;
 }
 
-/** Whether Tab / Shift-Tab has anywhere to put this task. */
+/** Whether Alt+→ / Alt+← has anywhere to put this task. */
 export function canMove(state: State, id: string, dir: MoveDirection): boolean {
   const owner = ownerOf(state, id);
   // Only tasks nest, so a group can never answer yes — the ⋯ menu asks about
-  // rows of both kinds, where Tab only ever reached a task.
+  // rows of both kinds, where the keyboard only ever reached a task.
   if (dir === "out") return owner !== undefined;
   if (owner) return false;
   return groupAbove(state, id) !== undefined;

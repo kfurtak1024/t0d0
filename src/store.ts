@@ -75,6 +75,15 @@ export class Store {
     this.#undo = state;
   }
 
+  /**
+   * The state an undo would restore, or null. Read before undoing, so a caller
+   * can prepare for the state about to arrive — the milestones in particular,
+   * which would otherwise celebrate a day the undo merely put back.
+   */
+  get undoTarget(): State | null {
+    return this.#undo;
+  }
+
   undo(): boolean {
     if (this.#undo === null) return false;
     this.#state = this.#undo;

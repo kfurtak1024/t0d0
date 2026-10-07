@@ -13,7 +13,7 @@ const FOCUSABLE = [
  *
  * `aria-modal` tells a screen reader the rest of the page is inert; it does
  * nothing for the Tab key. Without this, tabbing out of an open sheet lands on
- * the list behind it, where the app's own Tab handling then moves items around.
+ * the list behind it, where the app's own keyboard handling acts on its rows.
  */
 export function trapFocus(container: HTMLElement, initial?: HTMLElement): () => void {
   const restoreTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;

@@ -179,7 +179,7 @@ test("the row menu is a menu, and axe agrees", async ({ page }) => {
       - menuitem "Reset to 0"
       - menuitem "Mark important"
       - menuitem "One-off, remove tonight"
-      - menuitem "Into “Later” Tab"
+      - menuitem "Into “Later” Alt+→"
   `);
 
   const { violations } = await scan(page);

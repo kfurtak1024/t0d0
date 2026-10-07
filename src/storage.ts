@@ -31,6 +31,38 @@ export function save(state: State): boolean {
   }
 }
 
+/**
+ * Where a stored list that could not be read is kept before anything can
+ * overwrite it.
+ */
+export const UNREADABLE_KEY = `${STORAGE_KEY}.unreadable`;
+
+const read = (raw: string): State | null => {
+  try {
+    return normalize(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Put an unreadable list somewhere the next save will not reach.
+ *
+ * A null from {@link load} sends the app to a blank list, and the first tick
+ * then overwrites the stored one — so without this, anything `normalize`
+ * refuses is gone for good. Corruption is the rare way in. The likely one is a
+ * schema bump: an installed app still running a cached older build reads the
+ * newer list, refuses the version it does not know, and would erase it. The
+ * latest copy wins, since that is the one most likely to be someone's list.
+ */
+const keep = (raw: string): void => {
+  try {
+    localStorage.setItem(UNREADABLE_KEY, raw);
+  } catch {
+    /* nowhere to keep it; the fallback to a blank list stands either way */
+  }
+};
+
 export function load(): State | null {
   let raw: string | null;
   try {
@@ -40,11 +72,9 @@ export function load(): State | null {
   }
   if (raw === null) return null;
 
-  try {
-    return normalize(JSON.parse(raw));
-  } catch {
-    return null;
-  }
+  const state = read(raw);
+  if (state === null) keep(raw);
+  return state;
 }
 
 /** Fires when another tab writes; without it two open tabs silently clobber. */
