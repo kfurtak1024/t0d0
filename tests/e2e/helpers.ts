@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 export const STORAGE_KEY = "t0d0/v1";
 
@@ -30,6 +30,18 @@ export async function seedStorage(page: Page, state: unknown): Promise<void> {
 
 export async function seedRaw(page: Page, raw: string): Promise<void> {
   await boot(page, raw);
+}
+
+/**
+ * Wait out the tidy: every finished row at the root has gone down to the pile.
+ *
+ * A finished root row crosses below the ending after the tidy's delay, and
+ * takes "End day" up with it — so a click aimed at the closer straight after a
+ * tick can be judged stable, then land where the button used to be. Only
+ * meaningful with "Tidy finished items" on, which is the default.
+ */
+export async function settleTidy(page: Page): Promise<void> {
+  await expect(page.locator("#list > .task.done, #list > .group.clear")).toHaveCount(0);
 }
 
 export async function addItem(page: Page, text: string): Promise<void> {

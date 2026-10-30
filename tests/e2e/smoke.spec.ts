@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clearStorage, addItem, seedStorage, task } from "./helpers";
+import { clearStorage, addItem, seedStorage, task, settleTidy } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -237,10 +237,24 @@ test("a row ticked at the foot of the work waits with the rest", async ({ page }
       .evaluate((el) => el.parentElement?.id ?? "?")
       .catch(() => "?");
 
-  await page.locator(".task", { hasText: "alpha" }).locator(".tick").click();
-  expect(await where(), "in the work on the frame it was ticked").toBe("list");
-  await page.waitForTimeout(300);
-  expect(await where(), "still in the work while the tick lands").toBe("list");
+  /*
+   * Read in the page, not across the wire: each round trip is wall-clock the
+   * tidy's own timer keeps running through, and on a loaded runner two of them
+   * outlast it. A 300ms timer set after the tick always fires before the app's
+   * longer one, however slow the machine.
+   */
+  const [onTick, at300] = await page.evaluate(async () => {
+    const row = [...document.querySelectorAll<HTMLElement>(".task")].find(
+      (el) => el.querySelector(".label")?.textContent === "alpha",
+    );
+    const parent = () => row?.parentElement?.id ?? "?";
+    row?.querySelector<HTMLElement>(".tick")?.click();
+    const first = parent();
+    await new Promise((done) => setTimeout(done, 300));
+    return [first, parent()];
+  });
+  expect(onTick, "in the work on the frame it was ticked").toBe("list");
+  expect(at300, "still in the work while the tick lands").toBe("list");
   await expect.poll(where, { timeout: 4000 }).toBe("donelist");
 });
 
@@ -568,6 +582,7 @@ test("a collapsed group leaves the tab order", async ({ page }) => {
 test("the day card does not open with the destructive button focused", async ({ page }) => {
   await addItem(page, "shopping");
   await page.locator(".tick").first().click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
 
   await expect(page.locator("#veil")).toBeVisible();

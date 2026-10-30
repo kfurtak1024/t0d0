@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle, settleTidy } from "./helpers";
 
 /**
  * How the day is scored, end to end. The gates and the rainbow are unit-tested
@@ -217,12 +217,14 @@ test("the day card reports the verdict before it clears anything", async ({ page
   await addItem(page, "b");
 
   await tick(page, "call the bank, important").click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("The important things are done.");
   await page.locator("#veil .dismiss").click();
 
   await tick(page, "a").click();
   await tick(page, "b").click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("Everything done.");
 });
@@ -401,6 +403,7 @@ test("the closing card names what held the day back", async ({ page }) => {
 
   for (const name of ["ship the patch, important", "water plants", "shopping"])
     await tick(page, name).click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
 
   const gates = page.locator("#veil .gate");
