@@ -386,13 +386,17 @@ function siblingsOf(state: State, id: string): { rows: Node[]; at: number } {
  * `reorder` at a time — rather than computing a destination index. A second idea
  * of where a row belongs is exactly what that step exists to avoid, and it is
  * what lets `siblingsOf` be the only thing that knows about the depth.
+ *
+ * `pending` names rows finished in the same batch but not yet sent down. They
+ * were still work at the moment of this row's tick, so it travels past them as
+ * it would have then — see {@link tidyAll}.
  */
-export function sink(state: State, id: string): State {
+export function sink(state: State, id: string, pending: ReadonlySet<string> = new Set()): State {
   let next = state;
   for (;;) {
     const { rows, at } = siblingsOf(next, id);
     const below = at < 0 ? undefined : rows[at + 1];
-    if (!below || isFinished(below)) return next;
+    if (!below || (isFinished(below) && !pending.has(below.id))) return next;
 
     const stepped = reorder(next, id, "down", "level");
     // reorder declines in place rather than throwing, and a decline it is not
@@ -453,55 +457,40 @@ export function rowsToTidy(state: State, taskId: string): string[] {
 }
 
 /**
- * Where a row sits for the purpose of ordering a batch of tidies: which root
- * row it belongs to, then where it sits inside it.
- *
- * A root row takes `item: -1` so that a group sorts *after* its own items under
- * the descending order below — the nested rows settle inside the group, and
- * then the group carries them down the list. Null for an id the list has since
- * lost.
- */
-function tidyAt(state: State, id: string): { row: number; item: number } | null {
-  const owner = ownerOf(state, id);
-  const rowId = owner?.id ?? id;
-  const row = state.list.findIndex((node) => node.id === rowId);
-  if (row < 0) return null;
-  return { row, item: owner ? owner.items.findIndex((task) => task.id === id) : -1 };
-}
-
-/**
  * Apply a batch of queued tidies as one change, so the rows travel together.
  *
- * **Bottom-most row first.** A row stops above the finished ones already
- * resting below it, so sending the upper one first strands it on top of a
- * sibling that has not travelled yet — it stays up in the work, and the pile
- * ends up in an order nobody earned. Ordering by position is what makes two
- * ticks in one breath land where the same two ticks spread over a minute would.
+ * **In the order they were ticked, and as if one at a time.** A batch is only
+ * ticks that happened to land inside one tidy delay, so it has to leave the
+ * pile exactly where the same ticks spread over a minute would. Spread out, a
+ * row sinks past everything still unfinished at its own tick — including rows
+ * that were finished a moment later — and stops on the pile earned before it.
+ * So each row is sent down in tick order, past the rows still waiting in this
+ * batch, which are exactly the ones that were still work when it was ticked.
  *
- * Depth is part of that order rather than a rule beside it — two ticks in one
- * breath inside a group have to land where two ticks spread over a minute
- * would, exactly as they do at the root. A group and its own items can arrive
- * in the same batch; nothing visible turns on which of those goes first, since
- * a queued group means every sibling is already finished, but a nested id has
- * to be *ordered* rather than dropped, which is what reading it as position -1
- * used to do.
+ * It used to go bottom-most row first, ignoring tick order, which kept the
+ * batch in list order: two quick ticks stacked `b` over `c` where the same two
+ * spread out stacked `c` over `b`. How fast you tapped decided the pile.
+ * `tests/transitions.test.ts` now pins batch and spread against each other
+ * over arbitrary lists, rather than an example of each.
+ *
+ * Depth needs no rule of its own: `sink` keeps a nested row inside its group,
+ * and a group queued by the tick that finished it comes after that tick's task.
  *
  * Each row is re-checked on the way past: the list may have moved on since the
  * tick — the row unticked, deleted, or dragged somewhere else — and a queued
  * intention is not a licence to move something that is no longer done.
  */
 export function tidyAll(state: State, ids: Iterable<string>): State {
-  const order = [...ids]
-    .map((id) => ({ id, at: tidyAt(state, id) }))
-    .filter((row): row is { id: string; at: { row: number; item: number } } => row.at !== null)
-    .sort((a, b) => b.at.row - a.at.row || b.at.item - a.at.item);
+  const order = [...new Set(ids)];
+  const pending = new Set(order);
 
   let next = state;
-  for (const { id } of order) {
+  for (const id of order) {
+    pending.delete(id);
     // A nested row is not one of the list's own, and `findRow` will not see it.
     const row = findRow(next, id) ?? findTask(next, id);
     if (!row || !isFinished(row)) continue;
-    next = sink(row.kind === "group" ? collapse(next, id) : next, id);
+    next = sink(row.kind === "group" ? collapse(next, id) : next, id, pending);
   }
   return next;
 }

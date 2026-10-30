@@ -269,16 +269,18 @@ Invariants worth defending in review:
   is a correction with no reward to protect, and a row that took half a second to come
   back would feel stuck. Both are gated on `autoCollapseDone` — someone who turned off
   automatic tidying does not want automatic reordering in either direction.
-- **A batch of tidies is applied bottom-most row first**, in `tidyAll()`. A row stops above
-  whatever finished rows are already below it, so sending the upper one first
-  strands it on top of a sibling that has not travelled yet. Ordering by
-  position is what makes two ticks in one breath land where the same two ticks
-  spread over a minute would. **Depth is part of that order**, not a rule beside it:
-  `tidyAt()` keys a row by its root row and then by its place inside it, so two ticks in
-  one breath inside a group land the same way. A group and its own items can arrive in
-  the same batch and nothing visible turns on which goes first — but a nested id has to
-  be _ordered_ rather than dropped, which is what reading it off `state.list` as position
-  -1 used to do.
+- **A batch of tidies lands exactly where the same ticks spread out would.** A batch is
+  only ticks that happened to fall inside one tidy delay, so how fast they came must not
+  decide the pile. `tidyAll()` therefore sends rows down **in tick order** — `#tidyIds`
+  is a `Set`, so insertion order is tick order — and each one travels past the rows
+  still waiting in the same batch (`sink()`'s `pending`), which are exactly the rows
+  that were still work at its own tick. It used to go bottom-most row first, which kept
+  a batch in list order: two quick ticks stacked `b` over `c` where the same two spread
+  out stacked `c` over `b`, and the e2e tests had pinned the quick result. Depth needs no
+  rule of its own: `sink()` keeps a nested row in its group, and a group is queued after
+  the tick that finished it. `tests/transitions.test.ts` pins batch against spread over
+  arbitrary lists with a pile already earned — a property, not an example — and fails
+  on the old ordering.
 - **Closing the day reopens every fold.** The folds were earned by ticks that
   `clearTicks()` has just wiped; leaving them shut opens tomorrow on a list
   hiding most of itself.

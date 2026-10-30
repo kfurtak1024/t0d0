@@ -69,8 +69,9 @@ test("a folded group drops below the work that is left", async ({ page }) => {
   await expect(page.locator(".group", { hasText: "Morning" })).toHaveClass(/collapsed/);
   await settle(page);
 
-  // Out of the way, not gone: what is left is what is on top.
-  expect(await shape(page)).toEqual(["loose", "# Morning", "  eat breakfast", "  walk the dog"]);
+  // Out of the way, not gone: what is left is what is on top. Inside, the pile
+  // is in the order it was earned — breakfast first, so it is underneath.
+  expect(await shape(page)).toEqual(["loose", "# Morning", "  walk the dog", "  eat breakfast"]);
 });
 
 test("a ticked root item drops below the work that is left", async ({ page }) => {
@@ -129,14 +130,16 @@ test("unticking a nested item lifts it back above the group's finished run", asy
   await tick(page, "post mail").click();
   await tick(page, "book train").click();
   await passTidy(page);
-  await expect
-    .poll(() => shape(page))
-    .toEqual(["# Morning", "  wash up", "  post mail", "  book train"]);
-
-  await tick(page, "book train").click();
+  // Later on top: "book train" finished second and rests on "post mail".
   await expect
     .poll(() => shape(page))
     .toEqual(["# Morning", "  wash up", "  book train", "  post mail"]);
+
+  // The one at the foot, so there is a finished row above it to climb past.
+  await tick(page, "post mail").click();
+  await expect
+    .poll(() => shape(page))
+    .toEqual(["# Morning", "  wash up", "  post mail", "  book train"]);
 });
 
 test("with tidying off, a nested item stays where it was ticked", async ({ page }) => {
@@ -156,13 +159,15 @@ test("two ticks in the same breath both land", async ({ page }) => {
   await buildList(page, ["a", "b", "c", "d"]);
 
   // With the clock held, so both are certainly queued together rather than
-  // depending on how fast the machine got round to the second click. The upper
-  // one must not stop dead on the lower one before that one has travelled itself.
+  // depending on how fast the machine got round to the second click. One batch
+  // has to land where the same two ticks spread out would: "a" was still the
+  // only finished row when it was ticked, so it goes to the foot and "b"
+  // settles on it — not stopped dead on "b" because "b" happened to be quick.
   await holdTime(page);
   await tick(page, "a").click();
   await tick(page, "b").click();
   await passTidy(page);
-  await expect.poll(() => shape(page)).toEqual(["c", "d", "a", "b"]);
+  await expect.poll(() => shape(page)).toEqual(["c", "d", "b", "a"]);
 });
 
 /*
@@ -180,10 +185,11 @@ test("unticking a finished item brings it back above the pile", async ({ page })
   // In the pile, not merely finished in place: the untick below has to be a
   // row coming back from there.
   await expect(page.locator("#donelist > .task")).toHaveCount(2);
-  await expect.poll(() => shape(page)).toEqual(["still to do", "first done", "second done"]);
-
-  await tick(page, "second done").click();
   await expect.poll(() => shape(page)).toEqual(["still to do", "second done", "first done"]);
+
+  // The one at the foot, so there is a finished row above it to climb past.
+  await tick(page, "first done").click();
+  await expect.poll(() => shape(page)).toEqual(["still to do", "first done", "second done"]);
 });
 
 test("it stops under the work rather than climbing to the top", async ({ page }) => {
