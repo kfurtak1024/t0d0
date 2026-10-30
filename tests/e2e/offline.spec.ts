@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { addItem, clearStorage } from "./helpers";
+import { addItem, clearStorage, groupOf, rowOf } from "./helpers";
 
 /**
  * "Offline-first" is a claim on the front of the README. This is what defends
@@ -42,12 +42,12 @@ test("the app still opens with the network off", async ({ page, context }) => {
   // Served from the cache, not the network.
   expect(response?.status()).toBe(200);
   await expect(page.locator("#input")).toBeVisible();
-  await expect(page.locator(".group", { hasText: "Morning" })).toBeVisible();
+  await expect(groupOf(page, "Morning")).toBeVisible();
   await expect(page.locator("#frac")).toHaveText("1 of 1");
 
   // And it is still a working app, not a frozen snapshot.
   await addItem(page, "added while offline");
-  await expect(page.locator(".task", { hasText: "added while offline" })).toBeVisible();
+  await expect(rowOf(page, "added while offline")).toBeVisible();
 
   await context.setOffline(false);
 });

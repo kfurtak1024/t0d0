@@ -1,5 +1,15 @@
 import { expect, test, passTidy } from "./fixtures";
-import { addItem, clearStorage, seedStorage, settle, shape, task, landReveal } from "./helpers";
+import {
+  addItem,
+  clearStorage,
+  seedStorage,
+  settle,
+  shape,
+  task,
+  landReveal,
+  rowOf,
+  tickOf,
+} from "./helpers";
 
 /**
  * One-off items, end to end. The rules of what goes and what stays are
@@ -17,13 +27,13 @@ test("a trailing ~ marks an item, and stays out of its text", async ({ page }) =
   await addItem(page, "post the parcel~");
   await addItem(page, "water plants");
 
-  const marked = page.locator(".task", { hasText: "post the parcel" });
+  const marked = rowOf(page, "post the parcel");
   await expect(marked).toHaveClass(/oneoff/);
   await expect(marked.locator(".label")).toHaveText("post the parcel");
   await expect(marked.locator(".once")).toBeVisible();
   await expect(marked.locator(".tick")).toHaveAttribute("aria-label", "post the parcel, one-off");
 
-  const plain = page.locator(".task", { hasText: "water plants" });
+  const plain = rowOf(page, "water plants");
   await expect(plain).not.toHaveClass(/oneoff/);
   await expect(plain.locator(".once")).toBeHidden();
 });
@@ -31,7 +41,7 @@ test("a trailing ~ marks an item, and stays out of its text", async ({ page }) =
 test("both marks fit on one row, and both are announced", async ({ page }) => {
   await addItem(page, "call back!~ [2]");
 
-  const row = page.locator(".task", { hasText: "call back" });
+  const row = rowOf(page, "call back");
   await expect(row).toHaveClass(/important/);
   await expect(row).toHaveClass(/oneoff/);
   await expect(row.locator(".count")).toHaveText("0/2");
@@ -50,7 +60,7 @@ test("a ~ in a group heading is just a character", async ({ page }) => {
 test("editing a row shows the mark again, and can take it off", async ({ page }) => {
   await addItem(page, "post the parcel~");
 
-  const row = page.locator(".task", { hasText: "post the parcel" });
+  const row = rowOf(page, "post the parcel");
   await row.locator(".label").click();
   await expect(row.locator(".label")).toHaveText("post the parcel~");
 
@@ -61,28 +71,28 @@ test("editing a row shows the mark again, and can take it off", async ({ page })
 
 test("the ⋯ menu is the third route to the same field", async ({ page }) => {
   await addItem(page, "post the parcel");
-  const row = page.locator(".task", { hasText: "post the parcel" });
+  const row = rowOf(page, "post the parcel");
 
   await row.locator(".dots").click();
-  await page.locator(".rowmenu button", { hasText: "One-off, remove tonight" }).click();
+  await page.getByRole("menuitem", { name: "One-off, remove tonight" }).click();
   await expect(row).toHaveClass(/oneoff/);
 
   await row.locator(".dots").click();
-  await page.locator(".rowmenu button", { hasText: "Keep for tomorrow" }).click();
+  await page.getByRole("menuitem", { name: "Keep for tomorrow" }).click();
   await expect(row).not.toHaveClass(/oneoff/);
 });
 
 test("the mark survives a reload", async ({ page }) => {
   await addItem(page, "post the parcel~");
   await page.reload();
-  await expect(page.locator(".task", { hasText: "post the parcel" })).toHaveClass(/oneoff/);
+  await expect(rowOf(page, "post the parcel")).toHaveClass(/oneoff/);
 });
 
 test("the closer removes what the mark asked it to", async ({ page }) => {
   await addItem(page, "post the parcel~");
   await addItem(page, "water plants");
 
-  await page.locator(".task", { hasText: "post the parcel" }).locator(".tick").click();
+  await tickOf(page, "post the parcel").click();
   await page.locator("#closeday").click();
   await page.locator("#veil .confirm").click();
 
@@ -94,7 +104,7 @@ test("a one-off nobody got to is still there in the morning", async ({ page }) =
   // precisely the one you most need to see tomorrow.
   await addItem(page, "post the parcel~");
   await addItem(page, "water plants");
-  await page.locator(".task", { hasText: "water plants" }).locator(".tick").click();
+  await tickOf(page, "water plants").click();
   await passTidy(page);
 
   await page.locator("#closeday").click();
@@ -193,7 +203,7 @@ test("the tag lands in the count's column, in a group and out of one", async ({ 
   await settle(page);
 
   const right = async (row: string, sel: string): Promise<number> => {
-    const box = await page.locator(".task", { hasText: row }).locator(sel).boundingBox();
+    const box = await rowOf(page, row).locator(sel).boundingBox();
     if (!box) throw new Error(`no box for ${row} ${sel}`);
     return box.x + box.width;
   };

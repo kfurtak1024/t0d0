@@ -1,6 +1,6 @@
 import { type Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { addItem, clearStorage, settle, seedStorage } from "./helpers";
+import { addItem, clearStorage, settle, seedStorage, groupOf, rowOf } from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
@@ -201,12 +201,12 @@ test("import previews the file before replacing anything", async ({ page }) => {
   await expect(page.locator(".staged-sum")).toContainText("1 item");
   await expect(page.locator(".staged-sum")).toContainText("1 group");
   // Nothing has changed yet.
-  await expect(page.locator(".task", { hasText: "original" })).toHaveCount(1);
+  await expect(rowOf(page, "original")).toHaveCount(1);
 
   await page.locator('[data-act="import-confirm"]').click();
   await expect(page.locator(".drawer")).toBeHidden();
-  await expect(page.locator(".group", { hasText: "Imported" })).toBeVisible();
-  await expect(page.locator(".task", { hasText: "original" })).toHaveCount(0);
+  await expect(groupOf(page, "Imported")).toBeVisible();
+  await expect(rowOf(page, "original")).toHaveCount(0);
 });
 
 test("import is undoable", async ({ page }) => {
@@ -219,10 +219,10 @@ test("import is undoable", async ({ page }) => {
       backupFile([{ kind: "task", id: "t", text: "replacement", target: 1, count: 0 }]),
     );
   await page.locator('[data-act="import-confirm"]').click();
-  await expect(page.locator(".task", { hasText: "replacement" })).toBeVisible();
+  await expect(rowOf(page, "replacement")).toBeVisible();
 
   await page.locator(".toast-action").click();
-  await expect(page.locator(".task", { hasText: "original" })).toBeVisible();
+  await expect(rowOf(page, "original")).toBeVisible();
 });
 
 test("rejects a file that is not a t0d0 backup", async ({ page }) => {
@@ -248,7 +248,7 @@ test("erasing takes two presses and is undoable", async ({ page }) => {
   // First press only arms it.
   await page.locator('[data-act="erase"]').click();
   await expect(page.locator(".confirmbar-text")).toHaveText("Erase 2 items?");
-  await expect(page.locator(".group", { hasText: "Morning" })).toHaveCount(1);
+  await expect(groupOf(page, "Morning")).toHaveCount(1);
 
   await page.locator('[data-act="erase-go"]').click();
   await expect(page.locator(".drawer")).toBeHidden();
@@ -257,7 +257,7 @@ test("erasing takes two presses and is undoable", async ({ page }) => {
   await expect(page.locator("#empty")).toBeVisible();
 
   await page.locator(".toast-action").click();
-  await expect(page.locator(".group", { hasText: "Morning" })).toBeVisible();
+  await expect(groupOf(page, "Morning")).toBeVisible();
   await expect(page.locator(".list .task")).toHaveCount(2);
 });
 
@@ -289,7 +289,7 @@ test("cancelling the erase leaves the list alone", async ({ page }) => {
 
   await expect(page.locator(".confirmbar")).toBeHidden();
   await expect(page.locator('[data-act="erase"]')).toBeVisible();
-  await expect(page.locator(".task", { hasText: "shopping" })).toBeVisible();
+  await expect(rowOf(page, "shopping")).toBeVisible();
 });
 
 /*

@@ -470,7 +470,7 @@ export function rowsToTidy(state: State, taskId: string): string[] {
  * It used to go bottom-most row first, ignoring tick order, which kept the
  * batch in list order: two quick ticks stacked `b` over `c` where the same two
  * spread out stacked `c` over `b`. How fast you tapped decided the pile.
- * `tests/transitions.test.ts` now pins batch and spread against each other
+ * `tests/transitions/tidy.test.ts` now pins batch and spread against each other
  * over arbitrary lists, rather than an example of each.
  *
  * Depth needs no rule of its own: `sink` keeps a nested row inside its group,

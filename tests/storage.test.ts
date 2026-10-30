@@ -4,12 +4,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { load, onExternalChange, save, STORAGE_KEY, UNREADABLE_KEY } from "../src/storage";
 import type { State } from "../src/types";
+import { state as aState, task } from "./builders";
 
-const state = (text = "shopping"): State => ({
-  v: 1,
-  openedAt: null,
-  list: [{ kind: "task", id: "a", text, target: 1, count: 0, important: false, once: false }],
-});
+const state = (text = "shopping"): State => aState([task(text, { id: "a" })]);
 
 const breakStorage = (): void => {
   const boom = (): never => {

@@ -1,6 +1,6 @@
 import { type Page } from "@playwright/test";
 import { expect, test, nextFrame } from "./fixtures";
-import { addItem, buildList, clearStorage, seedStorage, shape } from "./helpers";
+import { addItem, buildList, clearStorage, seedStorage, shape, rowOf, tickOf } from "./helpers";
 
 /**
  * Reordering has two front doors — the ⋯ menu for a thumb and Alt+Arrow for a
@@ -8,8 +8,7 @@ import { addItem, buildList, clearStorage, seedStorage, shape } from "./helpers"
  * arrangement rules themselves are unit-tested against `State`.
  */
 
-const menuOf = (page: Page, text: string) =>
-  page.locator(".task", { hasText: text }).locator(".dots");
+const menuOf = (page: Page, text: string) => rowOf(page, text).locator(".dots");
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -135,7 +134,7 @@ test("a spent move stays in place, disabled, rather than moving under the finger
 test("Alt+Arrow reorders the focused row and keeps the focus on it", async ({ page }) => {
   await buildList(page, ["alpha", "beta"]);
 
-  const tick = page.locator(".task", { hasText: "beta" }).locator(".tick");
+  const tick = tickOf(page, "beta");
   await tick.focus();
   await page.keyboard.press("Alt+ArrowUp");
   // Focus is handed back on the next frame, once the row has been re-rendered.
@@ -158,7 +157,7 @@ test("Alt+Arrow reorders the focused row and keeps the focus on it", async ({ pa
 test("Alt+Arrow moves an item within its group and stops at the ends", async ({ page }) => {
   await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
 
-  const tick = page.locator(".task", { hasText: "eat breakfast" }).locator(".tick");
+  const tick = tickOf(page, "eat breakfast");
   await tick.focus();
 
   // Already at the top of its group: nowhere to go, and it does not pop out.
@@ -176,7 +175,7 @@ test("Alt+Arrow moves an item within its group and stops at the ends", async ({ 
 test("a root item steps past a whole group rather than into it", async ({ page }) => {
   await buildList(page, ["# Morning", "  eat breakfast", "loose"]);
 
-  await page.locator(".list > .task", { hasText: "loose" }).locator(".tick").focus();
+  await rowOf(page, "loose", ".list > .task").locator(".tick").focus();
   await page.keyboard.press("Alt+ArrowUp");
 
   expect(await shape(page)).toEqual(["loose", "# Morning", "  eat breakfast"]);
@@ -184,7 +183,7 @@ test("a root item steps past a whole group rather than into it", async ({ page }
 
 test("Alt+← takes an item out of its group, and Alt+→ puts it back", async ({ page }) => {
   await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog"]);
-  const tick = page.locator(".task", { hasText: "eat breakfast" }).locator(".tick");
+  const tick = tickOf(page, "eat breakfast");
 
   await tick.focus();
   await page.keyboard.press("Alt+ArrowLeft");
@@ -205,7 +204,7 @@ test("tabbing through the list changes nothing", async ({ page }) => {
   await buildList(page, ["# Morning", "  eat breakfast", "loose", "also loose"]);
   const before = await shape(page);
 
-  await page.locator(".task", { hasText: "eat breakfast" }).locator(".tick").focus();
+  await tickOf(page, "eat breakfast").focus();
   for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
   for (let i = 0; i < 12; i++) await page.keyboard.press("Shift+Tab");
 
@@ -214,7 +213,7 @@ test("tabbing through the list changes nothing", async ({ page }) => {
 
 test("Alt+arrows on a counted item move it without counting it", async ({ page }) => {
   await buildList(page, ["first", "calls [3]"]);
-  const row = page.locator(".task", { hasText: "calls" });
+  const row = rowOf(page, "calls");
 
   await row.locator(".tick").focus();
   await page.keyboard.press("Alt+ArrowUp");
@@ -294,7 +293,7 @@ test("a new item is brought into view above the composer", async ({ page }) => {
   });
 
   await addItem(page, "the newest thing");
-  const row = page.locator(".task", { hasText: "the newest thing" });
+  const row = rowOf(page, "the newest thing");
 
   await expect
     .poll(async () => {

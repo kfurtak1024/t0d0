@@ -5,12 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Store } from "../src/store";
 import { STORAGE_KEY } from "../src/storage";
 import type { State } from "../src/types";
+import { state as aState, task } from "./builders";
 
-const state = (text: string, count = 0): State => ({
-  v: 1,
-  openedAt: null,
-  list: [{ kind: "task", id: "a", text, target: 1, count, important: false, once: false }],
-});
+const state = (text: string, count = 0): State => aState([task(text, { id: "a", count })]);
 
 beforeEach(() => {
   localStorage.clear();

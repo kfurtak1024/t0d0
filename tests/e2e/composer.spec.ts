@@ -1,6 +1,5 @@
-import { type Page } from "@playwright/test";
 import { expect, test, passTidy } from "./fixtures";
-import { addItem, buildList, clearStorage, shape } from "./helpers";
+import { addItem, buildList, clearStorage, shape, groupOf, tickOf } from "./helpers";
 
 /**
  * Where the composer says the next item is going.
@@ -8,9 +7,6 @@ import { addItem, buildList, clearStorage, shape } from "./helpers";
  * "Adding to" is a promise about the item you are about to add, so it has to be
  * right before you press Enter, not after.
  */
-
-const tick = (page: Page, text: string) =>
-  page.locator(".task", { hasText: text }).locator(".tick");
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -32,18 +28,14 @@ test("the row appears with the first group and names it", async ({ page }) => {
 test("adding a group aims the composer at it", async ({ page }) => {
   await addItem(page, "# Morning");
   await addItem(page, "eat breakfast");
-  await expect(
-    page.locator(".group", { hasText: "Morning" }).locator(".items > .task"),
-  ).toHaveCount(1);
+  await expect(groupOf(page, "Morning").locator(".items > .task")).toHaveCount(1);
 
   await addItem(page, "# Work");
   await expect(page.locator("#dest").locator("option:checked")).toHaveText("Work");
   await expect(page.locator('.group:has-text("Work") .plus')).toHaveClass(/aimed/);
 
   await addItem(page, "review the PR");
-  await expect(page.locator(".group", { hasText: "Work" }).locator(".items > .task")).toHaveCount(
-    1,
-  );
+  await expect(groupOf(page, "Work").locator(".items > .task")).toHaveCount(1);
 });
 
 /*
@@ -89,9 +81,7 @@ test("typing a # switches the row to Top level, and giving it up restores the ai
   await expect(page.locator("#dest").locator("option:checked")).toHaveText("Morning");
 
   await page.locator("#input").press("Enter");
-  await expect(
-    page.locator(".group", { hasText: "Morning" }).locator(".items > .task"),
-  ).toHaveCount(1);
+  await expect(groupOf(page, "Morning").locator(".items > .task")).toHaveCount(1);
 });
 
 /*
@@ -109,7 +99,7 @@ test("typing a # switches the row to Top level, and giving it up restores the ai
 test("a new row lands at the top, and leaves the pile where it is", async ({ page }) => {
   await buildList(page, ["first", "second", "third"]);
 
-  await tick(page, "first").click();
+  await tickOf(page, "first").click();
   await passTidy(page);
   await expect.poll(() => shape(page)).toEqual(["second", "third", "first"]);
   await expect(page.locator("#donelist > .task")).toHaveCount(1);

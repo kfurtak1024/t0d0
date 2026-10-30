@@ -1,5 +1,14 @@
 import { expect, test } from "./fixtures";
-import { addItem, clearStorage, seedRaw, seedStorage, landReveal } from "./helpers";
+import {
+  addItem,
+  clearStorage,
+  seedRaw,
+  seedStorage,
+  landReveal,
+  groupOf,
+  rowOf,
+  tickOf,
+} from "./helpers";
 
 test("the list and its ticks survive a reload", async ({ page }) => {
   await clearStorage(page);
@@ -7,15 +16,13 @@ test("the list and its ticks survive a reload", async ({ page }) => {
   await addItem(page, "eat breakfast");
   await addItem(page, "make calls [3]");
 
-  await page.locator(".task", { hasText: "make calls" }).locator(".tick").click();
+  await tickOf(page, "make calls").click();
   await expect(page.locator("#frac")).toHaveText("0 of 2");
 
   await page.reload();
 
-  await expect(page.locator(".group", { hasText: "Morning" })).toBeVisible();
-  await expect(page.locator(".task", { hasText: "make calls" }).locator(".count")).toHaveText(
-    "1/3",
-  );
+  await expect(groupOf(page, "Morning")).toBeVisible();
+  await expect(rowOf(page, "make calls").locator(".count")).toHaveText("1/3");
 });
 
 /*
@@ -41,7 +48,7 @@ test("a corrupt store falls back to a usable app instead of a blank page", async
 
   await expect(page.locator("#input")).toBeVisible();
   await addItem(page, "still works");
-  await expect(page.locator(".task", { hasText: "still works" })).toBeVisible();
+  await expect(rowOf(page, "still works")).toBeVisible();
 });
 
 /*
@@ -70,7 +77,7 @@ test("a list that cannot be saved says so rather than pretending", async ({ page
     "Can't save — this list will be lost on reload",
   );
   // And it is still a working list. It simply will not survive the reload.
-  await expect(page.locator(".task", { hasText: "buy milk" })).toBeVisible();
+  await expect(rowOf(page, "buy milk")).toBeVisible();
 });
 
 test("counts stored above their target are repaired on load", async ({ page }) => {
@@ -80,9 +87,7 @@ test("counts stored above their target are repaired on load", async ({ page }) =
     list: [{ kind: "task", id: "a", text: "make calls", target: 3, count: 99 }],
   });
 
-  await expect(page.locator(".task", { hasText: "make calls" }).locator(".count")).toHaveText(
-    "3/3",
-  );
+  await expect(rowOf(page, "make calls").locator(".count")).toHaveText("3/3");
 });
 
 /*

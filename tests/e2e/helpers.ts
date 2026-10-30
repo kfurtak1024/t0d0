@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 export const STORAGE_KEY = "t0d0/v1";
 
@@ -31,6 +31,38 @@ export async function seedStorage(page: Page, state: unknown): Promise<void> {
 export async function seedRaw(page: Page, raw: string): Promise<void> {
   await boot(page, raw);
 }
+
+const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * A row's tick, found by its accessible name — the way a screen reader finds it.
+ *
+ * The name is the row's text, then ", important" and ", one-off" when those are
+ * set (`src/render/task.ts`), so the match is anchored on the text and allows
+ * only those marks after it. A substring would not do: `hasText: "shopping"`
+ * also finds "shopping list", and a lookup that can match two rows is one that
+ * eventually does. A counted row's tick is a spinbutton rather than a checkbox.
+ */
+export const tickOf = (page: Page, text: string): Locator => {
+  const name = new RegExp(`^${escape(text)}(, important)?(, one-off)?$`);
+  return page.getByRole("checkbox", { name }).or(page.getByRole("spinbutton", { name }));
+};
+
+/**
+ * The row whose tick is {@link tickOf} that text: the task's own `li`.
+ *
+ * Nested or not by default. `where` narrows it to a place — `".items > .task"`
+ * inside a group, `".list > .task"` at the root of the work, `"#donelist .task"`
+ * in the pile — for a spec whose point is where the row sits.
+ */
+export const rowOf = (page: Page, text: string, where = ".task"): Locator =>
+  page.locator(where).filter({ has: tickOf(page, text) });
+
+/** A group by its exact title. */
+export const groupOf = (page: Page, title: string): Locator =>
+  page
+    .locator(".group")
+    .filter({ has: page.locator(".gtitle", { hasText: new RegExp(`^${escape(title)}$`) }) });
 
 export async function addItem(page: Page, text: string): Promise<void> {
   await page.locator("#input").fill(text);
@@ -164,4 +196,4 @@ export async function watchTravel(page: Page): Promise<() => Promise<Travel[]>> 
 }
 
 /** A stored task whose id is its text, so a seeded list reads as its shape. */
-export const task = (text: string) => ({ kind: "task", id: text, text, target: 1, count: 0 });
+export { task } from "../builders";

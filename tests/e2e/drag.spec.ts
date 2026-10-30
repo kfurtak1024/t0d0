@@ -1,6 +1,6 @@
 import { type Locator, type Page } from "@playwright/test";
 import { expect, test, passTidy } from "./fixtures";
-import { buildList, clearStorage, seedStorage, settle, shape, task } from "./helpers";
+import { buildList, clearStorage, seedStorage, settle, shape, task, rowOf } from "./helpers";
 
 /**
  * Dragging is the reorder step applied repeatedly, so these tests are about the
@@ -31,8 +31,7 @@ async function drag(
   if (release) await page.mouse.up();
 }
 
-const gripOf = (page: Page, text: string): Locator =>
-  page.locator(".task", { hasText: text }).locator(".grip");
+const gripOf = (page: Page, text: string): Locator => rowOf(page, text).locator(".grip");
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -69,7 +68,7 @@ test("a drag survives crossing into a group, where the row is rebuilt", async ({
   await settle(page);
   const grip = gripOf(page, "loose");
   const from = await grip.boundingBox();
-  const member = await page.locator(".items > .task", { hasText: "eat breakfast" }).boundingBox();
+  const member = await rowOf(page, "eat breakfast", ".items > .task").boundingBox();
   if (!from || !member) throw new Error("missing geometry");
 
   // Clear of the group's near edge and past the midpoint of the item already
@@ -283,7 +282,7 @@ test("a whole group drags as one block", async ({ page }) => {
   await settle(page);
   const group = page.locator(".group");
   const groupBox = await group.boundingBox();
-  const looseBox = await page.locator(".list > .task", { hasText: "loose" }).boundingBox();
+  const looseBox = await rowOf(page, "loose", ".list > .task").boundingBox();
   if (!groupBox || !looseBox) throw new Error("missing geometry");
 
   await drag(page, group.locator(".ghead > .grip"), looseBox.y + looseBox.height - groupBox.y);
