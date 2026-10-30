@@ -397,18 +397,18 @@ describe("tidyAll", () => {
   };
 
   /*
-   * The rule the whole batch exists for. A row stops above the finished ones
-   * already below it, so the upper of two must not be sent first — it would
-   * stop dead on a sibling that has not travelled yet and stay stranded up in
-   * the work. Ordering top-most first here gives ["a", "b", "d", "c"].
+   * The rule the whole batch exists for: the queue is tick order, and a row
+   * travels past whatever was still work at its own tick. Ticked b then c, b
+   * goes right to the foot and c settles on it — as the same two spread out
+   * would. Ticked the other way round, c is the one at the foot.
    */
-  it("sends the bottom-most row first, so a batch lands where it was earned", () => {
+  it("stacks a batch in the order it was ticked, later on top", () => {
     const state = done(rows("a", "b", "c", "d"), "b", "c");
-    const ids = [taskOf(state, "b").id, taskOf(state, "c").id];
+    const b = taskOf(state, "b").id;
+    const c = taskOf(state, "c").id;
 
-    expect(shape(T.tidyAll(state, ids))).toEqual(["a", "d", "b", "c"]);
-    // Order of the queue must not matter; position is what decides.
-    expect(shape(T.tidyAll(state, [...ids].reverse()))).toEqual(["a", "d", "b", "c"]);
+    expect(shape(T.tidyAll(state, [b, c]))).toEqual(["a", "d", "c", "b"]);
+    expect(shape(T.tidyAll(state, [c, b]))).toEqual(["a", "d", "b", "c"]);
   });
 
   it("skips a row that is no longer finished", () => {
@@ -445,24 +445,14 @@ describe("tidyAll", () => {
     expect(shape(T.tidyAll(state, [id]))).toEqual(["a", "# Morning", "  y", "  x"]);
   });
 
-  /*
-   * The bottom-most-first rule, one level down. Two ticks in one breath inside a
-   * group have to land where the same two ticks spread over a minute would, and
-   * sending the upper one first strands it on a sibling that has not travelled.
-   */
-  it("sends the bottom-most of a group's rows first", () => {
+  // The same rule one level down: tick order, inside the group.
+  it("stacks a group's rows in the order they were ticked", () => {
     const state = done(rows("# Morning", "  a", "  b", "  c", "  d"), "b", "c");
-    const ids = [taskOf(state, "b").id, taskOf(state, "c").id];
+    const b = taskOf(state, "b").id;
+    const c = taskOf(state, "c").id;
 
-    expect(shape(T.tidyAll(state, ids))).toEqual(["# Morning", "  a", "  d", "  b", "  c"]);
-    // Order of the queue must not matter; position is what decides.
-    expect(shape(T.tidyAll(state, [...ids].reverse()))).toEqual([
-      "# Morning",
-      "  a",
-      "  d",
-      "  b",
-      "  c",
-    ]);
+    expect(shape(T.tidyAll(state, [b, c]))).toEqual(["# Morning", "  a", "  d", "  c", "  b"]);
+    expect(shape(T.tidyAll(state, [c, b]))).toEqual(["# Morning", "  a", "  d", "  b", "  c"]);
   });
 
   /*
@@ -489,6 +479,63 @@ describe("tidyAll", () => {
   it("skips a nested id that has left the list", () => {
     const state = done(rows("# Morning", "  x", "  y"), "x");
     expect(T.tidyAll(state, ["gone"])).toBe(state);
+  });
+
+  /*
+   * The claim itself rather than an example of it. A batch is only ticks that
+   * happened to land inside one tidy delay, so how fast they came must not
+   * decide where anything ends up: over any list, with a pile already earned,
+   * ticking a run of rows and tidying once has to equal tidying after each.
+   * Whole states are compared, so a fold that differs fails as well as an order.
+   */
+  it("lands a batch exactly where the same ticks spread out would", () => {
+    // Root tasks and groups of 0-3 items; names are the ids, so failures read.
+    const anyList = fc.array(fc.oneof(fc.constant(-1), fc.integer({ min: 0, max: 3 })), {
+      minLength: 1,
+      maxLength: 7,
+    });
+    const picks = fc.array(fc.nat({ max: 30 }), { maxLength: 6 });
+
+    fc.assert(
+      fc.property(anyList, picks, picks, (spec, earlier, now) => {
+        let n = 0;
+        const lines = spec.flatMap((size, g) =>
+          size < 0
+            ? [`t${String(n++)}`]
+            : [`# G${String(g)}`, ...Array.from({ length: size }, () => `  t${String(n++)}`)],
+        );
+        if (n === 0) return;
+        const pick = (state: State, at: number[]): string[] => [
+          ...new Set(
+            at.map((i) => `t${String(i % n)}`).filter((name) => !isDone(taskOf(state, name))),
+          ),
+        ];
+        const tick = (state: State, name: string): [State, string[]] => {
+          const next = T.bump(state, name, 1, NOW);
+          return [next, T.rowsToTidy(next, name)];
+        };
+
+        // A pile already earned, one tidy at a time.
+        let start = rows(...lines);
+        for (const name of pick(start, earlier)) {
+          const [ticked, ids] = tick(start, name);
+          start = T.tidyAll(ticked, ids);
+        }
+
+        let spread = start;
+        let batched = start;
+        const queue: string[] = [];
+        for (const name of pick(start, now)) {
+          const [one, ids] = tick(spread, name);
+          spread = T.tidyAll(one, ids);
+          const [many, more] = tick(batched, name);
+          batched = many;
+          queue.push(...more);
+        }
+        expect(T.tidyAll(batched, queue)).toEqual(spread);
+      }),
+      { numRuns: 500 },
+    );
   });
 });
 
