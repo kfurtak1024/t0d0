@@ -1,5 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clearStorage, addItem, seedStorage, task, settleTidy } from "./helpers";
+import {
+  clearStorage,
+  addItem,
+  holdTime,
+  passTidy,
+  seedStorage,
+  task,
+  settleTidy,
+} from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -237,24 +245,14 @@ test("a row ticked at the foot of the work waits with the rest", async ({ page }
       .evaluate((el) => el.parentElement?.id ?? "?")
       .catch(() => "?");
 
-  /*
-   * Read in the page, not across the wire: each round trip is wall-clock the
-   * tidy's own timer keeps running through, and on a loaded runner two of them
-   * outlast it. A 300ms timer set after the tick always fires before the app's
-   * longer one, however slow the machine.
-   */
-  const [onTick, at300] = await page.evaluate(async () => {
-    const row = [...document.querySelectorAll<HTMLElement>(".task")].find(
-      (el) => el.querySelector(".label")?.textContent === "alpha",
-    );
-    const parent = () => row?.parentElement?.id ?? "?";
-    row?.querySelector<HTMLElement>(".tick")?.click();
-    const first = parent();
-    await new Promise((done) => setTimeout(done, 300));
-    return [first, parent()];
-  });
-  expect(onTick, "in the work on the frame it was ticked").toBe("list");
-  expect(at300, "still in the work while the tick lands").toBe("list");
+  // Held, so "not yet" means the tidy's delay and not how quickly the runner
+  // got round to asking.
+  await holdTime(page);
+  await page.locator(".task", { hasText: "alpha" }).locator(".tick").click();
+  expect(await where(), "in the work on the frame it was ticked").toBe("list");
+  await page.clock.runFor(300);
+  expect(await where(), "still in the work while the tick lands").toBe("list");
+  await passTidy(page);
   await expect.poll(where, { timeout: 4000 }).toBe("donelist");
 });
 

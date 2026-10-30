@@ -44,6 +44,30 @@ export async function settleTidy(page: Page): Promise<void> {
   await expect(page.locator("#list > .task.done, #list > .group.clear")).toHaveCount(0);
 }
 
+/**
+ * Stop the page's clock, so the tidy's delay passes only when a test says so.
+ *
+ * A spec that raced the real timer was asking how fast the runner got round to
+ * its next step: two ticks either side of the tidy stack the pile in a
+ * different order from two inside it, and a "not yet" read one round trip
+ * after a tick can already be too late. With the clock held, every tick before
+ * {@link passTidy} is one batch, however long the steps between them take.
+ */
+export async function holdTime(page: Page): Promise<void> {
+  const now = Date.now();
+  await page.clock.install({ time: now });
+  // The installed clock runs in real time until it is paused, and pausing in
+  // its past throws — which a stalled runner managed with a one-second margin.
+  // A minute cannot be overtaken, and nothing the app schedules lasts that
+  // long, so the jump only fires what was due anyway.
+  await page.clock.pauseAt(now + 60_000);
+}
+
+/** Run a held clock past the tidy's delay — `COLLAPSE_MS` in src/app.ts, 520ms. */
+export async function passTidy(page: Page): Promise<void> {
+  await page.clock.runFor(1000);
+}
+
 export async function addItem(page: Page, text: string): Promise<void> {
   await page.locator("#input").fill(text);
   await page.locator("#input").press("Enter");

@@ -1,5 +1,14 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { buildList, clearStorage, seedStorage, settle, shape, task } from "./helpers";
+import {
+  buildList,
+  clearStorage,
+  holdTime,
+  passTidy,
+  seedStorage,
+  settle,
+  shape,
+  task,
+} from "./helpers";
 
 /**
  * Dragging is the reorder step applied repeatedly, so these tests are about the
@@ -433,50 +442,17 @@ test("a row ticked and then dragged is not tidied out from under the finger", as
   await settle(page);
   const row = page.locator('.task[data-id="b"]');
 
-  /*
-   * Tick and grab in one task. As separate round trips the grab only usually
-   * beat the tidy's delay: on a loaded runner the tidy went first, and there
-   * was no row left in the work to drag.
-   */
-  const pointer = (steps: [type: string, dy: number][], tickFirst = false) =>
-    row.evaluate(
-      (el, [steps, tickFirst]) => {
-        if (tickFirst) el.querySelector<HTMLElement>(".tick")?.click();
-        const grip = el.querySelector<HTMLElement>(".grip");
-        const box = grip?.getBoundingClientRect();
-        if (!grip || !box) return;
-        for (const [type, dy] of steps)
-          grip.dispatchEvent(
-            new PointerEvent(type, {
-              bubbles: true,
-              cancelable: true,
-              pointerId: 1,
-              pointerType: "mouse",
-              isPrimary: true,
-              clientX: box.x + box.width / 2,
-              clientY: box.y + box.height / 2 + dy,
-              button: 0,
-            }),
-          );
-      },
-      [steps, tickFirst] as const,
-    );
-
-  await pointer(
-    [
-      ["pointerdown", 0],
-      ["pointermove", 3],
-      ["pointermove", 6],
-      ["pointermove", 9],
-      ["pointermove", 12],
-    ],
-    true,
-  );
-  await page.waitForTimeout(900);
+  // Held, so the grab is certainly inside the tidy's delay however slowly the
+  // runner gets from the tick to the grip.
+  await holdTime(page);
+  await row.locator(".tick").click();
+  await drag(page, row.locator(".grip"), 12, { release: false, steps: 4 });
+  await passTidy(page);
   await expect(row).toHaveClass(/dragging/);
   expect(await row.evaluate((el) => el.parentElement?.id)).toBe("list");
 
-  await pointer([["pointerup", 12]]);
+  await page.mouse.up();
+  await passTidy(page);
   // And once the finger lifts, the tidy it held back goes.
   await expect.poll(() => row.evaluate((el) => el.parentElement?.id)).toBe("donelist");
   await expect(row).not.toHaveClass(/dragging/);
