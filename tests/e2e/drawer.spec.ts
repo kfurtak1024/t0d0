@@ -327,6 +327,9 @@ test("the settings sheet slides up without dragging the backdrop with it", async
 
   // And the panel is where it belongs, with focus in it rather than lost.
   await expect(page.locator(".drawer")).toBeVisible();
+  // The 600ms above is wall-clock, not the spring's; on a loaded runner the
+  // panel can still be on its way up.
+  await settle(page);
   const landed = await page.evaluate(() => {
     const box = document.querySelector(".drawer")?.getBoundingClientRect();
     return box ? box.bottom <= innerHeight + 1 && box.top < innerHeight : false;

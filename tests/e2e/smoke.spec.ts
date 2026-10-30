@@ -1,5 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clearStorage, addItem, seedStorage, task } from "./helpers";
+import {
+  clearStorage,
+  addItem,
+  holdTime,
+  passTidy,
+  seedStorage,
+  task,
+  settleTidy,
+} from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -237,10 +245,14 @@ test("a row ticked at the foot of the work waits with the rest", async ({ page }
       .evaluate((el) => el.parentElement?.id ?? "?")
       .catch(() => "?");
 
+  // Held, so "not yet" means the tidy's delay and not how quickly the runner
+  // got round to asking.
+  await holdTime(page);
   await page.locator(".task", { hasText: "alpha" }).locator(".tick").click();
   expect(await where(), "in the work on the frame it was ticked").toBe("list");
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(await where(), "still in the work while the tick lands").toBe("list");
+  await passTidy(page);
   await expect.poll(where, { timeout: 4000 }).toBe("donelist");
 });
 
@@ -248,6 +260,9 @@ test("tapping a finished plain item unticks it", async ({ page }) => {
   await addItem(page, "shopping");
   const row = page.locator(".task", { hasText: "shopping" });
   const tick = row.locator(".tick");
+  // Held, so the row the tick finishes stays put under the next click rather
+  // than sinking into the pile on the tidy's timer.
+  await holdTime(page);
 
   await tick.click();
   await expect(row).toHaveClass(/done/);
@@ -263,6 +278,9 @@ test("tapping a finished plain item unticks it", async ({ page }) => {
 test("a counted item counts up instead of toggling, and resets from the menu", async ({ page }) => {
   await addItem(page, "make calls [3]");
   const row = page.locator(".task", { hasText: "make calls" });
+  // Held, so the row the tick finishes stays put under the next click rather
+  // than sinking into the pile on the tidy's timer.
+  await holdTime(page);
 
   for (let i = 0; i < 3; i++) await row.locator(".tick").click();
   await expect(row.locator(".count")).toHaveText("3/3");
@@ -568,6 +586,7 @@ test("a collapsed group leaves the tab order", async ({ page }) => {
 test("the day card does not open with the destructive button focused", async ({ page }) => {
   await addItem(page, "shopping");
   await page.locator(".tick").first().click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
 
   await expect(page.locator("#veil")).toBeVisible();

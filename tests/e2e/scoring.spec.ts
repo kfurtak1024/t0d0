@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle, settleTidy, holdTime } from "./helpers";
 
 /**
  * How the day is scored, end to end. The gates and the rainbow are unit-tested
@@ -63,6 +63,9 @@ test("an outstanding important item holds the day back, however high the rest", 
 }) => {
   await addItem(page, "call the bank!");
   for (const text of ["a", "b", "c"]) await addItem(page, text);
+  // Held, so a row finished here does not sink out from under the next tick:
+  // what is being asked about is the score, not the tidy.
+  await holdTime(page);
   for (const text of ["a", "b", "c"]) await tick(page, text).click();
 
   await expect(page.locator("#frac")).toHaveText("3 of 4");
@@ -147,6 +150,9 @@ test("the day's verdict is said in words, not only in hue", async ({ page }) => 
   // The button is the action and says so, whatever the day is doing.
   await expect(page.locator("#closeday")).toHaveText(/End day/);
   await expect(closer).toHaveText(/That's the day/);
+  // Held, so a row finished here does not sink out from under the next tick:
+  // what is being asked about is the score, not the tidy.
+  await holdTime(page);
 
   await tick(page, "call the bank, important").click();
   await expect(closer).toHaveText(/The important work is done/);
@@ -177,6 +183,9 @@ test("the button marks the minimum plan landing, not just any progress", async (
 
   await expect(closer).not.toHaveClass(/lit/);
   await expect(closer).not.toHaveClass(/cleared/);
+  // Held, so a row finished here does not sink out from under the next tick:
+  // what is being asked about is the score, not the tidy.
+  await holdTime(page);
 
   // An ordinary tick lights it, and nothing more than that.
   await tick(page, "a").click();
@@ -217,12 +226,14 @@ test("the day card reports the verdict before it clears anything", async ({ page
   await addItem(page, "b");
 
   await tick(page, "call the bank, important").click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("The important things are done.");
   await page.locator("#veil .dismiss").click();
 
   await tick(page, "a").click();
   await tick(page, "b").click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("Everything done.");
 });
@@ -401,6 +412,7 @@ test("the closing card names what held the day back", async ({ page }) => {
 
   for (const name of ["ship the patch, important", "water plants", "shopping"])
     await tick(page, name).click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
 
   const gates = page.locator("#veil .gate");

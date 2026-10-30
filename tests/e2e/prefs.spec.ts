@@ -1,5 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addItem, buildList, clearStorage, seedStorage, settle, shape } from "./helpers";
+import {
+  addItem,
+  buildList,
+  clearStorage,
+  holdTime,
+  passTidy,
+  seedStorage,
+  settle,
+  shape,
+} from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
@@ -19,11 +28,15 @@ test.beforeEach(async ({ page }) => {
 test("a group folds itself once its last item is ticked", async ({ page }) => {
   await aDay(page);
   const group = page.locator(".group", { hasText: "Morning" });
+  // Held across both ticks: the first sinks its row under the second, which
+  // then moves out from under the click. Once both have landed, real time.
+  await holdTime(page);
 
   await tick(page, "eat breakfast").click();
   await expect(group).not.toHaveClass(/collapsed/);
 
   await tick(page, "walk the dog").click();
+  await page.clock.resume();
   await expect(group).toHaveClass(/collapsed/);
   // Folded, not finished with: the count still reports what is in there.
   await expect(group.locator(".gcount")).toHaveText("2/2");
@@ -32,22 +45,27 @@ test("a group folds itself once its last item is ticked", async ({ page }) => {
 test("folding waits for the tick to land rather than snatching the row away", async ({ page }) => {
   await aDay(page);
   const group = page.locator(".group", { hasText: "Morning" });
+  await holdTime(page);
 
   await tick(page, "eat breakfast").click();
   await tick(page, "walk the dog").click();
 
   // The reward is watching the last tick complete, so the row is still there
   // for a beat afterwards.
+  await page.clock.runFor(300);
   await expect(group).not.toHaveClass(/collapsed/);
+  await passTidy(page);
   await expect(group).toHaveClass(/collapsed/);
 });
 
 test("a folded group drops below the work that is left", async ({ page }) => {
   await buildList(page, ["# Morning", "  eat breakfast", "  walk the dog", "loose"]);
   expect(await shape(page)).toEqual(["# Morning", "  eat breakfast", "  walk the dog", "loose"]);
+  await holdTime(page);
 
   await tick(page, "eat breakfast").click();
   await tick(page, "walk the dog").click();
+  await passTidy(page);
   await expect(page.locator(".group", { hasText: "Morning" })).toHaveClass(/collapsed/);
   await settle(page);
 
@@ -103,10 +121,14 @@ test("a group's finished rows keep the order they were earned in", async ({ page
 });
 
 test("unticking a nested item lifts it back above the group's finished run", async ({ page }) => {
-  await buildList(page, ["# Morning", "  wash up", "  post mail", "  book train"]);
+  // "post mail" starts above the work, so the tidy has to be seen moving it:
+  // a shape the list already had would pass before anything had settled.
+  await buildList(page, ["# Morning", "  post mail", "  wash up", "  book train"]);
+  await holdTime(page);
 
   await tick(page, "post mail").click();
   await tick(page, "book train").click();
+  await passTidy(page);
   await expect
     .poll(() => shape(page))
     .toEqual(["# Morning", "  wash up", "  post mail", "  book train"]);
@@ -133,20 +155,13 @@ test("with tidying off, a nested item stays where it was ticked", async ({ page 
 test("two ticks in the same breath both land", async ({ page }) => {
   await buildList(page, ["a", "b", "c", "d"]);
 
-  // In one turn, so both are certainly queued together rather than depending on
-  // how fast the machine got round to the second click. The upper one must not
-  // stop dead on the lower one before that one has travelled itself.
-  await page.evaluate(
-    (texts) => {
-      for (const text of texts) {
-        const row = [...document.querySelectorAll(".task")].find(
-          (el) => el.querySelector(".label")?.textContent === text,
-        );
-        row?.querySelector<HTMLElement>(".tick")?.click();
-      }
-    },
-    ["a", "b"],
-  );
+  // With the clock held, so both are certainly queued together rather than
+  // depending on how fast the machine got round to the second click. The upper
+  // one must not stop dead on the lower one before that one has travelled itself.
+  await holdTime(page);
+  await tick(page, "a").click();
+  await tick(page, "b").click();
+  await passTidy(page);
   await expect.poll(() => shape(page)).toEqual(["c", "d", "a", "b"]);
 });
 
@@ -158,8 +173,13 @@ test("two ticks in the same breath both land", async ({ page }) => {
 test("unticking a finished item brings it back above the pile", async ({ page }) => {
   await buildList(page, ["still to do", "first done", "second done"]);
 
+  await holdTime(page);
   await tick(page, "first done").click();
   await tick(page, "second done").click();
+  await passTidy(page);
+  // In the pile, not merely finished in place: the untick below has to be a
+  // row coming back from there.
+  await expect(page.locator("#donelist > .task")).toHaveCount(2);
   await expect.poll(() => shape(page)).toEqual(["still to do", "first done", "second done"]);
 
   await tick(page, "second done").click();
@@ -168,9 +188,16 @@ test("unticking a finished item brings it back above the pile", async ({ page })
 
 test("it stops under the work rather than climbing to the top", async ({ page }) => {
   await buildList(page, ["one", "two", "done it"]);
+  await holdTime(page);
 
   await tick(page, "done it").click();
+  await passTidy(page);
+  await expect(page.locator("#donelist > .task")).toHaveCount(1);
+
+  // From the pile, and it has to have actually come off: the shape below is
+  // also what a missed click would leave.
   await tick(page, "done it").click();
+  await expect(page.locator(".task", { hasText: "done it" })).not.toHaveClass(/done/);
   // Nothing finished sits above it, so it has nowhere to climb to.
   await expect.poll(() => shape(page)).toEqual(["one", "two", "done it"]);
 });
@@ -268,9 +295,13 @@ test("with tidying off, an untick moves nothing either", async ({ page }) => {
 test("closing the day reopens every fold", async ({ page }) => {
   await aDay(page);
   const group = page.locator(".group", { hasText: "Morning" });
+  // Held across both ticks: the first sinks its row under the second, which
+  // then moves out from under the click. Once both have landed, real time.
+  await holdTime(page);
 
   await tick(page, "eat breakfast").click();
   await tick(page, "walk the dog").click();
+  await page.clock.resume();
   await expect(group).toHaveClass(/collapsed/);
 
   await page.locator("#closeday").click();
@@ -283,9 +314,13 @@ test("closing the day reopens every fold", async ({ page }) => {
 test("re-opening a folded group by hand sticks", async ({ page }) => {
   await aDay(page);
   const group = page.locator(".group", { hasText: "Morning" });
+  // Held across both ticks: the first sinks its row under the second, which
+  // then moves out from under the click. Once both have landed, real time.
+  await holdTime(page);
 
   await tick(page, "eat breakfast").click();
   await tick(page, "walk the dog").click();
+  await page.clock.resume();
   await expect(group).toHaveClass(/collapsed/);
 
   await group.locator(".chev").click();
@@ -395,6 +430,8 @@ test("a preference is not carried in a backup", async ({ page }) => {
  */
 test("the first finished row travels down to the pile, not in from a corner", async ({ page }) => {
   await buildList(page, ["alpha", "beta"]);
+  // A row still entering is scaled, and FLIP would read that as travel.
+  await settle(page);
 
   const travel = await page.evaluate(async () => {
     const moves: { x: number; y: number }[] = [];

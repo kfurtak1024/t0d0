@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle, holdTime } from "./helpers";
 
 /**
  * The `!` mark, end to end. The parser's own rules are unit-tested; what only a
@@ -351,6 +351,9 @@ test("ticking a marked item keeps the mark, and unticking brings it back", async
   await addItem(page, "call the bank!");
   const row = page.locator(".task", { hasText: "call the bank" });
   const tick = row.locator(".tick");
+  // Held, so the row the tick finishes stays put under the next click rather
+  // than sinking into the pile on the tidy's timer.
+  await holdTime(page);
 
   await tick.click();
   await expect(row).toHaveClass(/done/);

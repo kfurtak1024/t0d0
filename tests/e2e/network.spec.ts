@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addItem, clearStorage } from "./helpers";
+import { addItem, clearStorage, settleTidy } from "./helpers";
 
 /**
  * "No network at runtime" is the second hard constraint, and the CSP meta tag is
@@ -71,6 +71,7 @@ test("nothing off-origin is ever asked for", async ({ page, baseURL }) => {
   await addItem(page, "# Morning");
   await addItem(page, "eat breakfast");
   await page.locator(".tick").first().click();
+  await settleTidy(page);
 
   await page.locator("#closeday").click();
   await expect(page.locator("#veil")).toBeVisible();

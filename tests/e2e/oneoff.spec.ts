@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle, shape, task } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle, shape, task, settleTidy } from "./helpers";
 
 /**
  * One-off items, end to end. The rules of what goes and what stays are
@@ -83,6 +83,7 @@ test("the closer removes what the mark asked it to", async ({ page }) => {
   await addItem(page, "water plants");
 
   await page.locator(".task", { hasText: "post the parcel" }).locator(".tick").click();
+  await settleTidy(page);
   await page.locator("#closeday").click();
   await page.locator("#veil .confirm").click();
 
@@ -96,6 +97,7 @@ test("a one-off nobody got to is still there in the morning", async ({ page }) =
   await addItem(page, "water plants");
   await page.locator(".task", { hasText: "water plants" }).locator(".tick").click();
 
+  await settleTidy(page);
   await page.locator("#closeday").click();
   await page.locator("#veil .confirm").click();
   await expect(shape(page)).resolves.toEqual(["post the parcel", "water plants"]);
