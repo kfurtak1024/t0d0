@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle, settleTidy, holdTime } from "./helpers";
+import { type Page } from "@playwright/test";
+import { expect, test, nextFrame, passReveal } from "./fixtures";
+import { addItem, clearStorage, seedStorage, settle, landReveal } from "./helpers";
 
 /**
  * How the day is scored, end to end. The gates and the rainbow are unit-tested
@@ -63,9 +64,6 @@ test("an outstanding important item holds the day back, however high the rest", 
 }) => {
   await addItem(page, "call the bank!");
   for (const text of ["a", "b", "c"]) await addItem(page, text);
-  // Held, so a row finished here does not sink out from under the next tick:
-  // what is being asked about is the score, not the tidy.
-  await holdTime(page);
   for (const text of ["a", "b", "c"]) await tick(page, text).click();
 
   await expect(page.locator("#frac")).toHaveText("3 of 4");
@@ -150,9 +148,6 @@ test("the day's verdict is said in words, not only in hue", async ({ page }) => 
   // The button is the action and says so, whatever the day is doing.
   await expect(page.locator("#closeday")).toHaveText(/End day/);
   await expect(closer).toHaveText(/That's the day/);
-  // Held, so a row finished here does not sink out from under the next tick:
-  // what is being asked about is the score, not the tidy.
-  await holdTime(page);
 
   await tick(page, "call the bank, important").click();
   await expect(closer).toHaveText(/The important work is done/);
@@ -183,9 +178,6 @@ test("the button marks the minimum plan landing, not just any progress", async (
 
   await expect(closer).not.toHaveClass(/lit/);
   await expect(closer).not.toHaveClass(/cleared/);
-  // Held, so a row finished here does not sink out from under the next tick:
-  // what is being asked about is the score, not the tidy.
-  await holdTime(page);
 
   // An ordinary tick lights it, and nothing more than that.
   await tick(page, "a").click();
@@ -226,14 +218,12 @@ test("the day card reports the verdict before it clears anything", async ({ page
   await addItem(page, "b");
 
   await tick(page, "call the bank, important").click();
-  await settleTidy(page);
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("The important things are done.");
   await page.locator("#veil .dismiss").click();
 
   await tick(page, "a").click();
   await tick(page, "b").click();
-  await settleTidy(page);
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("Everything done.");
 });
@@ -412,7 +402,6 @@ test("the closing card names what held the day back", async ({ page }) => {
 
   for (const name of ["ship the patch, important", "water plants", "shopping"])
     await tick(page, name).click();
-  await settleTidy(page);
   await page.locator("#closeday").click();
 
   const gates = page.locator("#veil .gate");
@@ -509,7 +498,7 @@ test("the day-stands card shows no ceremony", async ({ page }) => {
   await seedStorage(page, A_MIXED_DAY);
   await page.locator("#totalring").click();
   await expect(page.locator(".stands")).toBeVisible();
-  await page.waitForTimeout(400);
+  await page.clock.runFor(400);
 
   const showing = await page.evaluate(
     () =>
@@ -552,6 +541,12 @@ const A_MIXED_DAY = {
     { kind: "task", id: "r4", text: "stretch", target: 1, count: 0 },
   ],
 };
+
+/** Each gate bar's rendered width, rounded to a pixel. */
+const bars = (page: Page): Promise<number[]> =>
+  page
+    .locator("#veil .gfill")
+    .evaluateAll((els) => els.map((el) => Math.round(parseFloat(getComputedStyle(el).width))));
 
 test("the closing card counts up and grows its bars", async ({ page }) => {
   await seedStorage(page, A_MIXED_DAY);
@@ -603,6 +598,7 @@ test("the closing card counts up and grows its bars", async ({ page }) => {
   });
 
   // And left to itself it arrives at the day.
+  await passReveal(page);
   await expect(page.locator("#veil .score")).toHaveText("5 of 6");
   for (const width of shot.finish) expect(width).toBeGreaterThan(0);
 });
@@ -615,45 +611,28 @@ test("the closing card counts up and grows its bars", async ({ page }) => {
 test("a press lands the reveal at once", async ({ page }) => {
   await seedStorage(page, A_MIXED_DAY);
 
-  const landed = await page.evaluate(async () => {
-    document.getElementById("closeday")?.click();
-    await new Promise((done) => setTimeout(done, 120));
-    const midway = document.querySelector("#veil .score")?.textContent ?? "";
-    document
-      .querySelector("#veil")
-      ?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-    await new Promise((done) => requestAnimationFrame(done));
-    return {
-      midway,
-      score: document.querySelector("#veil .score")?.textContent ?? "",
-      bars: [...document.querySelectorAll("#veil .gfill")].map((el) =>
-        Math.round(parseFloat(getComputedStyle(el).width)),
-      ),
-    };
-  });
+  await page.locator("#closeday").click();
+  // Released, then 120ms into a 900ms count: part-way, on every engine.
+  await nextFrame(page);
+  await page.clock.runFor(120);
+  const score = page.locator("#veil .score");
+  await expect(score).not.toHaveText("5 of 6");
+  await expect(score).not.toHaveText("0 of 6");
 
-  expect(landed.midway).not.toBe("5 of 6");
-  expect(landed.score).toBe("5 of 6");
-  for (const width of landed.bars) expect(width).toBeGreaterThan(0);
+  await landReveal(page);
+  await expect(score).toHaveText("5 of 6");
+  for (const width of await bars(page)) expect(width).toBeGreaterThan(0);
 });
 
 test("with motion turned off the card is finished on arrival", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seedStorage(page, A_MIXED_DAY);
 
-  const shown = await page.evaluate(async () => {
-    document.getElementById("closeday")?.click();
-    await new Promise((done) => requestAnimationFrame(done));
-    return {
-      score: document.querySelector("#veil .score")?.textContent ?? "",
-      bars: [...document.querySelectorAll("#veil .gfill")].map((el) =>
-        Math.round(parseFloat(getComputedStyle(el).width)),
-      ),
-    };
-  });
+  await page.locator("#closeday").click();
+  await nextFrame(page);
 
-  expect(shown.score).toBe("5 of 6");
-  for (const width of shown.bars) expect(width).toBeGreaterThan(0);
+  await expect(page.locator("#veil .score")).toHaveText("5 of 6");
+  for (const width of await bars(page)) expect(width).toBeGreaterThan(0);
 });
 
 /*
@@ -708,17 +687,23 @@ test("the closing shower is what the day earned, and nothing on a day that earne
   const drawn = (): Promise<number> =>
     page.evaluate(() => (window as unknown as { draws: number }).draws);
 
-  // The marked work landing is worth something — waited for, not timed.
-  await open(day([1, 1], [1, 0, 0, 0]));
-  await expect.poll(drawn, { timeout: 8000 }).toBeGreaterThan(0);
-
   /*
-   * Nothing marked done and the bar nowhere near: no moment was reached, so
-   * nothing should ever arrive. Given long enough to have arrived if it were
-   * going to — the whole ceremony, and then some.
+   * The whole ceremony, and then some, on the held clock: it costs nothing to
+   * run, and the shower draws on animation frames, which only an advanced
+   * clock runs at all. Five seconds is several times either of these days'
+   * ceremonies, whose length follows how much each one finished.
    */
+  const ceremony = (): Promise<void> => page.clock.runFor(5000);
+
+  // The marked work landing is worth something.
+  await open(day([1, 1], [1, 0, 0, 0]));
+  await ceremony();
+  expect(await drawn()).toBeGreaterThan(0);
+
+  // Nothing marked done and the bar nowhere near: no moment was reached, so
+  // nothing should ever arrive.
   await open(day([0, 0], [1, 0, 0, 0]));
-  await page.waitForTimeout(5000);
+  await ceremony();
   expect(await drawn()).toBe(0);
 });
 
@@ -832,6 +817,7 @@ for (const [width, height] of [
     await seedStorage(page, HEAVY);
     await page.locator("#closeday").click();
     await expect(page.locator("#veil .confirm")).toBeVisible();
+    await landReveal(page);
     /*
      * After the card has landed, not as it arrives. `.sheet` rides the same
      * spring as the drawer — `translateY(18px) scale(0.94)` out to an overshoot
@@ -905,7 +891,7 @@ test("a day left open in a tab is met with its card on coming back", async ({ pa
   await page.locator("#veil .dismiss").click();
   await expect(page.locator("#veil")).toBeHidden();
   await comeBack();
-  await page.waitForTimeout(100);
+  await page.clock.runFor(100);
   await expect(page.locator("#veil")).toBeHidden();
 });
 
@@ -940,11 +926,11 @@ test("undoing a closed day does not celebrate it a second time", async ({ page }
   await page.getByRole("button", { name: "Close the day" }).click();
   await expect(page.locator("#frac")).toHaveText("0 of 2");
   // The closing card's own shower is scheduled; let it go off before counting.
-  await page.waitForTimeout(2500);
+  await page.clock.runFor(2500);
   const before = await buzzes();
 
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.locator("#frac")).toHaveText("2 of 2");
-  await page.waitForTimeout(200);
+  await page.clock.runFor(200);
   expect(await buzzes()).toBe(before);
 });

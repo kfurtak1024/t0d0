@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test, passTidy } from "./fixtures";
 import { addItem, buildList, clearStorage, shape } from "./helpers";
 
 /**
@@ -109,6 +110,7 @@ test("a new row lands at the top, and leaves the pile where it is", async ({ pag
   await buildList(page, ["first", "second", "third"]);
 
   await tick(page, "first").click();
+  await passTidy(page);
   await expect.poll(() => shape(page)).toEqual(["second", "third", "first"]);
   await expect(page.locator("#donelist > .task")).toHaveCount(1);
 

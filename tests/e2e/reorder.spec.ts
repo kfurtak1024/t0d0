@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test, nextFrame } from "./fixtures";
 import { addItem, buildList, clearStorage, seedStorage, shape } from "./helpers";
 
 /**
@@ -137,11 +138,14 @@ test("Alt+Arrow reorders the focused row and keeps the focus on it", async ({ pa
   const tick = page.locator(".task", { hasText: "beta" }).locator(".tick");
   await tick.focus();
   await page.keyboard.press("Alt+ArrowUp");
+  // Focus is handed back on the next frame, once the row has been re-rendered.
+  await nextFrame(page);
 
   expect(await shape(page)).toEqual(["beta", "alpha"]);
   await expect(tick).toBeFocused();
 
   await page.keyboard.press("Alt+ArrowDown");
+  await nextFrame(page);
   expect(await shape(page)).toEqual(["alpha", "beta"]);
   await expect(tick).toBeFocused();
 });
@@ -184,6 +188,8 @@ test("Alt+← takes an item out of its group, and Alt+→ puts it back", async (
 
   await tick.focus();
   await page.keyboard.press("Alt+ArrowLeft");
+  // Focus is handed back on the next frame, once the row has been re-rendered.
+  await nextFrame(page);
   expect(await shape(page)).toEqual(["# Morning", "  walk the dog", "eat breakfast"]);
   await expect(tick).toBeFocused();
 
@@ -355,7 +361,7 @@ test.describe("a row that has settled into the pile", () => {
 
     await page.locator('#donelist > .task[data-id="d1"] .tick').focus();
     await page.keyboard.press("Alt+ArrowUp");
-    await page.waitForTimeout(120);
+    await page.clock.runFor(120);
 
     expect(await shape(page)).toEqual(before);
   });

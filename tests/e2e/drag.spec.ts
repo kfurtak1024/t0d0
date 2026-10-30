@@ -1,14 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import {
-  buildList,
-  clearStorage,
-  holdTime,
-  passTidy,
-  seedStorage,
-  settle,
-  shape,
-  task,
-} from "./helpers";
+import { type Locator, type Page } from "@playwright/test";
+import { expect, test, passTidy } from "./fixtures";
+import { buildList, clearStorage, seedStorage, settle, shape, task } from "./helpers";
 
 /**
  * Dragging is the reorder step applied repeatedly, so these tests are about the
@@ -442,9 +434,6 @@ test("a row ticked and then dragged is not tidied out from under the finger", as
   await settle(page);
   const row = page.locator('.task[data-id="b"]');
 
-  // Held, so the grab is certainly inside the tidy's delay however slowly the
-  // runner gets from the tick to the grip.
-  await holdTime(page);
   await row.locator(".tick").click();
   await drag(page, row.locator(".grip"), 12, { release: false, steps: 4 });
   await passTidy(page);
@@ -456,5 +445,6 @@ test("a row ticked and then dragged is not tidied out from under the finger", as
   // And once the finger lifts, the tidy it held back goes.
   await expect.poll(() => row.evaluate((el) => el.parentElement?.id)).toBe("donelist");
   await expect(row).not.toHaveClass(/dragging/);
-  expect(await row.getAttribute("style")).toBeFalsy();
+  // Nothing left in it: absent, or emptied.
+  await expect(row).not.toHaveAttribute("style", /\S/);
 });

@@ -1,6 +1,5 @@
+import { TOAST_MS } from "../timing";
 import { need } from "./dom";
-
-const VISIBLE_MS = 5000;
 
 export class Toast {
   #root: HTMLElement;
@@ -24,7 +23,7 @@ export class Toast {
     clearTimeout(this.#timer);
     this.#timer = setTimeout(() => {
       this.hide();
-    }, VISIBLE_MS);
+    }, TOAST_MS);
   }
 
   hide(): void {

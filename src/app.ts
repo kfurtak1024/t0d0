@@ -22,11 +22,7 @@ import { RowMenu, type MenuItem } from "./ui/menu";
 import { DaySheet } from "./ui/sheet";
 import { hasDay, StandsSheet } from "./ui/stands";
 import { Toast } from "./ui/toast";
-
-const STALE_MS = 16 * 60 * 60 * 1000;
-const EXIT_MS = 200;
-/** Long enough for the tick to finish landing before the group folds over it. */
-const COLLAPSE_MS = 520;
+import { COLLAPSE_MS, COUNT_UP_MS, EXIT_MS, STALE_MS } from "./timing";
 
 /**
  * What each moment looks like: the hue the ring turns as it lands, and how loud
@@ -1061,7 +1057,7 @@ export class App {
     cancelAnimationFrame(this.#tweenRaf);
 
     const step = (now: number): void => {
-      const k = Math.min(1, (now - started) / 420);
+      const k = Math.min(1, (now - started) / COUNT_UP_MS);
       const eased = 1 - Math.pow(1 - k, 3);
       this.#shownPct = Math.round(from + (target - from) * eased);
       this.#pct.textContent = `${String(this.#shownPct)}%`;

@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { addItem, clearStorage, seedRaw, seedStorage } from "./helpers";
+import { expect, test } from "./fixtures";
+import { addItem, clearStorage, seedRaw, seedStorage, landReveal } from "./helpers";
 
 test("the list and its ticks survive a reload", async ({ page }) => {
   await clearStorage(page);
@@ -131,6 +131,7 @@ test("a day left open overnight offers its summary instead of counting on", asyn
   });
 
   await expect(page.locator("#veil")).toBeVisible();
+  await landReveal(page);
   await expect(page.locator("#veil .score")).toHaveText("1 of 1");
 });
 

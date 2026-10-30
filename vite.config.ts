@@ -83,6 +83,8 @@ export default defineConfig({
       exclude: [
         "src/main.ts",
         "src/types.ts",
+        // Constants only, read by the excluded UI and by the e2e tests.
+        "src/timing.ts",
         "src/app.ts",
         "src/ui/**",
         "src/render/context.ts",

@@ -1,3 +1,4 @@
+import { SCORE_COUNT_MS } from "../timing";
 import { summarise, type DayScore, type DaySummary } from "../progress";
 import { barAtClose, didHeading, verdictOf } from "../words";
 import { keyboardScrollable, need } from "./dom";
@@ -40,7 +41,6 @@ const FLASH_STEP_MS = 420;
 const FLASH_MIN_MS = 90;
 const PHASE_MIN_MS = 620;
 const BUDGET_MS = 1900;
-const COUNT_MS = 900;
 
 /**
  * How long a gate's phase runs, and how far apart its names land.
@@ -298,7 +298,7 @@ export class DaySheet {
     if (done === 0) return;
     const started = performance.now();
     const step = (now: number): void => {
-      const k = Math.min(1, (now - started) / COUNT_MS);
+      const k = Math.min(1, (now - started) / SCORE_COUNT_MS);
       const eased = 1 - Math.pow(1 - k, 3);
       this.#score.textContent = `${String(Math.round(done * eased))} of ${String(total)}`;
       if (k < 1) this.#countRaf = requestAnimationFrame(step);

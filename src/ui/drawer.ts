@@ -4,11 +4,10 @@ import { allTasks } from "../progress";
 import { icon, type IconName } from "../render/context";
 import type { State } from "../types";
 import { loadTheme, saveTheme, THEMES, type Theme } from "../theme";
+import { CONFIRM_MS } from "../timing";
 import { count } from "../words";
 import { need } from "./dom";
 import { trapFocus } from "./focus";
-
-const CONFIRM_MS = 5000;
 
 const stamp = (date = new Date()): string => {
   const pad = (n: number): string => String(n).padStart(2, "0");
