@@ -1,6 +1,6 @@
 import { type Page } from "@playwright/test";
 import { expect, test, nextFrame, passReveal } from "./fixtures";
-import { addItem, clearStorage, seedStorage, settle, landReveal } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle, landReveal, tickOf } from "./helpers";
 
 /**
  * How the day is scored, end to end. The gates and the rainbow are unit-tested
@@ -8,14 +8,6 @@ import { addItem, clearStorage, seedStorage, settle, landReveal } from "./helper
  * reaches the scoring, that the ring wears the result, and that each milestone
  * is celebrated once.
  */
-
-/**
- * A row's tick, by its exact accessible name.
- *
- * Not `hasText`, which is a substring match: "a" finds "call the bank" too, and
- * the resulting strict-mode violation is a confusing way to learn that.
- */
-const tick = (page: Page, name: string) => page.getByRole("checkbox", { name, exact: true });
 
 const openDrawer = async (page: Page): Promise<void> => {
   await page.locator("#databtn").click();
@@ -64,14 +56,14 @@ test("an outstanding important item holds the day back, however high the rest", 
 }) => {
   await addItem(page, "call the bank!");
   for (const text of ["a", "b", "c"]) await addItem(page, text);
-  for (const text of ["a", "b", "c"]) await tick(page, text).click();
+  for (const text of ["a", "b", "c"]) await tickOf(page, text).click();
 
   await expect(page.locator("#frac")).toHaveText("3 of 4");
   await expect(page.locator("#closeday")).not.toHaveClass(/ripe/);
   // Still in the red-to-green stretch: nothing important has landed.
   expect(await dayHue(page)).toBeLessThan(30);
 
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   await expect(page.locator("#closeday")).toHaveClass(/ripe/);
 });
 
@@ -79,7 +71,7 @@ test("the ring turns green the moment the important work lands", async ({ page }
   await addItem(page, "call the bank!");
   for (const text of ["a", "b", "c"]) await addItem(page, text);
 
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   expect(await dayHue(page)).toBeCloseTo(150, 0);
 });
 
@@ -118,7 +110,7 @@ test("a day with nothing marked runs red to blue, not green first", async ({ pag
   await addItem(page, "b");
   expect(await dayHue(page)).toBeLessThan(30);
 
-  await tick(page, "a").click();
+  await tickOf(page, "a").click();
   // Half of the rest against a 70% bar: past red, nowhere near blue.
   const hue = await dayHue(page);
   expect(hue).toBeGreaterThan(100);
@@ -149,18 +141,18 @@ test("the day's verdict is said in words, not only in hue", async ({ page }) => 
   await expect(page.locator("#closeday")).toHaveText(/End day/);
   await expect(closer).toHaveText(/That's the day/);
 
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   await expect(closer).toHaveText(/The important work is done/);
 
   // Three of four ordinary items is 75%, past the 70% bar.
-  for (const text of ["a", "b", "c"]) await tick(page, text).click();
+  for (const text of ["a", "b", "c"]) await tickOf(page, text).click();
   await expect(closer).toHaveText(/That's a good day/);
 
-  await tick(page, "d").click();
+  await tickOf(page, "d").click();
   await expect(closer).toHaveText(/Everything done/);
 
   // And back down again when the day is no longer that.
-  await tick(page, "d").click();
+  await tickOf(page, "d").click();
   await expect(closer).toHaveText(/That's a good day/);
 });
 
@@ -180,21 +172,21 @@ test("the button marks the minimum plan landing, not just any progress", async (
   await expect(closer).not.toHaveClass(/cleared/);
 
   // An ordinary tick lights it, and nothing more than that.
-  await tick(page, "a").click();
+  await tickOf(page, "a").click();
   await expect(closer).toHaveClass(/lit/);
   await expect(closer).not.toHaveClass(/cleared/);
 
   // The marked work landing is its own state.
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   await expect(closer).toHaveClass(/cleared/);
   await expect(closer).not.toHaveClass(/ripe/);
 
   // And clearing the bar on top of it is another.
-  for (const text of ["b", "c"]) await tick(page, text).click();
+  for (const text of ["b", "c"]) await tickOf(page, text).click();
   await expect(closer).toHaveClass(/ripe/);
 
   // Unticking the marked item takes the state back off.
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   await expect(closer).not.toHaveClass(/cleared/);
 });
 
@@ -207,7 +199,7 @@ test("a day with nothing marked never reaches the cleared state", async ({ page 
   const closer = page.locator("#closeday");
 
   await expect(closer).not.toHaveClass(/cleared/);
-  await tick(page, "a").click();
+  await tickOf(page, "a").click();
   await expect(closer).toHaveClass(/lit/);
   await expect(closer).not.toHaveClass(/cleared/);
 });
@@ -217,13 +209,13 @@ test("the day card reports the verdict before it clears anything", async ({ page
   await addItem(page, "a");
   await addItem(page, "b");
 
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("The important things are done.");
   await page.locator("#veil .dismiss").click();
 
-  await tick(page, "a").click();
-  await tick(page, "b").click();
+  await tickOf(page, "a").click();
+  await tickOf(page, "b").click();
   await page.locator("#closeday").click();
   await expect(page.locator("#veil .verdict")).toHaveText("Everything done.");
 });
@@ -289,27 +281,27 @@ test("each milestone is celebrated once, and a doubled crossing only once", asyn
   expect(await milestones()).toBe(0);
 
   // Ordinary work first, stopping short of the bar: no moment reached.
-  await tick(page, "a").click();
-  await tick(page, "b").click();
+  await tickOf(page, "a").click();
+  await tickOf(page, "b").click();
   expect(await milestones()).toBe(0);
 
   // The important item lands — and 2 of 4 is under the 70% bar, so this is the
   // first moment only.
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   await expect.poll(milestones).toBe(1);
 
   // A third ordinary item takes the rest to 75%: the second moment.
-  await tick(page, "c").click();
+  await tickOf(page, "c").click();
   await expect.poll(milestones).toBe(2);
 
   // And the last one: the third.
-  await tick(page, "d").click();
+  await tickOf(page, "d").click();
   await expect.poll(milestones).toBe(3);
 
   // Unticking drops back below, and re-ticking earns it again rather than
   // staying spent for the rest of the day.
-  await tick(page, "d").click();
-  await tick(page, "d").click();
+  await tickOf(page, "d").click();
+  await tickOf(page, "d").click();
   await expect.poll(milestones).toBe(4);
 });
 
@@ -336,7 +328,7 @@ test("a milestone's own pattern is the haptic that survives the tick", async ({ 
 
   // One item, so this tick clears the important work, passes the bar and
   // finishes the day all at once.
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
 
   const buzzes = await page.evaluate(
     () => (window as unknown as { buzzes: (number | number[])[] }).buzzes,
@@ -375,7 +367,7 @@ test("crossing two gates on one tick celebrates once", async ({ page }) => {
     ],
   });
 
-  await tick(page, "call the bank, important").click();
+  await tickOf(page, "call the bank").click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -401,7 +393,7 @@ test("the closing card names what held the day back", async ({ page }) => {
   await addItem(page, "shopping");
 
   for (const name of ["ship the patch, important", "water plants", "shopping"])
-    await tick(page, name).click();
+    await tickOf(page, name).click();
   await page.locator("#closeday").click();
 
   const gates = page.locator("#veil .gate");
@@ -597,10 +589,11 @@ test("the closing card counts up and grows its bars", async ({ page }) => {
     expect(width).toBeLessThan(shot.finish[i] ?? 0);
   });
 
-  // And left to itself it arrives at the day.
-  await passReveal(page);
-  await expect(page.locator("#veil .score")).toHaveText("5 of 6");
-  for (const width of shot.finish) expect(width).toBeGreaterThan(0);
+  await test.step("left to itself, it arrives at the day", async () => {
+    await passReveal(page);
+    await expect(page.locator("#veil .score")).toHaveText("5 of 6");
+    for (const width of shot.finish) expect(width).toBeGreaterThan(0);
+  });
 });
 
 /*
@@ -695,16 +688,19 @@ test("the closing shower is what the day earned, and nothing on a day that earne
    */
   const ceremony = (): Promise<void> => page.clock.runFor(5000);
 
-  // The marked work landing is worth something.
-  await open(day([1, 1], [1, 0, 0, 0]));
-  await ceremony();
-  expect(await drawn()).toBeGreaterThan(0);
+  await test.step("a day whose marked work landed gets a shower", async () => {
+    await open(day([1, 1], [1, 0, 0, 0]));
+    await ceremony();
+    expect(await drawn()).toBeGreaterThan(0);
+  });
 
   // Nothing marked done and the bar nowhere near: no moment was reached, so
   // nothing should ever arrive.
-  await open(day([0, 0], [1, 0, 0, 0]));
-  await ceremony();
-  expect(await drawn()).toBe(0);
+  await test.step("a day that reached no moment gets none", async () => {
+    await open(day([0, 0], [1, 0, 0, 0]));
+    await ceremony();
+    expect(await drawn()).toBe(0);
+  });
 });
 
 test("the closing card does not scroll on a roomy window", async ({ page }) => {

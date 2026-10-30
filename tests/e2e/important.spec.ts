@@ -1,6 +1,6 @@
 import { type Locator, type Page } from "@playwright/test";
 import { expect, test, passTidy } from "./fixtures";
-import { addItem, clearStorage, seedStorage, settle } from "./helpers";
+import { addItem, clearStorage, seedStorage, settle, rowOf, tickOf } from "./helpers";
 
 /**
  * The `!` mark, end to end. The parser's own rules are unit-tested; what only a
@@ -29,12 +29,12 @@ test("a trailing ! marks an item, and stays out of its text", async ({ page }) =
   await addItem(page, "call the bank!");
   await addItem(page, "water plants");
 
-  const marked = page.locator(".task", { hasText: "call the bank" });
+  const marked = rowOf(page, "call the bank");
   await expect(marked).toHaveClass(/important/);
   await expect(marked.locator(".label")).toHaveText("call the bank");
   await expect(marked.locator(".tick")).toHaveAttribute("aria-label", "call the bank, important");
 
-  await expect(page.locator(".task", { hasText: "water plants" })).not.toHaveClass(/important/);
+  await expect(rowOf(page, "water plants")).not.toHaveClass(/important/);
 });
 
 test("a trailing ! marks a group", async ({ page }) => {
@@ -49,7 +49,7 @@ test("a trailing ! marks a group", async ({ page }) => {
 test("the mark and a count are independent", async ({ page }) => {
   await addItem(page, "make calls [3]!");
 
-  const row = page.locator(".task", { hasText: "make calls" });
+  const row = rowOf(page, "make calls");
   await expect(row).toHaveClass(/important/);
   await expect(row.locator(".count")).toHaveText("0/3");
 });
@@ -60,7 +60,7 @@ test("the mark and a count are independent", async ({ page }) => {
  */
 test("editing a row shows the mark again, and can take it off", async ({ page }) => {
   await addItem(page, "make calls [3]!");
-  const row = page.locator(".task", { hasText: "make calls" });
+  const row = rowOf(page, "make calls");
 
   await row.locator(".label").click();
   await expect(row.locator(".label")).toHaveText("make calls! [3]");
@@ -92,7 +92,7 @@ test("the mark survives a reload", async ({ page }) => {
   await addItem(page, "call the bank!");
   await page.reload();
 
-  await expect(page.locator(".task", { hasText: "call the bank" })).toHaveClass(/important/);
+  await expect(rowOf(page, "call the bank")).toHaveClass(/important/);
 });
 
 /*
@@ -107,7 +107,7 @@ test("a list from before the mark loads unmarked", async ({ page }) => {
     list: [{ kind: "task", id: "a", text: "shopping", target: 1, count: 0 }],
   });
 
-  await expect(page.locator(".task", { hasText: "shopping" })).not.toHaveClass(/important/);
+  await expect(rowOf(page, "shopping")).not.toHaveClass(/important/);
 });
 
 /*
@@ -117,7 +117,7 @@ test("a list from before the mark loads unmarked", async ({ page }) => {
  */
 test("the row menu marks and unmarks an item", async ({ page }) => {
   await addItem(page, "call the bank");
-  const row = page.locator(".task", { hasText: "call the bank" });
+  const row = rowOf(page, "call the bank");
   await expect(row).not.toHaveClass(/important/);
 
   await row.locator(".dots").click();
@@ -138,7 +138,7 @@ test("the row menu marks a group, and a nested item", async ({ page }) => {
   await addItem(page, "a");
   await addItem(page, "b");
 
-  const nested = page.locator(".items > .task", { hasText: "a" });
+  const nested = rowOf(page, "a", ".items > .task");
   await nested.locator(".dots").click();
   await page.getByRole("menuitem", { name: "Mark important", exact: true }).click();
   await expect(nested).toHaveClass(/important/);
@@ -150,19 +150,19 @@ test("the row menu marks a group, and a nested item", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Mark important", exact: true }).click();
   await expect(group).toHaveClass(/important/);
   // Marking the group marked what was left in it.
-  await expect(page.locator(".items > .task", { hasText: "b" })).toHaveClass(/important/);
+  await expect(rowOf(page, "b", ".items > .task")).toHaveClass(/important/);
 });
 
 test("marking from the menu is undoable", async ({ page }) => {
   await addItem(page, "call the bank");
-  const row = page.locator(".task", { hasText: "call the bank" });
+  const row = rowOf(page, "call the bank");
 
   await row.locator(".dots").click();
   await page.getByRole("menuitem", { name: "Mark important" }).click();
   await expect(row).toHaveClass(/important/);
 
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(page.locator(".task", { hasText: "call the bank" })).not.toHaveClass(/important/);
+  await expect(rowOf(page, "call the bank")).not.toHaveClass(/important/);
 });
 
 /*
@@ -174,7 +174,7 @@ test("an item inside an important group does not wear its own mark", async ({ pa
   await addItem(page, "marked one!");
   await addItem(page, "plain one");
 
-  const marked = page.locator(".items > .task", { hasText: "marked one" });
+  const marked = rowOf(page, "marked one", ".items > .task");
   const shown = () => wearsPill(marked);
 
   // The group is not important yet, so the item says so itself.
@@ -210,9 +210,7 @@ test("a group takes the mark when the only item put in it is marked", async ({ p
   // that plain row important by inheritance.
   await addItem(page, "water plants");
   await expect(group).not.toHaveClass(/important/);
-  await expect(page.locator(".items > .task", { hasText: "water plants" })).not.toHaveClass(
-    /important/,
-  );
+  await expect(rowOf(page, "water plants", ".items > .task")).not.toHaveClass(/important/);
 });
 
 /*
@@ -227,12 +225,12 @@ test("unmarking one item takes the mark off the group", async ({ page }) => {
   const group = page.locator(".group");
   await expect(group).toHaveClass(/important/);
 
-  await page.locator(".items > .task", { hasText: "one" }).locator(".dots").click();
+  await rowOf(page, "one", ".items > .task").locator(".dots").click();
   await page.getByRole("menuitem", { name: "Unmark important" }).click();
 
   await expect(group).not.toHaveClass(/important/);
   // The one still marked shows its own mark again, now the group is not saying it.
-  expect(await wearsPill(page.locator(".items > .task", { hasText: "two" }))).toBe(true);
+  expect(await wearsPill(rowOf(page, "two", ".items > .task"))).toBe(true);
 });
 
 /*
@@ -248,7 +246,7 @@ test("marking the last item promotes the group, which can still be unmarked", as
   const group = page.locator(".group");
   await expect(group).not.toHaveClass(/important/);
 
-  await page.locator(".items > .task", { hasText: "two" }).locator(".dots").click();
+  await rowOf(page, "two", ".items > .task").locator(".dots").click();
   await page.getByRole("menuitem", { name: "Mark important" }).click();
   await expect(group).toHaveClass(/important/);
 
@@ -350,7 +348,7 @@ test("a finished important row is still tellable from an ordinary one", async ({
  */
 test("ticking a marked item keeps the mark, and unticking brings it back", async ({ page }) => {
   await addItem(page, "call the bank!");
-  const row = page.locator(".task", { hasText: "call the bank" });
+  const row = rowOf(page, "call the bank");
   const tick = row.locator(".tick");
 
   await tick.click();
@@ -361,7 +359,7 @@ test("ticking a marked item keeps the mark, and unticking brings it back", async
   await expect(row).not.toHaveClass(/done/);
   await expect(row).toHaveClass(/important/);
   await page.reload();
-  await expect(page.locator(".task", { hasText: "call the bank" })).toHaveClass(/important/);
+  await expect(rowOf(page, "call the bank")).toHaveClass(/important/);
 });
 
 /*
@@ -372,7 +370,7 @@ test("a marked item still sinks when it is finished", async ({ page }) => {
   await addItem(page, "call the bank!");
   await addItem(page, "water plants");
 
-  await page.locator(".task", { hasText: "call the bank" }).locator(".tick").click();
+  await tickOf(page, "call the bank").click();
 
   await expect
     .poll(() =>
@@ -544,7 +542,7 @@ test.describe("what a folded group is still holding", () => {
     await addItem(page, "reply to Dana");
 
     for (const text of ["book the tickets", "reply to Dana"])
-      await page.locator(".items > .task", { hasText: text }).locator(".tick").click();
+      await rowOf(page, text, ".items > .task").locator(".tick").click();
     await passTidy(page);
 
     const group = page.locator(".group");

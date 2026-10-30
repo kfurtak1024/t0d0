@@ -1,6 +1,6 @@
 import { type Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { clearStorage, seedStorage } from "./helpers";
+import { clearStorage, seedStorage, tickOf } from "./helpers";
 
 /**
  * The ring's own card: where the day stands, mid-day, on the ring's terms.
@@ -262,7 +262,7 @@ test("the card reads the list as it stands now, not as it was opened", async ({ 
   await expect(page.locator("#standsscore")).toHaveText("4 of 8");
   await page.keyboard.press("Escape");
 
-  await page.locator(".task", { hasText: "sweep up" }).locator(".tick").click();
+  await tickOf(page, "sweep up").click();
   await open(page);
   await expect(page.locator("#standsscore")).toHaveText("5 of 8");
   await expect(page.locator(".stands .gate").nth(1).locator(".gnote")).toHaveText(

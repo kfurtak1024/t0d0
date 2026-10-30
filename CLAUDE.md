@@ -278,7 +278,7 @@ Invariants worth defending in review:
   a batch in list order: two quick ticks stacked `b` over `c` where the same two spread
   out stacked `c` over `b`, and the e2e tests had pinned the quick result. Depth needs no
   rule of its own: `sink()` keeps a nested row in its group, and a group is queued after
-  the tick that finished it. `tests/transitions.test.ts` pins batch against spread over
+  the tick that finished it. `tests/transitions/tidy.test.ts` pins batch against spread over
   arbitrary lists with a pile already earned — a property, not an example — and fails
   on the old ordering.
 - **Closing the day reopens every fold.** The folds were earned by ticks that
@@ -382,7 +382,7 @@ Invariants worth defending in review:
 - **The derivation is enforced by a property test, not by tidy call sites.** It runs from
   eight places across six transitions and there is no chokepoint to funnel them through,
   so the way it goes wrong is a seventh transition arriving without one.
-  `tests/transitions.test.ts` folds arbitrary runs of transitions and asserts the
+  `tests/transitions/marks.test.ts` folds arbitrary runs of transitions and asserts the
   invariant after every step — removing any one of the eight calls fails it. The rule is
   written out again in that test rather than imported: asking the implementation whether
   it agrees with itself would pass for the wrong reason.
@@ -416,7 +416,7 @@ Invariants worth defending in review:
 - **Only a _finished_ one-off departs.** An errand you did not get to is precisely the
   thing you most need to see in the morning, and taking it away because the day ended
   would make the mark a trapdoor rather than a convenience. It is one-off; it has not
-  been done once yet. `tests/transitions.test.ts` pins both halves.
+  been done once yet. `tests/transitions/close.test.ts` pins both halves.
 - **The day ends at the closer, never at the ring.** Removal hangs off `clearTicks()` —
   the one explicit end-of-day act. Hanging it off `scoreDay()` going complete would have
   rows vanishing under the pointer mid-afternoon.
@@ -742,7 +742,7 @@ Invariants worth defending in review:
   otherwise keep the right words in the wrong shape and lose the strike on that row for
   good. The other half was the boundary: a row crossing into `#donelist` is a removal and
   an insertion, which restarts its style, so the wipe also needed the row to stay put while
-  it played. `smoke.spec.ts` asks the transition rather than sampling a frame — the same
+  it played. `ticking.spec.ts` asks the transition rather than sampling a frame — the same
   lesson the closing card's reveal is scrubbed for.
 - **A row's label is its name and none of the marks.** All three of the things the
   composer parses leave the text on the way in, and each is shown by something built for
@@ -899,6 +899,16 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
 - `tests/e2e/a11y.spec.ts` is the net under the accessibility work: axe must report zero
   WCAG 2.1 AA violations on the list, both dialogs and the empty state, and an ARIA
   snapshot pins the roles, names and states of the whole list.
+- **Rows are found by name, and the classes that remain are test API.** `tickOf`,
+  `rowOf` and `groupOf` in `tests/e2e/helpers.ts` find a row by its tick's accessible
+  name, anchored and exact — `hasText` is a substring, so "shopping" also found
+  "shopping list". What the specs still reach by class or id is part of the contract, and
+  renaming one is a breaking change for them: the state classes they assert (`.done`,
+  `.clear`, `.important`, `.oneoff`, `.collapsed`, `.leaving`, `.dragging`, `.aimed`, and
+  the closer's `.lit` / `.cleared` / `.ripe`), the containers they scope to (`#list`,
+  `#donelist`, `.items`, `#veil`, `.stands`, `.drawer`, `.rowmenu`), and the readouts
+  they read (`#frac`, `#pct`, `.score`, `.gtally`, `.gfill`). `grep` the specs before
+  renaming anything in `src/render/` or `src/styles/`.
 - **Two day cards are in the DOM at once, and they share their classes** — `.sheet`,
   `.score`, `.dismiss`, `.gate`, `.track`. A spec must therefore say _which_ card it
   means, by scoping to `#veil` or `.stands`; an unscoped `.sheet .score` matched both and

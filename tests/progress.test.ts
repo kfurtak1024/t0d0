@@ -15,41 +15,14 @@ import {
   summarise,
 } from "../src/progress";
 import type { Group, State, Task } from "../src/types";
+import { group as aGroup, state, task as aTask } from "./builders";
 
-const task = (text: string, count = 0, target = 1): Task => ({
-  kind: "task",
-  id: text,
-  text,
-  target,
-  count,
-  important: false,
-  once: false,
-});
-
-const key = (text: string, count = 0, target = 1): Task => ({
-  ...task(text, count, target),
-  important: true,
-});
-
-const group = (title: string, items: Task[], collapsed = false): Group => ({
-  kind: "group",
-  id: title,
-  title,
-  collapsed,
-  important: false,
-  items,
-});
-
-const keyGroup = (title: string, items: Task[]): Group => ({
-  ...group(title, items),
-  important: true,
-});
-
-const state = (list: State["list"], openedAt: number | null = null): State => ({
-  v: 1,
-  openedAt,
-  list,
-});
+const task = (text: string, count = 0, target = 1): Task => aTask(text, { count, target });
+const key = (text: string, count = 0, target = 1): Task =>
+  aTask(text, { count, target, important: true });
+const group = (title: string, items: Task[], collapsed = false): Group =>
+  aGroup(title, items, { collapsed });
+const keyGroup = (title: string, items: Task[]): Group => aGroup(title, items, { important: true });
 
 describe("progress", () => {
   it("is zero for an empty list", () => {

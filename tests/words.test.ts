@@ -17,6 +17,7 @@ import {
   verdictOf,
 } from "../src/words";
 import type { Group, State, Task } from "../src/types";
+import { state, task as aTask } from "./builders";
 
 /**
  * Every sentence the day is reported in.
@@ -28,17 +29,10 @@ import type { Group, State, Task } from "../src/types";
  * bar without finishing that it had "0 things left for a clean sweep".
  */
 
-const task = (id: string, important: boolean, count: number, target = 1): Task => ({
-  kind: "task",
-  id,
-  text: id,
-  target,
-  count,
-  important,
-  once: false,
-});
+const task = (id: string, important: boolean, count: number, target = 1): Task =>
+  aTask(id, { important, count, target });
 
-const listOf = (...tasks: Task[]): State => ({ v: 1, openedAt: null, list: tasks });
+const listOf = (...tasks: Task[]): State => state(tasks);
 const scoreOf = (state: State, bar = 0.7) => scoreDay(state, bar);
 
 /** The card's own call, so the test cannot pass by handing in numbers by hand. */
