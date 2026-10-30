@@ -1,13 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import {
-  clearStorage,
-  addItem,
-  holdTime,
-  passTidy,
-  seedStorage,
-  task,
-  settleTidy,
-} from "./helpers";
+import { type Locator, type Page } from "@playwright/test";
+import { expect, test, passTidy, passExit, passCountUp } from "./fixtures";
+import { clearStorage, addItem, seedStorage, task, landReveal } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await clearStorage(page);
@@ -62,6 +55,7 @@ test("a count and a proportion are different questions", async ({ page }) => {
   // Three of the seven rows are done, and the third of a point the `[3]` has
   // earned belongs to the mean rather than to the tally.
   await expect(page.locator("#frac")).toHaveText("3 of 7");
+  await passCountUp(page);
   await expect(page.locator("#pct")).toHaveText("48%");
 });
 
@@ -227,6 +221,7 @@ test("the last row of the work wipes too, rather than crossing under the tick", 
   expect(wipe.size).toBe("0% 1.5px");
 
   // And it does reach the pile, once the tidy lets it go.
+  await passTidy(page);
   await expect(page.locator("#donelist .task", { hasText: "alpha" })).toBeVisible();
 });
 
@@ -245,9 +240,6 @@ test("a row ticked at the foot of the work waits with the rest", async ({ page }
       .evaluate((el) => el.parentElement?.id ?? "?")
       .catch(() => "?");
 
-  // Held, so "not yet" means the tidy's delay and not how quickly the runner
-  // got round to asking.
-  await holdTime(page);
   await page.locator(".task", { hasText: "alpha" }).locator(".tick").click();
   expect(await where(), "in the work on the frame it was ticked").toBe("list");
   await page.clock.runFor(300);
@@ -260,9 +252,6 @@ test("tapping a finished plain item unticks it", async ({ page }) => {
   await addItem(page, "shopping");
   const row = page.locator(".task", { hasText: "shopping" });
   const tick = row.locator(".tick");
-  // Held, so the row the tick finishes stays put under the next click rather
-  // than sinking into the pile on the tidy's timer.
-  await holdTime(page);
 
   await tick.click();
   await expect(row).toHaveClass(/done/);
@@ -278,9 +267,6 @@ test("tapping a finished plain item unticks it", async ({ page }) => {
 test("a counted item counts up instead of toggling, and resets from the menu", async ({ page }) => {
   await addItem(page, "make calls [3]");
   const row = page.locator(".task", { hasText: "make calls" });
-  // Held, so the row the tick finishes stays put under the next click rather
-  // than sinking into the pile on the tidy's timer.
-  await holdTime(page);
 
   for (let i = 0; i < 3; i++) await row.locator(".tick").click();
   await expect(row.locator(".count")).toHaveText("3/3");
@@ -346,6 +332,7 @@ test("the day closes with a summary and clears the ticks", async ({ page }) => {
 
   const sheet = page.locator("#veil");
   await expect(sheet).toBeVisible();
+  await landReveal(page);
   await expect(sheet.locator(".score")).toHaveText("1 of 2");
 
   await sheet.locator(".confirm").click();
@@ -359,6 +346,7 @@ test("deleting is undoable", async ({ page }) => {
   const row = page.locator(".task", { hasText: "shopping" });
 
   await deleteRow(page, row);
+  await passExit(page);
   await expect(page.locator(".list .task")).toHaveCount(0);
 
   await page.locator(".toast-action").click();
@@ -426,6 +414,7 @@ test("a row inside a group leaves with the same animation as one outside", async
   await page.getByRole("menuitem", { name: /^Delete/ }).click();
 
   await expect(row).toHaveClass(/leaving/);
+  await passExit(page);
   await expect(page.locator(".items > .task")).toHaveCount(0);
 });
 
@@ -586,7 +575,6 @@ test("a collapsed group leaves the tab order", async ({ page }) => {
 test("the day card does not open with the destructive button focused", async ({ page }) => {
   await addItem(page, "shopping");
   await page.locator(".tick").first().click();
-  await settleTidy(page);
   await page.locator("#closeday").click();
 
   await expect(page.locator("#veil")).toBeVisible();
@@ -632,8 +620,12 @@ test("deleting the last undone item still finishes the day", async ({ page }) =>
 
   const row = page.locator(".task", { hasText: "not yet" });
   await deleteRow(page, row);
+  await passExit(page);
 
   await expect(page.locator("#frac")).toHaveText("1 of 1");
+  // The shower draws on animation frames, which a held clock runs only when
+  // it is advanced.
+  await page.clock.runFor(1000);
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { draws: number }).draws))
     .toBeGreaterThan(0);
@@ -695,7 +687,8 @@ test("editing a row finished or unfinished moves it like a tick would", async ({
   await page.keyboard.type("calls");
   await page.keyboard.press("Enter");
   await expect(row).toHaveClass(/done/);
-  await expect.poll(where, { timeout: 4000 }).toBe("donelist");
+  await passTidy(page);
+  await expect.poll(where).toBe("donelist");
 
   await label.click();
   await page.keyboard.press("ControlOrMeta+a");

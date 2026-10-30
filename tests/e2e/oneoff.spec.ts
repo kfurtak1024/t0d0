@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { addItem, clearStorage, seedStorage, settle, shape, task, settleTidy } from "./helpers";
+import { expect, test, passTidy } from "./fixtures";
+import { addItem, clearStorage, seedStorage, settle, shape, task, landReveal } from "./helpers";
 
 /**
  * One-off items, end to end. The rules of what goes and what stays are
@@ -83,7 +83,6 @@ test("the closer removes what the mark asked it to", async ({ page }) => {
   await addItem(page, "water plants");
 
   await page.locator(".task", { hasText: "post the parcel" }).locator(".tick").click();
-  await settleTidy(page);
   await page.locator("#closeday").click();
   await page.locator("#veil .confirm").click();
 
@@ -96,8 +95,8 @@ test("a one-off nobody got to is still there in the morning", async ({ page }) =
   await addItem(page, "post the parcel~");
   await addItem(page, "water plants");
   await page.locator(".task", { hasText: "water plants" }).locator(".tick").click();
+  await passTidy(page);
 
-  await settleTidy(page);
   await page.locator("#closeday").click();
   await page.locator("#veil .confirm").click();
   await expect(shape(page)).resolves.toEqual(["post the parcel", "water plants"]);
@@ -236,6 +235,7 @@ test("the card still fits without scrolling once it has a removal to report", as
   await page.locator("#closeday").click();
   const panel = page.locator("#veil .sheet");
   await expect(panel.locator(".confirm")).toBeVisible();
+  await landReveal(page);
 
   // `.sheet-body` is the box that scrolls; `.sheet` is capped and holds it, so
   // asking the panel whether it overflows is a question that answers itself.

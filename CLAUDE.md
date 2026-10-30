@@ -806,6 +806,7 @@ Node version is pinned in `.nvmrc`. Use `npm ci`, not `npm install`, in automati
 src/theme.ts      theme preference, in its own storage key
 src/prefs.ts      behaviour preferences, in their own storage key
 src/types.ts      Task, Group, State, and the limits
+src/timing.ts     every delay the app keeps, side-effect free so tests can import it
 src/normalize.ts  the single gate for data arriving from outside
 src/marks.ts      a group's mark, derived from its items
 src/storage.ts    load/save against one localStorage key
@@ -878,6 +879,23 @@ yourself rebuilding `innerHTML`, stop; that is the bug this file prevents.
 - The keyed patch has DOM tests asserting node identity survives an update.
 - Playwright covers the paths a unit test cannot: persistence across reload, the mobile
   viewport, the export/import round-trip, and a cold start with the network off.
+- **Every e2e test runs on a held clock.** `test` comes from `tests/e2e/fixtures.ts`,
+  which installs and pauses `page.clock` before the first load, so nothing the app does
+  on a timer happens until the test advances time: `passTidy`, `passExit`, `passToast`,
+  `passConfirm`, `passCountUp`, `passReveal` and `nextFrame`, each sized from
+  `src/timing.ts` rather than restated. It replaced racing the real timers, which about
+  twenty tests did and lost one at a time on CI — a click landing where a row used to
+  be, two ticks either side of the tidy, a "not yet" read too late. A forgotten advance
+  now fails every time instead of rarely. ESLint enforces it: importing `test` from
+  `@playwright/test` in a spec is an error, and so is `waitForTimeout`.
+- **A held clock holds `requestAnimationFrame` too.** Focus handed back after a keyboard
+  move, `#pct`'s count-up, the closing card's release and score, and the confetti all
+  wait for an advance — `nextFrame` for one frame. The Web Animations themselves run on
+  the page's real timeline and are not held, so a spec about them scrubs `currentTime`
+  or waits with `settle()`. `test.use({ realTime: true })` is the opt-out, and only for
+  a spec whose subject runs on frames in real time: axe, which schedules its own work on
+  the page's timers, and the drawer's spring sampled frame by frame. A spec that only
+  wants the finished closing card lands it with `landReveal()`, the app's own route.
 - `tests/e2e/a11y.spec.ts` is the net under the accessibility work: axe must report zero
   WCAG 2.1 AA violations on the list, both dialogs and the empty state, and an ARIA
   snapshot pins the roles, names and states of the whole list.

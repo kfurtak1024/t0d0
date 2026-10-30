@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedStorage } from "./helpers";
 
 /**
@@ -21,6 +22,13 @@ import { seedStorage } from "./helpers";
  * first paint — emulating it after navigation is already too late.
  */
 test.use({ contextOptions: { reducedMotion: "reduce" } });
+
+/*
+ * axe schedules its own work on the page's timers, so a held clock stops a scan
+ * dead. Nothing here races one either: every state is seeded, and with motion
+ * reduced the tidy is immediate and the closing card arrives finished.
+ */
+test.use({ realTime: true });
 
 const A_DAY = {
   v: 1,

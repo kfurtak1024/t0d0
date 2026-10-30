@@ -117,6 +117,7 @@ src/
 ├─ words.ts                                     every sentence the app says about the list
 ├─ storage.ts store.ts                          persistence and one level of undo
 ├─ theme.ts prefs.ts                            appearance and behaviour, own storage keys
+├─ timing.ts                                    every delay, importable by the tests
 ├─ render/    list flip ring task group context keyed DOM patching, and FLIP
 ├─ ui/        drawer sheet stands rail gates menu drag toast edit focus confetti dom
 ├─ styles/    tokens.css base.css app.css

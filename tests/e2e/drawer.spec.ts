@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { addItem, clearStorage, settle, seedStorage } from "./helpers";
 
 const openDrawer = async (page: Page): Promise<void> => {
@@ -299,47 +300,53 @@ test("cancelling the erase leaves the list alone", async ({ page }) => {
  * focus({ preventScroll: true }) in ui/focus.ts, plus a veil that cannot scroll
  * on phones; this is the net under both.
  */
-test("the settings sheet slides up without dragging the backdrop with it", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 720 });
-  await clearStorage(page);
-  await addItem(page, "shopping");
+test.describe("on a real clock", () => {
+  // Sampled every frame while the spring plays on the page's real timeline:
+  // a held clock would hold the frames and leave the spring running unwatched.
+  test.use({ realTime: true });
 
-  await page.locator("#databtn").click();
+  test("the settings sheet slides up without dragging the backdrop with it", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 720 });
+    await clearStorage(page);
+    await addItem(page, "shopping");
 
-  const worst = await page.evaluate(async () => {
-    const veil = document.getElementById("dataveil");
-    if (!veil) return -1;
-    let max = 0;
-    const started = performance.now();
-    await new Promise<void>((done) => {
-      const tick = (): void => {
-        max = Math.max(max, veil.scrollTop);
-        if (performance.now() - started < 600) requestAnimationFrame(tick);
-        else done();
-      };
-      requestAnimationFrame(tick);
+    await page.locator("#databtn").click();
+
+    const worst = await page.evaluate(async () => {
+      const veil = document.getElementById("dataveil");
+      if (!veil) return -1;
+      let max = 0;
+      const started = performance.now();
+      await new Promise<void>((done) => {
+        const tick = (): void => {
+          max = Math.max(max, veil.scrollTop);
+          if (performance.now() - started < 600) requestAnimationFrame(tick);
+          else done();
+        };
+        requestAnimationFrame(tick);
+      });
+      return max;
     });
-    return max;
-  });
 
-  // Not "small" — the backdrop has no business moving at all.
-  expect(worst).toBe(0);
+    // Not "small" — the backdrop has no business moving at all.
+    expect(worst).toBe(0);
 
-  // And the panel is where it belongs, with focus in it rather than lost.
-  await expect(page.locator(".drawer")).toBeVisible();
-  // The 600ms above is wall-clock, not the spring's; on a loaded runner the
-  // panel can still be on its way up.
-  await settle(page);
-  const landed = await page.evaluate(() => {
-    const box = document.querySelector(".drawer")?.getBoundingClientRect();
-    return box ? box.bottom <= innerHeight + 1 && box.top < innerHeight : false;
+    // And the panel is where it belongs, with focus in it rather than lost.
+    await expect(page.locator(".drawer")).toBeVisible();
+    // The 600ms above is wall-clock, not the spring's; on a loaded runner the
+    // panel can still be on its way up.
+    await settle(page);
+    const landed = await page.evaluate(() => {
+      const box = document.querySelector(".drawer")?.getBoundingClientRect();
+      return box ? box.bottom <= innerHeight + 1 && box.top < innerHeight : false;
+    });
+    expect(landed).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.querySelector(".drawer")?.contains(document.activeElement) ?? false,
+      ),
+    ).toBe(true);
   });
-  expect(landed).toBe(true);
-  expect(
-    await page.evaluate(
-      () => document.querySelector(".drawer")?.contains(document.activeElement) ?? false,
-    ),
-  ).toBe(true);
 });
 
 test("the drawer traps focus and gives it back on close", async ({ page }) => {
