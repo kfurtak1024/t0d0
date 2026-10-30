@@ -74,7 +74,9 @@ test("a counted item needs one tap per unit", async ({ page }) => {
  */
 test("a finished row is struck through across a wrapped label", async ({ page }) => {
   await page.setViewportSize({ width: 380, height: 700 });
-  await addItem(page, "walk the dog before it rains today");
+  // Long enough to wrap at this width in every engine's fonts: Firefox fitted
+  // a shorter one on a single line, and the test then asked nothing.
+  await addItem(page, "walk the dog the long way round before it starts raining this afternoon");
   const line = page.locator(".task .label .line");
 
   const before = await line.evaluate((el) => ({

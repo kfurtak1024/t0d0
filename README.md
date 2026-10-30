@@ -89,21 +89,22 @@ npm ci
 npm run dev
 ```
 
-| Script                  | Does                                                                                |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| `npm run dev`           | dev server with hot reload                                                          |
-| `npm run build`         | typecheck, then production build into `dist/`                                       |
-| `npm run preview`       | serve the built output                                                              |
-| `npm test`              | unit and DOM tests                                                                  |
-| `npm run test:watch`    | the same, on save                                                                   |
-| `npm run test:coverage` | the same, with the thresholds CI enforces                                           |
-| `npm run test:e2e`      | Playwright — Chromium, WebKit and mobile Safari, plus axe and an offline cold start |
-| `npm run lint`          | ESLint                                                                              |
-| `npm run format`        | Prettier, writing in place                                                          |
-| `npm run format:check`  | Prettier in check mode — fails on anything unformatted                              |
-| `npm run icons`         | regenerate the favicon and PWA icons                                                |
-| `npm run screenshots`   | regenerate the README screenshots from the built app                                |
-| **`npm run check`**     | **lint + format + typecheck + tests with coverage — the gate CI runs**              |
+| Script                    | Does                                                                                         |
+| ------------------------- | -------------------------------------------------------------------------------------------- |
+| `npm run dev`             | dev server with hot reload                                                                   |
+| `npm run build`           | typecheck, then production build into `dist/`                                                |
+| `npm run preview`         | serve the built output                                                                       |
+| `npm test`                | unit and DOM tests                                                                           |
+| `npm run test:watch`      | the same, on save                                                                            |
+| `npm run test:coverage`   | the same, with the thresholds CI enforces                                                    |
+| `npm run test:e2e`        | Playwright — Chromium, Firefox, WebKit and mobile Safari, plus axe and an offline cold start |
+| `npm run test:e2e:docker` | the same, inside Playwright's image — every browser CI runs, on any machine with Docker      |
+| `npm run lint`            | ESLint                                                                                       |
+| `npm run format`          | Prettier, writing in place                                                                   |
+| `npm run format:check`    | Prettier in check mode — fails on anything unformatted                                       |
+| `npm run icons`           | regenerate the favicon and PWA icons                                                         |
+| `npm run screenshots`     | regenerate the README screenshots from the built app                                         |
+| **`npm run check`**       | **lint + format + typecheck + tests with coverage — the gate CI runs**                       |
 
 Node version is pinned in [`.nvmrc`](./.nvmrc).
 

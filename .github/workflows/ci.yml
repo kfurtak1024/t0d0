@@ -29,16 +29,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    # This name is the required status check on main. Renaming it stops the rule
-    # matching, and every pull request then waits for a check that never reports
-    # — so change it here and in the ruleset together, or not at all.
-    name: Lint, typecheck, test
+  check:
+    name: Check
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
       - uses: ./.github/actions/verify
         with:
           artifact-suffix: ci
+          e2e-project: none
+
+  # One job per browser, side by side. As one job the four ran back to back on
+  # two workers, and the gate took as long as all of them together; split, it
+  # takes as long as the slowest. Not fail-fast: a WebKit-only failure is worth
+  # seeing next to a green Chromium, not instead of it.
+  e2e:
+    name: End-to-end (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop-chromium, desktop-webkit, mobile-safari, desktop-firefox]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/verify
+        with:
+          artifact-suffix: ci-${{ matrix.project }}
+          check: "false"
+          e2e-project: ${{ matrix.project }}
+
+  verify:
+    # This name is the required status check on main. Renaming it stops the rule
+    # matching, and every pull request then waits for a check that never reports
+    # — so change it here and in the ruleset together, or not at all.
+    #
+    # It no longer does the work; it reports on the jobs that do. `always()` so
+    # it reports red when one of them failed rather than being skipped — a
+    # skipped required check is one GitHub can treat as passing.
+    name: Lint, typecheck, test
+    needs: [check, e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every part of the gate passed
+        shell: bash
+        run: |
+          echo "check: ${{ needs.check.result }}, end-to-end: ${{ needs.e2e.result }}"
+          test "${{ needs.check.result }}" = success
+          test "${{ needs.e2e.result }}" = success
