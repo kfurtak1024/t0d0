@@ -25,8 +25,11 @@ const { version } = createRequire(import.meta.url)("@playwright/test/package.jso
 const IMAGE = `mcr.microsoft.com/playwright:v${version}-noble`;
 const owner = `${process.getuid()}:${process.getgid()}`;
 
+// `|| true` because not every run writes all three — `--reporter=line` writes no
+// playwright-report — and a failed chown in the trap would become the exit
+// code, turning a passing run red. A failing run keeps its own code either way.
 const script = [
-  `trap 'chown -R ${owner} dist test-results playwright-report 2>/dev/null' EXIT`,
+  `trap 'chown -R ${owner} dist test-results playwright-report 2>/dev/null || true' EXIT`,
   "npm ci --no-audit --no-fund --loglevel=error",
   'npx playwright test "$@"',
 ].join("\n");
