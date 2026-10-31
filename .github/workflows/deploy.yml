@@ -16,10 +16,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The same per-browser split as CI, for the same reason: as one job the four
+  # browsers ran back to back and a deploy took over twelve minutes; split, it
+  # takes as long as the slowest. The browsers are run again rather than trusted
+  # from the pull request because a squash merge is a commit no PR ever tested.
+  e2e:
+    name: End-to-end (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop-chromium, desktop-webkit, mobile-safari, desktop-firefox]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/verify
+        with:
+          artifact-suffix: deploy-${{ matrix.project }}
+          check: "false"
+          e2e-project: ${{ matrix.project }}
+
+  # Runs beside the browsers rather than after them, since nothing here waits on
+  # them: it checks, builds and uploads, and `deploy` is what waits for both.
   build:
     name: Verify and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     # Named so the smoke check can prove *this* build is the one being served,
     # rather than accepting whatever the CDN happens to still have cached.
     outputs:
@@ -36,6 +61,7 @@ jobs:
       - uses: ./.github/actions/verify
         with:
           artifact-suffix: deploy
+          e2e-project: none
 
       # Vite content-hashes this, so the name is unique to the build.
       - id: asset
@@ -53,7 +79,9 @@ jobs:
 
   deploy:
     name: Publish to Pages
-    needs: build
+    # Both, or nothing is published: a build that checked out but failed in one
+    # browser is not a build to serve.
+    needs: [build, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The only job that can publish, and it does nothing else.

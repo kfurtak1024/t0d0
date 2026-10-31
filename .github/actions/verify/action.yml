@@ -2,10 +2,9 @@ name: Verify
 description: The full gate — lint, typecheck, tests, end-to-end, and the bundle budget.
 
 # Both workflows run this, so the gate a pull request clears and the gate a
-# deploy clears cannot drift apart. A deploy runs all of it in one job; CI runs
-# the check half in one job and the end-to-end half once per browser, in
-# parallel, which is what the two inputs below are for — the steps themselves
-# are the same either way.
+# deploy clears cannot drift apart. Both run the check half in one job and the
+# end-to-end half once per browser, in parallel, which is what the two inputs
+# below are for — the steps themselves are the same either way.
 #
 # A composite action rather than a reusable workflow on purpose: a reusable
 # workflow renames the check run to "<caller job> / <called job>", and this
