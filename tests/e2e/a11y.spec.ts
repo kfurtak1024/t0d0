@@ -153,7 +153,7 @@ test("the accessibility tree says what the screen says", async ({ page }) => {
       - listitem:
         - spinbutton "make calls"
         - text: make calls
-        - 'button "make calls: one fewer"': 1/3
+        - 'button "1/3, make calls: one fewer"': 1/3
         - button "More for make calls": ⋯
       - listitem:
         - checkbox "shopping" [checked]
