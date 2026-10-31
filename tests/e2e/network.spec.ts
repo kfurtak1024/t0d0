@@ -6,9 +6,9 @@ import { addItem, clearStorage } from "./helpers";
  * what enforces it. Nothing was checking either half.
  *
  * Distinct from `offline.spec.ts`, which asks whether the app still works with
- * the network cut — a question about the service worker, and Chromium-only for
- * harness reasons. This asks whether the app ever wanted the network in the
- * first place, which every engine can answer.
+ * the network cut — a question about the service worker, and not asked of
+ * WebKit, for harness reasons. This asks whether the app ever wanted the
+ * network in the first place, which every engine can answer.
  */
 
 /*

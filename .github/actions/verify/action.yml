@@ -1,8 +1,11 @@
 name: Verify
 description: The full gate — lint, typecheck, tests, end-to-end, and the bundle budget.
 
-# Both workflows run exactly this, so the gate a pull request clears and the gate
-# a deploy clears cannot drift apart.
+# Both workflows run this, so the gate a pull request clears and the gate a
+# deploy clears cannot drift apart. A deploy runs all of it in one job; CI runs
+# the check half in one job and the end-to-end half once per browser, in
+# parallel, which is what the two inputs below are for — the steps themselves
+# are the same either way.
 #
 # A composite action rather than a reusable workflow on purpose: a reusable
 # workflow renames the check run to "<caller job> / <called job>", and this
@@ -16,8 +19,14 @@ description: The full gate — lint, typecheck, tests, end-to-end, and the bundl
 
 inputs:
   artifact-suffix:
-    description: Distinguishes the uploads when both workflows run this gate.
+    description: Distinguishes the uploads when more than one job runs this gate.
     required: true
+  check:
+    description: Run the check half — lint, format, typecheck, unit tests, coverage, build, budget.
+    default: "true"
+  e2e-project:
+    description: The Playwright project to run, "all" for every one, or "none".
+    default: "all"
 
 runs:
   using: composite
@@ -42,6 +51,7 @@ runs:
     # Zero runtime dependencies is the first hard constraint in CLAUDE.md, and
     # until now nothing enforced it.
     - name: No runtime dependencies
+      if: inputs.check == 'true'
       shell: bash
       run: |
         node -e '
@@ -54,13 +64,14 @@ runs:
         '
 
     - name: Lint, format, typecheck, unit tests, coverage thresholds
+      if: inputs.check == 'true'
       shell: bash
       run: |
         npm run check
         echo "$(date +%s) npm run check" >> "$RUNNER_TEMP/phases"
 
     - uses: actions/upload-artifact@v7
-      if: ${{ !cancelled() }}
+      if: ${{ !cancelled() && inputs.check == 'true' }}
       with:
         name: coverage-${{ inputs.artifact-suffix }}
         path: coverage/
@@ -68,50 +79,70 @@ runs:
 
     # The browser install is the most variable step in the gate — 50s to 222s
     # across recent runs — and the binaries only change when Playwright does.
-    - name: Playwright version
+    # Only the engine a job runs is installed, and the cache is keyed on it too,
+    # so a WebKit job neither downloads Firefox nor restores it.
+    - name: Playwright version and browsers
       id: playwright
+      if: inputs.e2e-project != 'none'
       shell: bash
-      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+        case "${{ inputs.e2e-project }}" in
+          all) browsers="chromium webkit firefox" ;;
+          desktop-chromium) browsers="chromium" ;;
+          desktop-firefox) browsers="firefox" ;;
+          desktop-webkit | mobile-safari) browsers="webkit" ;;
+          *) echo "::error::no browser known for project ${{ inputs.e2e-project }}"; exit 1 ;;
+        esac
+        echo "browsers=${browsers}" >> "$GITHUB_OUTPUT"
+        echo "key=${browsers// /-}" >> "$GITHUB_OUTPUT"
 
     - uses: actions/cache@v6
       id: browsers
+      if: inputs.e2e-project != 'none'
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.key }}
 
-    - shell: bash
+    - if: inputs.e2e-project != 'none'
+      shell: bash
       run: echo "$(date +%s) cache restore (hit=${{ steps.browsers.outputs.cache-hit == 'true' }})" >> "$RUNNER_TEMP/phases"
 
     - name: Install browsers
-      if: steps.browsers.outputs.cache-hit != 'true'
+      if: inputs.e2e-project != 'none' && steps.browsers.outputs.cache-hit != 'true'
       shell: bash
-      run: npx playwright install --with-deps chromium webkit
+      run: npx playwright install --with-deps ${{ steps.playwright.outputs.browsers }}
 
     # The apt packages live outside the cached directory, so a hit still needs
     # them. The cache saves the download, not the system dependencies.
     - name: Install browser system dependencies
-      if: steps.browsers.outputs.cache-hit == 'true'
+      if: inputs.e2e-project != 'none' && steps.browsers.outputs.cache-hit == 'true'
       shell: bash
-      run: npx playwright install-deps chromium webkit
+      run: npx playwright install-deps ${{ steps.playwright.outputs.browsers }}
 
-    - shell: bash
+    - if: inputs.e2e-project != 'none'
+      shell: bash
       run: echo "$(date +%s) browsers ready" >> "$RUNNER_TEMP/phases"
 
     - name: End-to-end tests
+      if: inputs.e2e-project != 'none'
       shell: bash
       # A test that only passes on retry is a bug, not weather.
       run: |
-        npm run test:e2e -- --fail-on-flaky-tests
+        project=()
+        if [ "${{ inputs.e2e-project }}" != "all" ]; then project=(--project "${{ inputs.e2e-project }}"); fi
+        npm run test:e2e -- --fail-on-flaky-tests "${project[@]}"
         echo "$(date +%s) end-to-end tests" >> "$RUNNER_TEMP/phases"
 
     - uses: actions/upload-artifact@v7
-      if: ${{ !cancelled() }}
+      if: ${{ !cancelled() && inputs.e2e-project != 'none' }}
       with:
         name: playwright-report-${{ inputs.artifact-suffix }}
         path: playwright-report/
         retention-days: 7
 
     - name: Build
+      if: inputs.check == 'true'
       shell: bash
       run: |
         npm run build
@@ -135,6 +166,7 @@ runs:
     # tight. find makes no promise about order across filesystems, so without
     # this the same commit can measure differently on two machines.
     - name: Check bundle budget
+      if: inputs.check == 'true'
       shell: bash
       run: |
         limit=30720
