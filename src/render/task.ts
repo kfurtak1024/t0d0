@@ -167,7 +167,9 @@ export function createTask(task: Task, actions: RowActions, nested: boolean): Ke
 
     count.hidden = next.target <= 1;
     count.textContent = next.target > 1 ? `${String(next.count)}/${String(next.target)}` : "";
-    count.setAttribute("aria-label", `${next.text}: one fewer`);
+    // The name starts with what the button shows, so someone using voice
+    // control can say "1/3" and reach it (WCAG 2.5.3, Label in Name).
+    count.setAttribute("aria-label", `${count.textContent}, ${next.text}: one fewer`);
 
     if (next.target > 1) {
       tick.setAttribute("role", "spinbutton");
